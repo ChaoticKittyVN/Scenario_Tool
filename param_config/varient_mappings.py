@@ -1,0 +1,4 @@
+# 自动生成的参数映射
+# 请不要手动编辑此文件
+
+VARIENT_MAPPINGS = {'chaiyong': {'微笑': 'smile', '微笑b': 'smile_b', '严肃': 'serious', '严肃b': 'serious_b'}, 'haocai': {'微笑': 'smile', '微笑b': 'smile_b', '生气': 'angry', '生气b': 'angry_b', '说话': 'say', '说话b': 'say_b', '好色': 'haose', '好色b': 'haose_b'}, 'farmer': {'说话': 'say', '悲伤': 'sad'}, 'nixiang': {'微笑': 'smile', '生气': 'angry', '生气b': 'angry_b', '生气c': 'angry_c', '叹气': 'sigh', '叹气b': 'sigh_b', '悲伤': 'sad', '意外': 'amazed'}, 'wude': {'微笑': 'smile', '微笑b': 'smile_b', '生气': 'angry', '生气b': 'angry_b', '生气c': 'angry_c', '通常': 'idle'}, 'shuimo': {'意外': 'amazed', '生气': 'angry', '生气b': 'angry_b', '悲伤': 'sad', '叹气': 'sigh', '微笑': 'smile', '高兴': 'happy', '不满': 'discontent', '犹豫': 'hesitate', '害羞': 'shy', '面纱': 'veil'}, '基础参数模板': {}}
