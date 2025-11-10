@@ -1,15 +1,4 @@
 # naninovel引擎专用
-# 参数类型表
-
-
-# # 参数组
-# PARAM_GROUPS = {
-#     "note_audio": ["Note", "Music", "Ambience", "Sound", "Voice"],
-#     "background": ["Back", "BackID", "BackScale", "BackPos", "BackVisible", "BackWait", "Dissolve", "DissolveParam", "BackTime"],
-#     "character": ["Char", "Varient", "Pose", "Position", "Scale", "Visible", "Tint", "Wait", "Time"],
-#     "hide_trans": ["Hide", "HideWait", "HideChars", "HideCharsWait", "Movie", "Transition"],
-#     "text_command": ["Printer", "PrinterPos", "Speaker", "Text", "HidePrinter"]
-# }
 
 # 格式配置字典
 FORMAT_CONFIG = {
@@ -40,7 +29,7 @@ FORMAT_CONFIG = {
     },
     "Voice": {
         "category": "Audio",
-        "format_stop": "@stopVoice wait:False",
+        "format_stop": "@stopVoice",
         "format": '@voice {value}',
         "audio_behavior": True,
     },

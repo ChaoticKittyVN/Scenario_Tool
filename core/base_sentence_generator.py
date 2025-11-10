@@ -31,6 +31,13 @@ class BaseSentenceGenerator(ABC):
             return int(match.group(1))
         return 999  # 没有前缀的放在最后
 
+    @property
+    @abstractmethod
+    def default_param(self) -> dict[str, str]:
+        """默认参数值词典"""
+        pass
+
+
     @abstractmethod
     def process(self, params: Dict[str, Any]) -> List[str]:
         """
@@ -70,3 +77,20 @@ class BaseSentenceGenerator(ABC):
                 continue
 
         return new_data
+
+    def get_value(self, value):
+        return value if value else ""
+    
+    def get_value2(self, name, data):
+        if name in data:
+            return data.get(name)
+        else:
+            return ""
+        
+    def get_int(self, num : str):
+        num = str(num)
+        try:
+            return int(float(num))
+        except:
+            print(f"警告：{num}不是支持的数字格式") 
+            return num
