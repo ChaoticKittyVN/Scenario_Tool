@@ -40,8 +40,8 @@ def process_excel_file(file_path, output_path):
         processor = create_simple_processor()
         # 读取Excel文件
         test_file = pd.read_excel(file_path, sheet_name=None)
-        sheet_names = pd.ExcelFile(file_path).sheet_names
-        
+        sheet_names = list(test_file.keys())
+
         # 获取文件基本名（不含扩展名）
         file_basename = os.path.splitext(os.path.basename(file_path))[0]
         
@@ -69,15 +69,23 @@ def process_excel_file(file_path, output_path):
             j = 0
             out_put_list = []
 
+            # ✅ 优化：批量提取需要处理的行数据，避免重复的iloc调用
+            valid_indices = []
+            for j in range(i):
+                if test_file[sheet].iloc[j].get("Ignore") in IGNORE_WORDS and IGNORE_MODE:
+                    continue
+                valid_indices.append(j)
+
+            # ✅ 优化：一次性获取所有需要处理的行
+            if valid_indices:
+                # 方法1：使用loc一次性获取所有行（推荐）
+                valid_rows_df = test_file[sheet].loc[valid_indices]
+
             with tqdm(total=i, desc=f"处理 {file_basename} - {sheet}") as pbar:
-                while j < i:
-                    # out_put_list.extend(sg.generate_all_commands(j, test_file[sheet]))
-                    if test_file[sheet].iloc[j].get("Ignore") in IGNORE_WORDS and IGNORE_MODE:
-                        pbar.update(1)
-                        j += 1
-                        continue
-                    out_put_list.extend(processor.process_row(test_file[sheet].iloc[j]))
-                    j += 1
+                # ✅ 优化：批量处理，避免重复的DataFrame索引
+                for idx in range(len(valid_rows_df)):
+                    row_data = valid_rows_df.iloc[idx]  # 这个开销比从原始DataFrame获取小
+                    out_put_list.extend(processor.process_row(row_data))
                     pbar.update(1)
 
             # 确保输出目录存在
@@ -95,7 +103,7 @@ def process_excel_file(file_path, output_path):
                             out_put.write("    " + line.strip() + "\n")
                     else:
                         # 其他引擎的默认处理
-                        out_put.write(line.strip() + "\n")
+                        out_put.write(line + "\n")
                         
             print(f"已生成: {output_file_path}")
             

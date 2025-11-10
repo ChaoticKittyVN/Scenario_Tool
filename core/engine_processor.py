@@ -1,6 +1,5 @@
 # core/engine_processor.py
 from typing import List, Dict, Any
-from .param_extractor import ParamExtractor
 import pandas as pd
 
 class EngineProcessor:
@@ -25,11 +24,24 @@ class EngineProcessor:
         self.generators = generators  # 管道中的各个处理器
         self.translator = translator
         self.context = context_manager
-        self.extractor = None  # 稍后初始化
-        
+        self.format_config = {} # 稍后初始化
+
+    def _build_generator_param_map(self):
+        """构建generator到参数的映射"""
+        generator_param_map = {}
+        for generator in self.generators:
+            category = generator.category
+            category_params = []
+            for param_name, config in self.format_config.items():
+                if config.get("category") == category:
+                    category_params.append(param_name)
+            generator_param_map[category] = category_params
+        return generator_param_map
+
     def setup(self, format_config: Dict):
         """设置处理器，初始化参数提取器"""
-        self.extractor = ParamExtractor(format_config)
+        self.format_config = format_config
+        self.generator_param_map = self._build_generator_param_map()
         
     def process_row(self, row_data: pd.Series) -> List[str]:
         """
@@ -41,31 +53,35 @@ class EngineProcessor:
         Returns:
             List[str]: 生成的命令列表
         """
-        if not self.extractor:
-            raise RuntimeError("Processor not setup. Call setup() first.")
-            
+        row_dict = row_data.to_dict()
+
         results = []
-        
-        # try:
-        # 1. 提取参数（管道入口）
-        grouped_params = self.extractor.extract_single_row(row_data)
-        
-        # 2. 通过管道传递数据
-        current_params = grouped_params
-        # current_context = self.context
-        
+
+        # ✅ 优化：直接为每个generator提取所需参数，避免全量提取
+        current_params = {}
+
         for generator in self.generators:
-            # 每个生成器处理数据并可能修改上下文
+            category = generator.category
+            category_params = {}
+
+            # 只提取这个generator需要的参数
+            for param_name in self.generator_param_map.get(category, []):
+                if param_name in row_dict:
+                    value = row_dict[param_name]
+                    if not (pd.isna(value) or value == ""):
+                        category_params[param_name] = value
+
+            if category_params:
+                current_params[category] = category_params
+
+        # 原有的管道处理逻辑
+        for generator in self.generators:
             commands = generator.process(current_params.get(generator.category))
             if commands:
                 results.extend(commands)
-        
+
         return results
-            
-        # except Exception as e:
-        #     print(f"处理行数据时出错: {e}")
-        #     return []
-    
+
     def get_pipeline_info(self) -> Dict[str, Any]:
         """获取管道信息，用于调试"""
         info = {
