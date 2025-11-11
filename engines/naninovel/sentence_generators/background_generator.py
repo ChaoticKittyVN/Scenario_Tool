@@ -6,6 +6,19 @@ param_processor = pm()
 class BackgroundGenerator(BaseSentenceGenerator):
     
     @property
+    def default_param(self) -> dict[str, str]:
+        return {
+            "Back": "",
+            "BackID": "",
+            "BackScale": "",
+            "BackPos": "",
+            "BackVisible": "",
+            "BackWait": "",
+            "Dissolve": "",
+            "DissolveParam": "",
+            "BackTime": ""
+        }
+    @property
     def category(self):
         return "Background"
 

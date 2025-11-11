@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-from engines.naninovel import scenario_generator as sg
+# from engines.naninovel import scenario_generator as sg
 from core.engine_processor import EngineProcessor as ep
 from tqdm import tqdm
 from core.config import TARGET_PATH, OUTPUT_PATH, ENGINE_TYPE, get_engine_config, IGNORE_MODE, IGNORE_WORDS

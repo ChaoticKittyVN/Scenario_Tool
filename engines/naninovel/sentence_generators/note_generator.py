@@ -3,6 +3,12 @@ from core.base_sentence_generator import BaseSentenceGenerator
 class NoteGenerator(BaseSentenceGenerator):
     
     @property
+    def default_param(self) -> dict[str, str]:
+        return {
+            "Note": ""
+        }
+    
+    @property
     def category(self):
         return "Note"
 

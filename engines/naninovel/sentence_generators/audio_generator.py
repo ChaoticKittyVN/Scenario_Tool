@@ -3,6 +3,17 @@ from core.base_sentence_generator import BaseSentenceGenerator
 class AudioGenerator(BaseSentenceGenerator):
     
     @property
+    def default_param(self) -> dict[str, str]:
+        return {
+            "Music": "",
+            "Ambience": "",
+            "Sound": "",
+            "Volume": "",
+            "AudioFade": "",
+            "Voice": ""
+        }    
+
+    @property
     def category(self):
         return "Audio"
 

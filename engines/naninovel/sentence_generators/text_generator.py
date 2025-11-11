@@ -3,6 +3,16 @@ from core.base_sentence_generator import BaseSentenceGenerator
 class TextGenerator(BaseSentenceGenerator):
 
     @property
+    def default_param(self) -> dict[str, str]:
+        return {
+            "Speaker": "",
+            "Text": "",
+            "Printer": "",
+            "HidePrinter": "",
+            "PrinterPos": ""
+        }
+    
+    @property
     def category(self):
         return "Text"
 

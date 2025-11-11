@@ -6,6 +6,20 @@ param_processor = pm()
 class CharacterGenerator(BaseSentenceGenerator):
     
     @property
+    def default_param(self) -> dict[str, str]:
+        return {
+            "Char": "",
+            "Varient": "",
+            "Pose": "",
+            "Position": "",
+            "Scale": "1",
+            "Visible": "true",
+            "Tint": "",
+            "Wait": "true",
+            "Time": "1"
+        }
+    
+    @property
     def category(self):
         return "Character"
 
