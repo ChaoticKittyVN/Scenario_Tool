@@ -10,6 +10,43 @@ class BackgroundGenerator(BaseSentenceGenerator):
         return "Background"
 
     @property
+    def param_config(self) -> dict[str, dict]:
+        return {
+            "Command": {
+                "translayte_type": "Command",
+                "default": "show"
+            },
+            "Background": {
+                "translate_type": "Background",
+            },
+            "Event": {
+                "translate_type": "Event",
+            },
+            "EventVarient": {
+            },
+            "At": {
+                "translate_type": "Transform",
+                "format": " at {value}"
+            },
+            "Onlayer": {
+                "translate_type": "Layer",
+                "format": " onlayer {value}"
+            },
+            "With": {
+                "translate_type": "Transition",
+                "format": " with {value}",
+                "default": "dissolve",
+                "match_word": "empty",
+                "format_matched": ""
+            },
+            "WithAtr": {
+                "format": "({value})"
+            },
+            "ATLtype":{
+            }
+        }    
+    
+    @property
     def priority(self) -> int:
         return 200
 
@@ -21,29 +58,48 @@ class BackgroundGenerator(BaseSentenceGenerator):
 
         data = self.do_translate(data)
 
-        background = data.get("Background")
-        event = data.get("Event")
-        
-        if not background and not event:
-            return []
-        
-        # 构建场景命令
-        command = "scene " if data.get("UseScene") else "show "
-        image = background or event
-        
-        # 添加事件属性（差分）
-        if event and data.get("EventAtr"):
-            image += f" {data['EventAtr']}"
-        
-        # 添加位置
-        at = param_processor._process_at_parameter(data.get("At"))
-        
-        # 添加图层
-        onlayer = param_processor._process_onlayer_parameter(data.get("Onlayer"))
-        
-        # 添加过渡效果
-        transition = param_processor._process_transition_parameter(data.get("With"), data.get("WithAtr"), "dissolve")
-        
-        # 构建最终命令
-        result = f"{command}{image}{at}{onlayer}{transition}"
-        return [result]
+        lines = []
+
+
+        if self.exsits_param("Background", data) or self.exsits_param("Event", data):
+            line = ""
+            background = self.get_value("Background", data)
+            event = self.get_value("Event", data)
+
+            # 构建场景命令
+            command = self.get_value_default("Command", data) + " "
+            image = background or event
+
+            # 添加事件属性（差分）
+            varient = self.get_value("Varient", data)
+            if varient:
+                image += f" {varient}"
+
+            # 添加位置
+            at = self.get_sentence("At", data)
+
+            # 添加图层
+            onlayer = self.get_sentence("Onlayer", data)
+
+            # 添加过渡效果
+            transition = self.get_value("With", data)
+            if transition != "empty":
+                transition = self.get_sentence_default("With", data)
+                with_atr = self.get_sentence("WithAtr", data)
+                if with_atr:
+                    transition += with_atr
+            else:
+                transition = ""
+
+            # 构建最终命令
+            line = f"{command}{image}{at}{onlayer}{transition}"
+
+            if self.exsits_param("ATLtype", data):
+                line = f"{line}:"
+
+            lines.append(line)
+
+
+
+
+        return lines

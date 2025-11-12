@@ -33,8 +33,8 @@ class BaseSentenceGenerator(ABC):
 
     @property
     @abstractmethod
-    def default_param(self) -> dict[str, str]:
-        """默认参数值词典"""
+    def param_config(self) -> dict[str, dict]:
+        """参数属性词典"""
         pass
 
 
@@ -78,15 +78,8 @@ class BaseSentenceGenerator(ABC):
 
         return new_data
 
-    def get_value(self, value):
-        return value if value else ""
-    
-    def get_value2(self, name, data):
-        if name in data:
-            return data.get(name)
-        else:
-            return ""
-        
+    # def get_value(self, value):
+    #     return value if value else ""
     def get_int(self, num : str):
         num = str(num)
         try:
@@ -94,3 +87,44 @@ class BaseSentenceGenerator(ABC):
         except:
             print(f"警告：{num}不是支持的数字格式") 
             return num
+        
+    def get_value2(self, name, data):
+        return self.get_value_in_config(name, data)
+        
+    def get_format_in_config(self, name):
+        return self.format_config.get(name).get("format")
+    
+    def get_value(self, name, data):
+        if name in data:
+            return data[name]
+        else:
+            return ""
+        
+    def get_value_default(self, name, data):
+        if name in data:
+            return data[name]
+        elif self.format_config.get(name).get("default") is not None:
+            return self.format_config.get(name).get("default")
+        else:
+            return ""
+
+    def get_sentence(self, name, data):
+        format_str = self.format_config.get(name).get("format")
+        if name in data:
+            return format_str.format(value = data[name])
+        else:
+            return ""
+        
+    def get_sentence_default(self, name, data):
+        format_str = self.format_config.get(name).get("format")
+        value = self.get_value_default(name,data)
+        return format_str.format(value = value)
+        # if name in data:
+        #     return format_str.format(value = data[name])
+        # elif self.format_config.get(name).get("default") is not None:
+        #     return format_str.format(value = self.format_config.get(name).get("default"))
+        # else:
+        #     return ""
+
+    def exsits_param(self, name, data):
+        return name in data

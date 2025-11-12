@@ -3,7 +3,7 @@ from core.base_sentence_generator import BaseSentenceGenerator
 class TextGenerator(BaseSentenceGenerator):
 
     @property
-    def default_param(self) -> dict[str, str]:
+    def param_config(self) -> dict[str, dict]:
         return {
             "Speaker": "",
             "Text": "",

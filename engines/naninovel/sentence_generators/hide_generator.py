@@ -6,7 +6,7 @@ param_processor = pm()
 class HiedeGenerator(BaseSentenceGenerator):
     
     @property
-    def default_param(self) -> dict[str, str]:
+    def param_config(self) -> dict[str, dict]:
         return {
             "Hide": "",
             "HideWait": "",

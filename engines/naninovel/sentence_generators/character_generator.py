@@ -6,17 +6,17 @@ param_processor = pm()
 class CharacterGenerator(BaseSentenceGenerator):
     
     @property
-    def default_param(self) -> dict[str, str]:
+    def param_config(self) -> dict[str, dict]:
         return {
             "Char": "",
             "Varient": "",
             "Pose": "",
             "Position": "",
-            "Scale": "1",
-            "Visible": "true",
+            "Scale": "",
+            "Visible": "",
             "Tint": "",
-            "Wait": "true",
-            "Time": "1"
+            "Wait": "",
+            "Time": ""
         }
     
     @property

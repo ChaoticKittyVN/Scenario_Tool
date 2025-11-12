@@ -7,6 +7,22 @@ class TransitionGenerator(BaseSentenceGenerator):
         return "Transition"
 
     @property
+    def param_config(self) -> dict[str, dict]:
+        return {
+            "UseTrans":{
+            },
+            "TransWith": {
+                "translate_type": "Transition",
+                "format": " with {value}",
+                "default": "Dissolve"
+            },
+            "TransWithAtr": {
+                "format": "({value})",
+                "default": "1.0"
+            },
+        }    
+    
+    @property
     def priority(self) -> int:
         return 800
 
@@ -14,22 +30,19 @@ class TransitionGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return
 
-        results = []
-
+        lines = []
+        
         # 处理全局转场效果
-        trans_with = data.get("TransWith")
+        trans_with = self.get_value_default("TransWith", data)
         if trans_with:
             # 处理转场效果属性
             trans_with = self.translator.translate("Transition", trans_with)
-            trans_with_atr = data.get("TransWithAtr")
-            if trans_with_atr:
-                if trans_with == "dissolve":
-                    trans_with = f"Dissolve({trans_with_atr})"
-                else:
-                    trans_with = f"{trans_with}({trans_with_atr})"
+            if trans_with.istitle():
+                trans_with_atr = self.get_sentence_default("TransWithAtr")
+                trans_with = f"{trans_with}{trans_with_atr}"
             
             # 构建转场命令
-            result = f"with {trans_with}"
-            results.append(result)
+            line = f"with {trans_with}"
+            lines.append(line)
         
-        return results
+        return lines

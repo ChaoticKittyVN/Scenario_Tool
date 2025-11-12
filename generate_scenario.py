@@ -81,7 +81,7 @@ def process_excel_file(file_path, output_path):
                 # 方法1：使用loc一次性获取所有行（推荐）
                 valid_rows_df = test_file[sheet].loc[valid_indices]
 
-            with tqdm(total=i, desc=f"处理 {file_basename} - {sheet}") as pbar:
+            with tqdm(total=len(valid_indices), desc=f"处理 {file_basename} - {sheet}") as pbar:
                 # ✅ 优化：批量处理，避免重复的DataFrame索引
                 for idx in range(len(valid_rows_df)):
                     row_data = valid_rows_df.iloc[idx]  # 这个开销比从原始DataFrame获取小

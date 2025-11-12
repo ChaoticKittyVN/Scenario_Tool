@@ -7,6 +7,14 @@ class NoteGenerator(BaseSentenceGenerator):
         return "Note"
 
     @property
+    def param_config(self) -> dict[str, dict]:
+        return {
+            "Note": {
+                "format": "# {value}"
+            },
+        }    
+    
+    @property
     def priority(self) -> int:
         return 0
 
@@ -14,9 +22,6 @@ class NoteGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return
 
-        temp = data.get("Note",None)
-        if temp:
-            value = f"# {temp}"
-        else:
-            return []
-        return [value]
+        note = self.get_sentence("Note", data)
+
+        return [note]

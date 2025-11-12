@@ -7,6 +7,15 @@ class SceneClearGenerator(BaseSentenceGenerator):
         return "SceneClear"
 
     @property
+    def param_config(self) -> dict[str, dict]:
+        return {
+            "ClearLayer": {
+                "translate_type": "Layer",
+                "format": "scene onlayer {value}"
+            },
+        }    
+    
+    @property
     def priority(self) -> int:
         return 150
 
@@ -16,6 +25,7 @@ class SceneClearGenerator(BaseSentenceGenerator):
         
         data = self.do_translate(data)
 
-        value = data.get("SceneOnlayer")
+        if self.exsits_param("ClearLayer", data):
+            line = self.get_sentence("ClearLayer", data)
 
-        return [f"scene onlayer {value}"]
+        return [line]

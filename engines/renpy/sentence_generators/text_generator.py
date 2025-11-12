@@ -7,6 +7,21 @@ class TextGenerator(BaseSentenceGenerator):
         return "Text"
 
     @property
+    def param_config(self) -> dict[str, dict]:
+        return {
+            "Window": {
+            },
+
+            "Speaker": {
+                "translate_type": "Speaker",
+            },
+
+            "Text": {
+            },
+    
+        }    
+    
+    @property
     def priority(self) -> int:
         return 900
 
@@ -14,27 +29,26 @@ class TextGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return
 
-        speaker = data.get("Speaker")
-        text = data.get("Text")
-        wd_show = data.get("WindowShow")
-        wd_hide = data.get("WindowHide")
+        speaker = self.get_value("Speaker", data)
+        text = self.get_value("Text", data)
+        window = self.get_value("Window", data)
 
-        results = []
-
-        if wd_show:
-            results.append("window show")
+        lines = []
+        
+        if window in ["显示", "显示和隐藏"]:
+            lines.append("window show")
 
         if speaker:
             if speaker == "renpy":
-                results.append(text)
+                lines.append(text)
             else:
                 speaker = self.translator.translate("Speaker",speaker)
-                results.append(f'{speaker} "{text}"')
+                lines.append(f'{speaker} "{text}"')
         else:
             if text:
-                results.append(f'"{text}"')
+                lines.append(f'"{text}"')
 
-        if wd_hide:
-            results.append("window hide")
+        if window in ["隐藏", "显示和隐藏"]:
+            lines.append("window hide")
 
-        return results
+        return lines

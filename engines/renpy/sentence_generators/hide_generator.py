@@ -1,42 +1,59 @@
-from core.base_sentence_generator import BaseSentenceGenerator
-from engines.renpy.param_processor import ParamProcessor as pm
+# from core.base_sentence_generator import BaseSentenceGenerator
+# from engines.renpy.param_processor import ParamProcessor as pm
 
-param_processor = pm()
+# param_processor = pm()
 
-class HiedeGenerator(BaseSentenceGenerator):
+# class HiedeGenerator(BaseSentenceGenerator):
     
-    @property
-    def category(self):
-        return "Hide"
+#     @property
+#     def category(self):
+#         return "Hide"
 
-    @property
-    def priority(self) -> int:
-        return 400
+#     @property
+#     def param_config(self) -> dict[str, dict]:
+#         return {
+#             "Hide": {
+#                 "translate_types": ["Figure", "Background", "Event"],
+#                 "default_type": "Figure"
+#             },
+#             "HideOnlayer": {
+#                 "translate_type": "Layer",
+#             },
+#             "HideWith": {
+#                 "translate_type": "Transition",
+#             },
+#             "HideWithAtr": {
+#             },
+#         }    
+    
+#     @property
+#     def priority(self) -> int:
+#         return 400
 
-    def process(self, data):
-        if not self.can_process(data):
-            return
+#     def process(self, data):
+#         if not self.can_process(data):
+#             return
 
-        data = self.do_translate(data)
+#         data = self.do_translate(data)
 
 
-        """构建隐藏和转场命令"""
-        results = []
+#         """构建隐藏和转场命令"""
+#         results = []
 
-        # 处理隐藏命令
-        hide = data.get("Hide")
-        if hide:
-            command = "hide "
-            image = hide
+#         # 处理隐藏命令
+#         hide = data.get("Hide")
+#         if hide:
+#             command = "hide "
+#             image = hide
             
-            # 添加图层
-            onlayer = param_processor._process_onlayer_parameter(data.get("HideOnlayer"))
+#             # 添加图层
+#             onlayer = param_processor._process_onlayer_parameter(data.get("HideOnlayer"))
             
-            # 添加过渡效果
-            transition = param_processor._process_transition_parameter(data.get("HideWith"), data.get("HideWithAtr"), "dissolve")
+#             # 添加过渡效果
+#             transition = param_processor._process_transition_parameter(data.get("HideWith"), data.get("HideWithAtr"), "dissolve")
             
-            # 构建隐藏命令
-            result = f"{command}{image}{onlayer}{transition}"
-            results.append(result)
+#             # 构建隐藏命令
+#             result = f"{command}{image}{onlayer}{transition}"
+#             results.append(result)
 
-        return results
+#         return results
