@@ -32,6 +32,7 @@ class CharacterGenerator(BaseSentenceGenerator):
 
             "SpriteAt": {
                 "translate_type": "Transform",
+                "format": " at {value}"
             },
 
             "SpriteOnlayer": {
@@ -91,14 +92,15 @@ class CharacterGenerator(BaseSentenceGenerator):
             # 添加所有属性（差分）
             for i in range(1, 4):  # 支持最多3个属性
                 atr_key = f"Atr{i}"
-                atr_value = self.get_value(atr_key, data)
-                imgae += f" {atr_value}"
+                if self.exsits_param(atr_key, data):
+                    atr_value = self.get_value(atr_key, data)
+                    image += f" {atr_value}"
 
             # 添加位置
-            at = self.get_value("SpriteAt", data)
+            at = self.get_sentence("SpriteAt", data)
 
             # 添加图层
-            onlayer = self.get_value("SpriteOnlayer", data)
+            onlayer = self.get_sentence("SpriteOnlayer", data)
 
             # 添加过渡效果
             transition = self.get_value_default("SpriteWith", data)

@@ -5,6 +5,8 @@ __pycache__/
 
 
 trash or backup/
+input/
+output/
 
 # C extensions
 *.so

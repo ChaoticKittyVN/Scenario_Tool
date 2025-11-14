@@ -28,19 +28,20 @@ class TransitionGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return
 
+        data = self.do_translate(data)
+
         lines = []
         
         # 处理全局转场效果
         trans_with = self.get_value_default("TransWith", data)
-        if trans_with:
-            # 处理转场效果属性
-            trans_with = self.translator.translate("Transition", trans_with)
-            if trans_with.istitle():
-                trans_with_atr = self.get_sentence_default("TransWithAtr", data)
-                trans_with = f"{trans_with}{trans_with_atr}"
-            
-            # 构建转场命令
-            line = f"with {trans_with}"
-            lines.append(line)
+
+        # 处理转场效果属性
+        if trans_with.istitle():
+            trans_with_atr = self.get_sentence_default("TransWithAtr", data)
+            trans_with = f"{trans_with}{trans_with_atr}"
+        
+        # 构建转场命令
+        line = f"with {trans_with}"
+        lines.append(line)
         
         return lines
