@@ -3,26 +3,23 @@ from core.base_sentence_generator import BaseSentenceGenerator
 class SceneClearGenerator(BaseSentenceGenerator):
 
     param_config = {
-            "ClearLayer": {
-                "translate_type": "Layer",
-                "format": "scene onlayer {value}"
+            "Pause": {
+                "format": "pause {value}"
             },
         }
     
     @property
     def category(self):
-        return "SceneClear"
+        return "Pause"
     
     @property
     def priority(self) -> int:
-        return 150
+        return 850
 
     def process(self, data):
         if not self.can_process(data):
             return
-        
-        data = self.do_translate(data)
 
-        line = self.get_sentence("ClearLayer", data)
+        line = self.get_sentence("Pause", data)
 
         return [line]

@@ -8,8 +8,13 @@ class CharacterGenerator(BaseSentenceGenerator):
                 "translayte_type": "Command",
                 "default": "show",
             },
+
             "Character": {
                 "translate_type": "Character",
+            },
+
+            "Sprite": {
+                "translate_type": "Sprite",
             },
 
             "Varient": {
@@ -69,22 +74,25 @@ class CharacterGenerator(BaseSentenceGenerator):
         """构建立绘命令"""
         # 检查是否有足够的上下文生成立绘命令
         
-        if self.exsits_param("Character", data):
+        if self.exsits_param("Character", data) or self.exsits_param("Sprite", data):
 
             line = ""
             character = self.get_value("Character", data)
+            sprite = self. get_value("Sprite", data)
+
+            image = character or sprite
             # 构建立绘命令
             command = self.get_value_default("CharacterCommand", data) + " "
             # 添加非层叠式图像属性 (ShowAtr0)
             varient = self.get_value("Varient", data)
             if varient:
-                character = f"{character} {varient}"
+                image = f"{image} {varient}"
 
             # 添加所有属性（差分）
             for i in range(1, 4):  # 支持最多3个属性
                 atr_key = f"Atr{i}"
                 atr_value = self.get_value(atr_key, data)
-                character += atr_value
+                imgae += f" {atr_value}"
 
             # 添加位置
             at = self.get_value("SpriteAt", data)
@@ -103,7 +111,7 @@ class CharacterGenerator(BaseSentenceGenerator):
                 transition = ""
 
             # 构建最终命令
-            line = f"{command}{character}{at}{onlayer}{transition}"
+            line = f"{command}{image}{at}{onlayer}{transition}"
 
             if self.exsits_param("ATLtype", data):
                 line = f"{line}:"

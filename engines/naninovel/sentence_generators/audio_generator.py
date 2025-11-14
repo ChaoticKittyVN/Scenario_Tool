@@ -2,16 +2,37 @@ from core.base_sentence_generator import BaseSentenceGenerator
 
 class AudioGenerator(BaseSentenceGenerator):
     
-    @property
-    def param_config(self) -> dict[str, dict]:
-        return {
-            "Music": "",
-            "Ambience": "",
-            "Sound": "",
-            "Volume": "",
-            "AudioFade": "",
-            "Voice": ""
-        }    
+    param_config ={
+            "Music": {
+                "translate_type": "Music",
+                "match_word": "stop",
+                "stop_format": "@stopBgm wait:False",
+                "format": '@bgm Music/{value}',
+            },
+
+            "Ambience": {
+                "translate_type": "Ambience",
+                "match_word": "stop",
+                "stop_format": "stop ambience",
+                "format": "play ambience {value}",
+            },
+
+            "Sound": {
+                "translate_type": "Sound",
+                "match_word": "stop",
+                "stop_format": "stop sound",
+                "format": "play sound {value}",
+            },
+
+            "Volume": {
+                "format": " volume {value}",
+            },
+
+            "AudioFade": {
+                "fadeout_format": " fadeout {value}",
+                "format": " fadein {value}",
+            },
+        }
 
     @property
     def category(self):
