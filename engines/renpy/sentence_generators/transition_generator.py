@@ -2,13 +2,7 @@ from core.base_sentence_generator import BaseSentenceGenerator
 
 class TransitionGenerator(BaseSentenceGenerator):
 
-    @property
-    def category(self):
-        return "Transition"
-
-    @property
-    def param_config(self) -> dict[str, dict]:
-        return {
+    param_config = {
             "UseTrans":{
             },
             "TransWith": {
@@ -20,7 +14,11 @@ class TransitionGenerator(BaseSentenceGenerator):
                 "format": "({value})",
                 "default": "1.0"
             },
-        }    
+        }
+    
+    @property
+    def category(self):
+        return "Transition"
     
     @property
     def priority(self) -> int:

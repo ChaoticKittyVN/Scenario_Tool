@@ -1,14 +1,8 @@
 from core.base_sentence_generator import BaseSentenceGenerator
 
 class AudioGenerator(BaseSentenceGenerator):
-    
-    @property
-    def category(self):
-        return "Audio"
 
-    @property
-    def param_config(self) -> dict[str, dict]:
-        return {
+    param_config ={
             "Music": {
                 "translate_type": "Music",
                 "match_word": "stop",
@@ -39,7 +33,10 @@ class AudioGenerator(BaseSentenceGenerator):
                 "format": " fadein {value}",
             },
         }
-
+    
+    @property
+    def category(self):
+        return "Audio"
 
     @property
     def priority(self) -> int:

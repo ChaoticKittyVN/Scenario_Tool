@@ -2,14 +2,9 @@ from core.base_sentence_generator import BaseSentenceGenerator
 
 class TextGenerator(BaseSentenceGenerator):
 
-    @property
-    def category(self):
-        return "Text"
-
-    @property
-    def param_config(self) -> dict[str, dict]:
-        return {
+    param_config = {
             "Window": {
+                "translate_type": "Window"
             },
 
             "Speaker": {
@@ -18,8 +13,11 @@ class TextGenerator(BaseSentenceGenerator):
 
             "Text": {
             },
+        }
     
-        }    
+    @property
+    def category(self):
+        return "Text"
     
     @property
     def priority(self) -> int:

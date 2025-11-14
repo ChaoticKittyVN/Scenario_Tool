@@ -1,18 +1,18 @@
 from core.base_sentence_generator import BaseSentenceGenerator
 
 class NoteGenerator(BaseSentenceGenerator):
-    
+
+    param_config ={
+            "Note": {
+                "format": "# {value}"
+            },
+        }
+        
     @property
     def category(self):
         return "Note"
 
-    @property
-    def param_config(self) -> dict[str, dict]:
-        return {
-            "Note": {
-                "format": "# {value}"
-            },
-        }    
+
     
     @property
     def priority(self) -> int:

@@ -4,7 +4,16 @@ from typing import List, Dict, Any
 
 class BaseSentenceGenerator(ABC):
     """句子生成器基类 - 管道模式"""
-    
+
+    # @property
+    # @abstractmethod
+    # def param_config(self) -> dict[str, dict]:
+    #     """参数属性词典"""
+    #     pass
+
+    # 类属性 - 参数配置
+    param_config: Dict[str, Dict] = {}
+
     def __init__(self, format_config, translator):
         self.format_config = format_config
         self.translator = translator
@@ -13,6 +22,12 @@ class BaseSentenceGenerator(ABC):
     @abstractmethod
     def category(self) -> str:
         """返回生成器处理的句子类型"""
+        pass
+
+    @property
+    @abstractmethod
+    def necessary_param(self) -> list[str]:
+        """返回生成器的必要参数列表"""
         pass
 
     @property
@@ -31,11 +46,7 @@ class BaseSentenceGenerator(ABC):
             return int(match.group(1))
         return 999  # 没有前缀的放在最后
 
-    @property
-    @abstractmethod
-    def param_config(self) -> dict[str, dict]:
-        """参数属性词典"""
-        pass
+
 
 
     @abstractmethod

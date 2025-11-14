@@ -1,10 +1,6 @@
 import os
 import sys
-from core.param_updater import (
-    generate_base_param_mappings, 
-    generate_varient_param_mappings,
-    validation_update
-)
+from core.param_updater import ParamUpdater
 from core.config import PARAM_FILE, VARIENT_DATA_FILE
 
 def main():
@@ -15,6 +11,8 @@ def main():
     param_files_exist = os.path.exists(PARAM_FILE)
     varient_files_exist = os.path.exists(VARIENT_DATA_FILE)
     
+    updator = ParamUpdater()
+
     if not param_files_exist and not varient_files_exist:
         print("错误: 所有参数文件都不存在")
         print(f"检查的文件:")
@@ -26,7 +24,7 @@ def main():
     base_mappings = {}
     if param_files_exist:
         print("\n=== 生成基础参数映射 ===")
-        base_mappings = generate_base_param_mappings()
+        base_mappings = updator.generate_base_param_mappings()
         
         if base_mappings:
             total_mappings = sum(len(m) for m in base_mappings.values())
@@ -45,7 +43,7 @@ def main():
     varient_params = []
     if varient_files_exist:
         print("\n=== 生成差分参数映射 ===")
-        varient_mappings, varient_params = generate_varient_param_mappings()
+        varient_mappings, varient_params = updator.generate_varient_param_mappings()
         
         if varient_mappings:
             total_varients = sum(len(m) for m in varient_mappings.values())
@@ -62,7 +60,7 @@ def main():
     
     # 阶段3: 更新验证数据（会同时使用基础参数和差分参数）
     print("\n=== 更新验证数据 ===")
-    success = validation_update()
+    success = updator.validation_update()
     
     # 输出最终统计信息
     print("\n=== 更新完成统计 ===")

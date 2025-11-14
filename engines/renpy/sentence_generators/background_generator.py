@@ -1,17 +1,9 @@
 from core.base_sentence_generator import BaseSentenceGenerator
 from engines.renpy.param_processor import ParamProcessor as pm
 
-param_processor = pm()
-
 class BackgroundGenerator(BaseSentenceGenerator):
-    
-    @property
-    def category(self):
-        return "Background"
 
-    @property
-    def param_config(self) -> dict[str, dict]:
-        return {
+    param_config = {
             "Command": {
                 "translayte_type": "Command",
                 "default": "show"
@@ -44,7 +36,13 @@ class BackgroundGenerator(BaseSentenceGenerator):
             },
             "ATLtype":{
             }
-        }    
+        }        
+    
+    @property
+    def category(self):
+        return "Background"
+
+
     
     @property
     def priority(self) -> int:

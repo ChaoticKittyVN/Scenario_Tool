@@ -1,17 +1,9 @@
 from core.base_sentence_generator import BaseSentenceGenerator
 from engines.renpy.param_processor import ParamProcessor as pm
 
-param_processor = pm()
-
 class CharacterGenerator(BaseSentenceGenerator):
-    
-    @property
-    def category(self):
-        return "Character"
 
-    @property
-    def param_config(self) -> dict[str, dict]:
-        return {
+    param_config = {
             "CharacterCommand": {
                 "translayte_type": "Command",
                 "default": "show",
@@ -54,7 +46,13 @@ class CharacterGenerator(BaseSentenceGenerator):
 
             "SpriteATLtype": {
             },
-        }    
+        }
+    
+    @property
+    def category(self):
+        return "Character"
+
+
     
     @property
     def priority(self) -> int:

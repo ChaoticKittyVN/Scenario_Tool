@@ -2,18 +2,16 @@ from core.base_sentence_generator import BaseSentenceGenerator
 
 class SceneClearGenerator(BaseSentenceGenerator):
 
-    @property
-    def category(self):
-        return "SceneClear"
-
-    @property
-    def param_config(self) -> dict[str, dict]:
-        return {
+    param_config = {
             "ClearLayer": {
                 "translate_type": "Layer",
                 "format": "scene onlayer {value}"
             },
-        }    
+        }
+    
+    @property
+    def category(self):
+        return "SceneClear"
     
     @property
     def priority(self) -> int:

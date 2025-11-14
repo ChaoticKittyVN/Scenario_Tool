@@ -1,26 +1,4 @@
 # renpy引擎专用
-# 参数类型列表
-PARAM_NAMES = ["Layer", "Transform", "Transition",
-                "Speaker", "Figure", "Varient", "Animation",
-                  "Background", "Event", 
-                  "Movie", "Music", "Sound"]
-
-# 参数组
-PARAM_GROUPS = {
-    "note_audio": ["Note", "SceneOnlayer", "Music", "Ambience", "Sound", "Voice"],
-    "scene": ["UseScene", "Background", "Event", "EventAtr", "At", "Onlayer", "With", "WithAtr"],
-    "figure": ['Show', 'ShowAtr0', 'ShowAtr1', 'ShowAtr2', 'ShowAtr3', 'ShowAt', 'ShowOnlayer', 'ShowWith', 'ShowWithAtr', 'ShowATL'],
-    "hide_trans": ['Hide', 'HideOnlayer', 'HideWith', 'HideWithAtr', 'TransWith', 'TransWithAtr'],
-    "text_command": ['WindowShow', 'Speaker', 'Text', 'WindowHide']
-}
-# 管道顺序列表
-GENERATOR_PIPELINE = [
-    "NoteAudioGenerator",
-    "SceneGenerator", 
-    "FigureGenerator",
-    "HideTransGenerator",
-    "TextGenerator"
-]
 
 # 格式配置字典
 FORMAT_CONFIG = {
