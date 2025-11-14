@@ -36,7 +36,7 @@ class TransitionGenerator(BaseSentenceGenerator):
             # 处理转场效果属性
             trans_with = self.translator.translate("Transition", trans_with)
             if trans_with.istitle():
-                trans_with_atr = self.get_sentence_default("TransWithAtr")
+                trans_with_atr = self.get_sentence_default("TransWithAtr", data)
                 trans_with = f"{trans_with}{trans_with_atr}"
             
             # 构建转场命令

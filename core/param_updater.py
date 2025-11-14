@@ -178,16 +178,15 @@ class ParamUpdater:
                         sheet_param_map[sheet_name].append(param_name)
                         
                         # 添加到验证数据
-                        if param_name not in validation_data:
-                            validation_data[param_name] = set()
-                        validation_data[param_name].update(params)
+
+                        validation_data[param_name] = params
                 else:
                     if sheet_name not in missing_sheets:
                         missing_sheets.append(sheet_name)
 
         # 将集合转换为排序列表
         for param_name in validation_data:
-            validation_data[param_name] = sorted(list(validation_data[param_name]))
+            validation_data[param_name] = list(validation_data[param_name])
 
         # 输出工作表收集总结
         for sheet_name, params_set in collected_sheets.items():

@@ -1,43 +1,33 @@
 import pandas as pd
 import os
-# from engines.naninovel import scenario_generator as sg
-from core.engine_processor import EngineProcessor as ep
+from core.engine_processor import EngineProcessor
 from tqdm import tqdm
 from core.config import TARGET_PATH, OUTPUT_PATH, ENGINE_TYPE, get_engine_config, IGNORE_MODE, IGNORE_WORDS
 
-def create_simple_processor():
-    """创建简单的测试处理器"""
+def create_processor():
+    """创建处理器实例"""
     import importlib
-    from core.engine_processor import EngineProcessor
-    from core.generator_loader import discover_generators
-    
-    # 临时导入配置
+
+    # 导入引擎配置
     engine_config_path = f"engines.{ENGINE_TYPE}.engine_param_config"
     engine_config = importlib.import_module(engine_config_path)
-    format_config = engine_config.FORMAT_CONFIG
-    from core.param_translator import ParamTranslator  # 假设有这个模块
     
-    # 创建翻译器实例
-    translator = ParamTranslator()  # 你可能需要根据实际情况初始化
+    from core.param_translator import ParamTranslator
     
-    # 自动发现生成器，传入必需的参数
-    generators = discover_generators(ENGINE_TYPE, format_config, translator)
+    # 创建翻译器和上下文管理器实例
+    translator = ParamTranslator()
     
-    # 如果没有发现任何生成器，创建一个临时的
-    if not generators:
-        print("警告: 未发现任何生成器")
-    
-    # 创建处理器
-    processor = EngineProcessor(generators, translator, None)
-    processor.setup(format_config)
+    # 创建处理器 - 现在只需要传入引擎类型和依赖组件
+    processor = EngineProcessor(ENGINE_TYPE, translator)
+    processor.setup()
     
     return processor
-
 
 def process_excel_file(file_path, output_path):
     """处理单个Excel文件"""
     try:
-        processor = create_simple_processor()
+        processor = create_processor()
+    
         # 读取Excel文件
         test_file = pd.read_excel(file_path, sheet_name=None)
         sheet_names = list(test_file.keys())
@@ -52,13 +42,11 @@ def process_excel_file(file_path, output_path):
                 
             # 根据引擎类型确定输出文件扩展名
             if ENGINE_TYPE == "renpy":
-                scenario_name = f"{sheet}.rpy" # f"{file_basename}_{sheet}.rpy"
+                scenario_name = f"{sheet}.rpy"
             elif ENGINE_TYPE == "naninovel":
-                # 为其他引擎预留
-                scenario_name = f"{sheet}.nani" # f"{file_basename}_{sheet}.txt"
+                scenario_name = f"{sheet}.nani"
             else:
-                # 为其他引擎预留
-                scenario_name = f"{sheet}.txt" # f"{file_basename}_{sheet}.txt"
+                scenario_name = f"{sheet}.txt"
             
             # 检查结束标记
             if "Note" not in test_file[sheet].columns or "END" not in test_file[sheet]["Note"].tolist():
@@ -69,22 +57,21 @@ def process_excel_file(file_path, output_path):
             j = 0
             out_put_list = []
 
-            # ✅ 优化：批量提取需要处理的行数据，避免重复的iloc调用
+            # 批量提取需要处理的行数据
             valid_indices = []
             for j in range(i):
                 if test_file[sheet].iloc[j].get("Ignore") in IGNORE_WORDS and IGNORE_MODE:
                     continue
                 valid_indices.append(j)
 
-            # ✅ 优化：一次性获取所有需要处理的行
+            # 一次性获取所有需要处理的行
             if valid_indices:
-                # 方法1：使用loc一次性获取所有行（推荐）
                 valid_rows_df = test_file[sheet].loc[valid_indices]
 
             with tqdm(total=len(valid_indices), desc=f"处理 {file_basename} - {sheet}") as pbar:
-                # ✅ 优化：批量处理，避免重复的DataFrame索引
+                # 批量处理
                 for idx in range(len(valid_rows_df)):
-                    row_data = valid_rows_df.iloc[idx]  # 这个开销比从原始DataFrame获取小
+                    row_data = valid_rows_df.iloc[idx]
                     out_put_list.extend(processor.process_row(row_data))
                     pbar.update(1)
 
@@ -140,4 +127,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

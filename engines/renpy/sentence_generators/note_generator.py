@@ -12,8 +12,6 @@ class NoteGenerator(BaseSentenceGenerator):
     def category(self):
         return "Note"
 
-
-    
     @property
     def priority(self) -> int:
         return 0

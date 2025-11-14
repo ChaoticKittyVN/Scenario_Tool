@@ -1,6 +1,7 @@
 # core/engine_processor.py
 from typing import List, Dict, Any
 import pandas as pd
+from core.sentence_generator_manager import SentenceGeneratorManager
 
 class EngineProcessor:
     """
@@ -12,46 +13,49 @@ class EngineProcessor:
     3. 处理异常和日志
     """
     
-    def __init__(self, generators: List, translator, context_manager):
+    def __init__(self, engine_type: str, translator):
         """
         初始化管道处理器
         
         Args:
-            generators: 生成器列表，按执行顺序排列
+            engine_type: 引擎类型
             translator: 参数翻译器
             context_manager: 上下文管理器
         """
-        self.generators = generators  # 管道中的各个处理器
+        self.engine_type = engine_type
         self.translator = translator
-        self.context = context_manager
-        self.format_config = {} # 稍后初始化
+        # self.context = context_manager
+        self.generators = []
+        self.generator_param_map = {}
+        
+        # 初始化生成器管理器
+        self.generator_manager = SentenceGeneratorManager(engine_type)
+        self.generator_manager.load()
 
+    def setup(self):
+        """设置处理器，初始化生成器和参数提取器"""
+        
+        # 通过生成器管理器创建生成器实例
+        self.generators = self.generator_manager.create_generator_instances(
+            self.translator
+        )
+        
+        self.generator_param_map = self._build_generator_param_map()
+        
     def _build_generator_param_map(self):
         """构建generator到参数的映射"""
         generator_param_map = {}
         for generator in self.generators:
-            # category = generator.category
-            # category_params = []
-            # for param_name, config in self.format_config.items():
-            #     if config.get("category") == category:
-            #         category_params.append(param_name)
-            # generator_param_map[category] = category_params
             params = []
-            # generator.param_config 期望为 dict 或可迭代的键集合
             generator_params = getattr(generator, "param_config", {}) or {}
             generator_params_keys = generator_params.keys() if isinstance(generator_params, dict) else generator_params
-            for name in self.format_config.keys():
-                if name in generator_params_keys:
-                    params.append(name)
+
+            for name in generator_params_keys:
+                params.append(name)
             generator_param_map[generator] = params
 
         return generator_param_map
 
-    def setup(self, format_config: Dict):
-        """设置处理器，初始化参数提取器"""
-        self.format_config = format_config
-        self.generator_param_map = self._build_generator_param_map()
-        
     def process_row(self, row_data: pd.Series) -> List[str]:
         """
         处理单行数据 - 管道模式
@@ -100,5 +104,7 @@ class EngineProcessor:
             info["pipeline"].append(stage_info)
             
         return info
-    
-    
+
+    def get_generator_manager(self) -> SentenceGeneratorManager:
+        """获取生成器管理器实例"""
+        return self.generator_manager

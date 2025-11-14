@@ -87,13 +87,13 @@ class CharacterGenerator(BaseSentenceGenerator):
                 character += atr_value
 
             # 添加位置
-            at = self.get_value("SriteAt", data)
+            at = self.get_value("SpriteAt", data)
 
             # 添加图层
-            onlayer = self.get_value("SriteOnlayer", data)
+            onlayer = self.get_value("SpriteOnlayer", data)
 
             # 添加过渡效果
-            transition = self.get_value_default("SriteWith", data)
+            transition = self.get_value_default("SpriteWith", data)
             if transition != "empty":
                 transition = self.get_sentence_default("SpriteWith", data)
                 with_atr = self.get_sentence("SpriteWithAtr", data)

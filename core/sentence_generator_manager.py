@@ -101,14 +101,14 @@ class SentenceGeneratorManager:
 
         return mapping
 
-    def create_generator_instances(self, format_config, translator):
+    def create_generator_instances(self, translator):
         """创建生成器实例（用于 engine_processor）"""
         self.load()
 
         instances = []
         for generator_class in self.generator_classes:
             try:
-                instance = generator_class(format_config, translator)
+                instance = generator_class(translator)
                 instances.append(instance)
             except Exception as e:
                 print(f"创建 {generator_class.__name__} 实例失败: {e}")
