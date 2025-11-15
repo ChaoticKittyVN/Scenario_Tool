@@ -115,6 +115,11 @@ class SentenceGeneratorManager:
 
         # 按优先级排序
         instances.sort(key=lambda g: getattr(g, 'priority', 0))
+
+        print(f"共发现 {len(instances)} 个生成器，执行顺序:")
+        for i, generator in enumerate(instances, 1):
+            print(f"  {i}. {generator.__class__.__name__} (优先级: {generator.priority})")
+
         return instances
 
     def get_generator_info(self) -> Dict:

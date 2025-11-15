@@ -87,7 +87,7 @@ def process_excel_file(file_path, output_path):
                         if line.strip().startswith("label "):
                             out_put.write(line.strip() + "\n")
                         else:
-                            out_put.write("    " + line.strip() + "\n")
+                            out_put.write("    " + line + "\n")
                     else:
                         # 其他引擎的默认处理
                         out_put.write(line + "\n")

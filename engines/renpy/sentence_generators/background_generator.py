@@ -34,7 +34,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             "WithAtr": {
                 "format": "({value})"
             },
-            "ATLtype":{
+            "ATLType":{
             }
         }        
     
@@ -92,7 +92,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             # 构建最终命令
             line = f"{command}{image}{at}{onlayer}{transition}"
 
-            if self.exsits_param("ATLtype", data):
+            if self.exsits_param("ATLType", data):
                 line = f"{line}:"
 
             lines.append(line)
