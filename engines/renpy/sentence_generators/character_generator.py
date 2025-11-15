@@ -115,7 +115,7 @@ class CharacterGenerator(BaseSentenceGenerator):
             # 构建最终命令
             line = f"{command}{image}{at}{onlayer}{transition}"
 
-            if self.exsits_param("ATLType", data):
+            if self.exsits_param("SpriteATLType", data):
                 line = f"{line}:"
 
             lines.append(line)
