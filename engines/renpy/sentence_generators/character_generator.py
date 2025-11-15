@@ -1,11 +1,10 @@
 from core.base_sentence_generator import BaseSentenceGenerator
-from engines.renpy.param_processor import ParamProcessor as pm
 
 class CharacterGenerator(BaseSentenceGenerator):
 
     param_config = {
-            "CharacterCommand": {
-                "translayte_type": "Command",
+            "SpriteCommand": {
+                "translate_type": "Command",
                 "default": "show",
             },
 

@@ -6,11 +6,6 @@ from core.config import TARGET_PATH, OUTPUT_PATH, ENGINE_TYPE, get_engine_config
 
 def create_processor():
     """创建处理器实例"""
-    import importlib
-
-    # 导入引擎配置
-    engine_config_path = f"engines.{ENGINE_TYPE}.engine_param_config"
-    engine_config = importlib.import_module(engine_config_path)
     
     from core.param_translator import ParamTranslator
     
@@ -29,7 +24,7 @@ def process_excel_file(file_path, output_path):
         processor = create_processor()
     
         # 读取Excel文件
-        test_file = pd.read_excel(file_path, sheet_name=None)
+        test_file = pd.read_excel(file_path, sheet_name=None, dtype=str)
         sheet_names = list(test_file.keys())
 
         # 获取文件基本名（不含扩展名）

@@ -80,7 +80,7 @@ class BaseProjectFilesValidator(ABC):
         """比较两个列表是否相同（忽略顺序）"""
         return sorted(source_list) == sorted(project_list)
 
-    def _search_files(self, base_path: str, filenames: List[str], file_types: List[str] = None) -> Dict[str, str]:
+    def _search_files(self, base_path: str, filenames: List[str], file_types: List[str] = []) -> Dict[str, str]:
         """
         通用文件搜索方法
         
@@ -134,9 +134,9 @@ class BaseProjectFilesValidator(ABC):
                 if base_name.lower() == filename.lower():
                     return os.path.basename(file_path)
         
-        return None
+        return ""
 
-    def search_files_in_source(self, filenames: List[str], file_types: List[str] = None) -> Dict[str, str]:
+    def search_files_in_source(self, filenames: List[str], file_types: List[str] = []) -> Dict[str, str]:
         """
         在资源库中搜索文件
         
@@ -149,7 +149,7 @@ class BaseProjectFilesValidator(ABC):
         """
         return self._search_files(self.source_path, filenames, file_types)
 
-    def search_files_in_project(self, filenames: List[str], file_types: List[str] = None) -> Dict[str, str]:
+    def search_files_in_project(self, filenames: List[str], file_types: List[str] = []) -> Dict[str, str]:
         """
         在项目库中搜索文件
         

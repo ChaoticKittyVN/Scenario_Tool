@@ -1,11 +1,10 @@
 from core.base_sentence_generator import BaseSentenceGenerator
-from engines.renpy.param_processor import ParamProcessor as pm
 
 class BackgroundGenerator(BaseSentenceGenerator):
 
     param_config = {
             "Command": {
-                "translayte_type": "Command",
+                "translate_type": "Command",
                 "default": "show"
             },
             "Background": {

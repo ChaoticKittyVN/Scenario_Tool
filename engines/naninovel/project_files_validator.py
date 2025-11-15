@@ -24,7 +24,7 @@ class NaninovelProjectFilesValidatorGenerator(BaseProjectFilesValidator):
     @property
     def params_list(self) -> list:
         """需要抓取的参数类型"""
-        return
+        return []
     
     def process_filenames(self, params):
         """

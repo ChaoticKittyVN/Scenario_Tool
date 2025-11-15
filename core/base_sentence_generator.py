@@ -49,7 +49,7 @@ class BaseSentenceGenerator(ABC):
 
 
     @abstractmethod
-    def process(self, params: Dict[str, Any]) -> List[str]:
+    def process(self, data: Dict[str, Any]) -> List[str] | None:
         """
         处理参数并生成命令（管道模式）
         
@@ -71,14 +71,14 @@ class BaseSentenceGenerator(ABC):
     def do_translate(self, row_data : dict):
         new_data = row_data
         for name,value in row_data.items():
-            translate_type = self.param_config.get(name).get("translate_type")
+            translate_type = self.param_config.get(name, {}).get("translate_type")
 
             if translate_type:
                 new_value = self.translator.translate(translate_type, value)
                 new_data[name] = new_value
 
-            elif self.param_config.get(name).get("translate_types"):
-                for translate_type in self.param_config.get(name).get("translate_types"):
+            elif self.param_config.get(name, {}).get("translate_types", []):
+                for translate_type in self.param_config.get(name, {}).get("translate_types", ""):
                     if value in self.translator.mappings[translate_type]:
                         new_value = self.translator.translate(translate_type, value)
                         new_data[name] = new_value
@@ -98,11 +98,11 @@ class BaseSentenceGenerator(ABC):
             print(f"警告：{num}不是支持的数字格式") 
             return num
         
-    def get_value2(self, name, data):
-        return self.get_value_in_config(name, data)
+    # def get_value2(self, name, data):
+    #     return self.get_value_in_config(name, data)
         
     def get_format_in_config(self, name):
-        return self.param_config.get(name).get("format")
+        return self.param_config.get(name, {}).get("format")
     
     def get_value(self, name, data):
         if name in data:
@@ -113,20 +113,20 @@ class BaseSentenceGenerator(ABC):
     def get_value_default(self, name, data):
         if name in data:
             return str(data[name])
-        elif self.param_config.get(name).get("default") is not None:
-            return str(self.param_config.get(name).get("default"))
+        elif self.param_config.get(name, {}).get("default", None) is not None:
+            return str(self.param_config.get(name, {}).get("default"))
         else:
             return ""
 
     def get_sentence(self, name, data):
-        format_str = self.param_config.get(name).get("format")
+        format_str = self.param_config.get(name, {}).get("format", "")
         if name in data:
             return format_str.format(value = data[name])
         else:
             return ""
         
-    def get_sentence_default(self, name, data):
-        format_str = self.param_config.get(name).get("format")
+    def get_sentence_default(self, name : str, data : dict):
+        format_str = self.param_config.get(name, {}).get("format", "")
         value = self.get_value_default(name,data)
         return format_str.format(value = value)
         # if name in data:
