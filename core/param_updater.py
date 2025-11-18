@@ -9,6 +9,7 @@ from core.config import PARAM_FILE, TARGET_PATH, MAPPINGS_FILE, VARIENT_DATA_FIL
 from core.sentence_generator_manager import SentenceGeneratorManager
 from openpyxl.utils import get_column_letter
 
+# TODO 需要将读取参数的方法改为使用param_extractor
 class ParamUpdater:
     """参数表更新器 - 用于更新Excel中的数据验证和命名区域"""
     def __init__(self, engine_type=None):

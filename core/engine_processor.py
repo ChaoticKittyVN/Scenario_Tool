@@ -72,7 +72,7 @@ class EngineProcessor:
         for generator in self.generators:
             needed_params = self.generator_param_map.get(generator, [])
             params = {}
-
+        # TODO 解耦，改为param_extractor中的方法
             # 只提取这个generator需要的参数
             for param_name in needed_params:
                 if param_name in row_dict:

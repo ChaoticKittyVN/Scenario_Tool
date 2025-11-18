@@ -2,6 +2,7 @@
 import pandas as pd
 from typing import Dict, Any, List
 
+# TODO 未使用，需要根据现有代码进行重构投入使用，目前仅在engine_processor中有对应方法
 class ParamExtractor:
     """
     参数抓取器 - 从单行Excel数据中提取参数

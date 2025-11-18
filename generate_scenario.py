@@ -18,6 +18,7 @@ def create_processor():
     
     return processor
 
+# TODO 方法过大，需要解耦，读表部分需要改为使用目前名为param_extractor和data_reader的对象
 def process_excel_file(file_path, output_path):
     """处理单个Excel文件"""
     try:
