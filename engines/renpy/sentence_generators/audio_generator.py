@@ -54,7 +54,7 @@ class AudioGenerator(BaseSentenceGenerator):
         music = self.get_value("Music", data)
         ambience = self.get_value("Ambience", data)
         sound = self.get_value("Sound", data)
-        volume = music = self.get_value("Volume", data)
+        volume = self.get_value("Volume", data)
         audio_fade = self.get_value("AudioFade", data)
 
         for param_name,param_value in {"Music": music, "Ambience": ambience, "Sound": sound}.items():

@@ -23,4 +23,7 @@ class VoiceGenerator(BaseSentenceGenerator):
 
         line = self.get_sentence("Voice", data)
 
+        if line == "stop":
+            line = "voice stop"
+
         return [line]

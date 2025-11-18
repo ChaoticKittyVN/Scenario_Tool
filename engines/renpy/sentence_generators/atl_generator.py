@@ -21,7 +21,7 @@ class ATLGenerator(BaseSentenceGenerator):
         } 
     
     @property
-    def category(self):
+    def category(self) -> str:
         return "ATL"
 
    
