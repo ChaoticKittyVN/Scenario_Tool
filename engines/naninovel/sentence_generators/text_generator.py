@@ -17,7 +17,6 @@ class TextGenerator(BaseSentenceGenerator):
         "Printer": {
             "translate_type": "Printer"
         },
-        "HidePrinter": ,
         "PrinterPos": {}
     }
 
@@ -42,36 +41,33 @@ class TextGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return None
 
-        speaker = data.get("Speaker")
-        text = data.get("Text")
-        printer = data.get("Printer")
-        hide_printer = data.get("HidePrinter")
+        speaker = self.get_value("Speaker", data)
+        text = self.get_value("Text", data)
+        printer = self.get_value("Printer", data)
 
-        results = []
+        lines = []
 
         # 处理打印机设置
-        if printer:
+        if printer != "隐藏":
             printer = self.translator.translate("Printer", printer)
-            printer_pos = data.get("PrinterPos")
-            temp = f"@printer {printer}"
+            printer_pos = self.get_sentence("PrinterPos", data)
+            line = f"@printer {printer}"
             if printer_pos:
-                temp += f" pos:{printer_pos}"
-            results.append(temp)
+                line += printer_pos
+            lines.append(line)
+        else:
+            lines.append("@hidePrinter wait:true")
 
         # 处理对话文本
         if speaker:
             if speaker == SpecialSpeaker.NANINOVEL_COMMAND.value:
                 # 直接输入 Naninovel 命令
-                results.append(text)
+                lines.append(text)
             else:
                 speaker = self.translator.translate("Speaker", speaker)
-                results.append(f'{speaker}: {text}')
+                lines.append(f'{speaker}: {text}')
         else:
             if text:
-                results.append(text)
+                lines.append(text)
 
-        # 处理隐藏打印机
-        if hide_printer:
-            results.append("@hidePrinter")
-
-        return results
+        return lines

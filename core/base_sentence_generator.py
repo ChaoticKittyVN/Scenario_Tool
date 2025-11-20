@@ -192,7 +192,7 @@ class BaseSentenceGenerator(ABC):
             str: 格式化后的句子
         """
         format_str = self.param_config.get(name, {}).get("format", "")
-        if name in data:
+        if format_str:
             return format_str.format(value=data[name])
         else:
             return ""

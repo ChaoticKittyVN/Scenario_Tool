@@ -3,33 +3,68 @@ Naninovel Character Generator
 生成角色相关命令
 """
 from core.base_sentence_generator import BaseSentenceGenerator
-from engines.naninovel.param_processor import ParamProcessor
 
 
 class CharacterGenerator(BaseSentenceGenerator):
     """角色生成器"""
 
     param_config = {
-        "Char": {
-            "translate_type": "Character"
+        "TransChar": {
+            "category": "Character"
         },
+
+        "Char": {
+            "translate_type": "Character",
+        },
+
         "Varient": {
             "translate_type": "Varient"
         },
-        "Pose": {},
-        "Position": {
-            "translate_type": "Position"
+
+        "Pose": {
+            "translate_type": "Pose",
+            "format": " pose:{value}"
         },
-        "Scale": {},
-        "Visible": {},
-        "Tint": ,
-        "Wait": {},
-        "Time": {}
+
+        "Position": {
+            "format": " position:{value}"
+        },
+
+        "Scale": {
+            "format": " scale:{value}"
+        },
+
+        "Visible": {
+            "format": " visible:{value}"
+        },
+
+        "Tint": {
+            "translate_type": "Tint",
+            "format": " tint:{value}"
+        },
+
+        "Wait": {
+            "format": " wait:true"
+        },
+
+        "Time": {
+            "format": " time:{value}",
+            "default": "0.5"
+        },
+
+        "CharAnim": {
+        },
+
+        "CharAnimParam": {
+            "translate_type": "CharAnimParam"
+        },
+
+        "CharAnimWait": {
+        },
     }
 
     def __init__(self, translator, engine_config):
         super().__init__(translator, engine_config)
-        self.param_processor = ParamProcessor()
 
     @property
     def category(self):
@@ -37,7 +72,7 @@ class CharacterGenerator(BaseSentenceGenerator):
 
     @property
     def priority(self) -> int:
-        return 200
+        return 300
 
     def process(self, data):
         """
@@ -54,27 +89,82 @@ class CharacterGenerator(BaseSentenceGenerator):
 
         data = self.do_translate(data)
 
-        char = data.get("Char")
-        if not char:
+        """构建角色命令"""
+        # 检查是否有足够的上下文生成角色命令
+        char = self.get_value("Char", data)
+        anim = self.get_value("CharAnimParam", data)
+
+        if not char and not anim:
             return []
+        
+        lines = []
+        trans = self.get_value("TransChar", data)
 
-        # 构建角色命令
-        command = "@char "
-        image = char
+        if trans == "模块":
+            command = "    "
+        else:
+            command = ""
 
-        # 添加变体
-        if "Varient" in data:
-            image += f".{data['Varient']}"
+        if char == "hideAll":
+            lines.append("@hideChars")
+            # 构建角色命令
 
-        # 添加各种参数
-        pose = self.param_processor._process_pose_parameter(data.get("Pose"))
-        position = self.param_processor._process_position_parameter(data.get("Position"))
-        scale = self.param_processor._process_scale_parameter(data.get("Scale"))
-        visible = self.param_processor._process_visible_parameter(data.get("Visible"))
-        tint = self.param_processor._process_tint_parameter(data.get("Tint"))
-        wait = self.param_processor._process_wait_parameter(data.get("Wait"))
-        time = self.param_processor._process_time_parameter(data.get("Time"))
+        else:
+            image = char
+            varient = self.get_value("Varient", data)
 
-        # 构建最终命令
-        result = f"{command}{image}{pose}{position}{scale}{visible}{tint}{wait}{time}"
-        return [result]
+            # 使用varient_data时使用以下指令进行翻译
+            # self.translator._translate_varient(varient,image)
+
+            # 差分名，如有需要使用多参数组合
+            image += f".{varient}"
+
+            if trans == "隐藏":
+                command += "@hide"
+            else:
+                command += "@char"
+
+            # 添加姿势
+            pose = self.get_sentence("Pose", data)
+            
+            # 添加位置
+            position = pose = self.get_sentence("Position", data)
+            
+            # 添加缩放
+            scale = self.get_sentence("Scale", data)
+            
+            # 添加可见性
+            visible = self.get_sentence("Visible", data)
+            
+            # 添加色调
+            tint = self.get_sentence("Tint", data)
+            
+            # 添加等待参数
+            wait = self.get_sentence("Wait", data)
+
+            line = (f"{command}{image}{pose}{position}{scale}{visible}{tint}{wait}")
+            # 构建最终命令
+            if trans == "转场":
+                time = self.get_sentence_default("Time", data)
+                lines.append(f"@trans{time}")
+                lines.append("    @hideChars")
+                lines.append(line)
+            else:
+                time = self.get_sentence("Time", data)
+                lines.append(f"{line}{time}")
+
+        if anim:
+            char_anim = self.get_value("CharAnim", data)
+            if not char_anim:
+                char_anim = char
+            
+            anim = self.get_value("CharAnimParam", data)
+
+            anim_wait = ""
+
+            if self.exists_param("CharAnimWait", data):
+                anim_wait = " wait:true"
+
+            lines.append(f"@animate {char} {anim}{anim_wait}")
+
+        return lines

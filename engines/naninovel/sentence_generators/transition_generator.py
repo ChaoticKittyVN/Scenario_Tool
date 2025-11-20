@@ -22,6 +22,7 @@ class TransitionGenerator(BaseSentenceGenerator):
     def priority(self) -> int:
         return 400
 
+    # TODO 未改完
     def process(self, data):
         """
         处理转场参数

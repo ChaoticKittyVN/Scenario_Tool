@@ -9,16 +9,29 @@ class AudioGenerator(BaseSentenceGenerator):
     """音频生成器"""
 
     param_config = {
-        "Music": {
-            "translate_type": "Music",
-        },
-        "Sound": {
-            "translate_type": "Sound",
-        },
-        "Voice": {
-            "translate_type": "Voice",
-        },
-    }
+            "Music": {
+                "format_stop": "@stopBgm wait:False",
+                "format": '@bgm Music/{value}',
+                "translate_type": "Music",
+            },
+            "Sound": {
+                "format_stop": "@stopSound wait:False",
+                "format": '@sfx SFX/{value}',
+                "translate_type": "Sound",
+            },
+            "Ambience": {
+                "format_stop": "@stopSound wait:False",
+                "format": '@sfx SFX/{value} loop:True',
+                "translate_type": "Ambience",
+            },
+            "Volume": {
+                "format": " volume:{value}",
+            },
+
+            "AudioFade": {
+                "format": " fade:{value}",
+            },
+        }
 
     @property
     def category(self):
@@ -42,30 +55,21 @@ class AudioGenerator(BaseSentenceGenerator):
             return None
 
         data = self.do_translate(data)
-        results = []
 
-        # 处理音乐
-        if "Music" in data:
-            music = data["Music"]
-            if music == "stop":
-                results.append("@stopBgm")
+        lines = []
+
+        for param_name in ["Music", "Ambience", "Sound"]:
+            param_value = self.get_value(param_name, data)
+            if param_value == "stop":
+                line = self.param_config[param_name].get("format_stop","")
             else:
-                results.append(f"@bgm Music/{music}")
+                line = self.get_sentence(param_name, data)
+                if self.exists_param("Volume", data):
+                    line += self.get_sentence("Volume", data)
 
-        # 处理音效
-        if "Sound" in data:
-            sound = data["Sound"]
-            if sound == "stop":
-                results.append("@stopSfx")
-            else:
-                results.append(f"@sfx SFX/{sound}")
+            if self.exists_param("AudioFade", data):
+                line += self.get_sentence("AudioFade", data)
+            
+            lines.append(line)
 
-        # 处理语音
-        if "Voice" in data:
-            voice = data["Voice"]
-            if voice == "stop":
-                results.append("@stopVoice")
-            else:
-                results.append(f"@voice {voice}")
-
-        return results
+        return lines

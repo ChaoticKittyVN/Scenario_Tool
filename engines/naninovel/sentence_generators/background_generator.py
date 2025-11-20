@@ -3,29 +3,63 @@ Naninovel Background Generator
 生成背景相关命令
 """
 from core.base_sentence_generator import BaseSentenceGenerator
-from engines.naninovel.param_processor import ParamProcessor
 
 
 class BackgroundGenerator(BaseSentenceGenerator):
     """背景生成器"""
 
-    param_config = {
-        "Back": {
-            "translate_type": "Background"
+    param_config ={
+        "TransBack": {
+            "translate_type": "Background",
         },
-        "BackID": {},
-        "BackScale": {},
-        "BackPos": {},
-        "BackVisible": {},
-        "BackWait": {},
-        "Dissolve": {},
-        "DissolveParam": {},
-        "BackTime": {}
+        "Back": {
+            "translate_type": "Background",
+        },
+        "Event": {
+            "translate_type": "Background",
+        },
+        "BackID": {
+            "translate_type": "Id",
+            "format": " id:{value}",
+            "default": "MainBackground"
+        },
+        "BackScale": {
+            "format":" sacle:{value}"
+        },
+        "BackPos": {
+            "format":" pos:{value}"
+        },
+        "BackVisible": {
+            "format":" visible:{value}"
+        },
+        "BackWait": {
+            "format":" wait:{value}"
+        },
+        "Dissolve": {
+            "translate_type": "Transition",
+            "format": " dissolve:{value}"
+        },
+        "DissolveParam": {
+            "format": " params:{value}",
+            "default": "90"
+        },
+        "BackTint": {
+            "format":" tint:{value}",
+        },
+        "BackTime": {
+            "format":" time:{value}",
+            "default": "1.0"
+        },
+        "BackAnim": {
+            "translate_type": "Background",
+        },
+        "BackAnimParam": {
+            "translate_type": "Background",
+        },
     }
 
     def __init__(self, translator, engine_config):
         super().__init__(translator, engine_config)
-        self.param_processor = ParamProcessor()
 
     @property
     def category(self):
@@ -45,30 +79,86 @@ class BackgroundGenerator(BaseSentenceGenerator):
         Returns:
             List[str]: 生成的背景命令
         """
+        # 检查是否有足够的上下文生成场景命令
         if not self.can_process(data):
-            return None
+            return
+
+        # data = self.do_translate(data)
+
+        """构建场景命令"""
+        # 检查是否有足够的上下文生成场景命令
 
         data = self.do_translate(data)
 
-        background = data.get("Back")
-        if not background:
-            return []
+        background = self.get_value("Back", data)
+        event = self.get_value("Event", data)
 
-        # 构建场景命令
-        image = background
+        if not background and not event:
+            return None
+        
+        lines = []
+        trans = self.get_value("TransBack", data)
+        
+        # 添加渐变遮罩
+        dissolve = self.get_sentence("Dissolve", data)
+        if dissolve:
+            dissolve += self.get_sentence_default("DissolveParam", data)
 
-        # 添加各种参数
-        id_param = self.param_processor._process_id_parameter(data.get("BackID"))
-        pos = self.param_processor._process_pos_parameter(data.get("BackPos"))
-        scale = self.param_processor._process_scale_parameter(data.get("BackScale"))
-        visible = self.param_processor._process_visible_parameter(data.get("BackVisible"))
-        dissolve = self.param_processor._process_dissolve_parameter(
-            data.get("Dissolve"),
-            data.get("DissolveParam")
-        )
-        wait = self.param_processor._process_wait_parameter(data.get("BackWait"))
-        time = self.param_processor._process_time_parameter(data.get("BackTime"))
+        # 是否等待
+        wait = self.get_sentence("BackWait", data)
+
+        # 等待时间
+        time = self.get_sentence_default("BackTime", data)
+
+        if trans == "模块":
+            command = "    "
+        else:
+            command = ""
+
+        if "隐藏" in [background,event] or trans == "隐藏":
+            command += "@hide "
+            image = ""
+
+            if background:
+                # 添加图层
+                id = self.get_value_default("BackID", data)
+            else:
+                id = "CG"
+
+            if dissolve:
+                image = f"{image}.Custom"
+            
+            line = f"{command}{image}{id}{dissolve}{wait}"
+
+        else:
+            command += "@back "
+            # 构建场景命令
+            if background:
+                image = background
+                id = self.get_value("BackID", data)
+            else:
+                image = event
+                id = " id:CG"
+
+            if dissolve:
+                image = f"{image}.Custom"
+            
+            # 添加位置和缩放变换
+            pos = self.get_sentence("BackPos", data)
+            
+            scale = self.get_sentence("BackScale", data)
+
+            # 是否可见
+            visible = self.get_sentence("BackVisible", data)
+
+            tint = self.get_sentence("BackTint", data)
+
+            line = f"{command}{image}{id}{pos}{scale}{visible}{tint}{dissolve}{wait}"
 
         # 构建最终命令
-        result = f"@back {image}{id_param}{pos}{scale}{visible}{dissolve}{wait}{time}"
-        return [result]
+        if trans == "转场":
+            lines.append(f"@trans{time}")
+            lines.append(line)
+        else:
+            lines.append(f"{line}{time}")
+        return lines
