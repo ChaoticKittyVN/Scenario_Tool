@@ -1,0 +1,173 @@
+@startuml Scenario Tool Architecture
+
+' 配置管理
+package "Configuration" {
+    class AppConfig {
+        +paths: PathConfig
+        +processing: ProcessingConfig
+        +engine: EngineConfig
+        +from_file(config_path: Path): AppConfig
+        +from_dict(data: Dict): AppConfig
+    }
+
+    class PathConfig {
+        +input_dir: Path
+        +output_dir: Path
+        +param_config_dir: Path
+        +log_dir: Path
+    }
+
+    class ProcessingConfig {
+        +ignore_mode: bool
+        +ignore_words: List[str]
+        +batch_size: int
+    }
+
+    abstract class EngineConfig {
+        +engine_type: str
+    }
+
+    AppConfig *-- PathConfig
+    AppConfig *-- ProcessingConfig
+    AppConfig *-- EngineConfig
+}
+
+' 日志系统
+package "Logging" {
+    class ScenarioToolLogger {
+        -{static} _instance: Logger
+        +{static} get_logger(name: str): Logger
+    }
+
+    class ColoredFormatter {
+        +format(record): str
+    }
+
+    ScenarioToolLogger ..> ColoredFormatter
+}
+
+' 异常系统
+package "Exceptions" {
+    class ScenarioToolError {
+        +message: str
+    }
+    note right: 9个自定义异常类\nConfigError, EngineError\nGeneratorError等
+}
+
+' 引擎注册
+package "Engine Registry" {
+    class EngineRegistry {
+        -{static} _engines: Dict
+        +{static} register(meta: EngineMeta)
+        +{static} get(name: str): EngineMeta
+        +{static} list_engines(): List[str]
+    }
+
+    class EngineMeta {
+        +name: str
+        +display_name: str
+        +file_extension: str
+        +processor_factory: Callable
+    }
+
+    EngineRegistry o-- EngineMeta
+}
+
+' 参数翻译
+package "Translation" {
+    class ParamTranslator {
+        -param_mappings: Dict
+        +load_param_config(config_dir: Path)
+        +translate(param_type, param_name, param_value): Any
+        +do_translate(row_data: dict): dict
+    }
+}
+
+' 生成器管理
+package "Generator Management" {
+    abstract class BaseSentenceGenerator {
+        #translator: ParamTranslator
+        #engine_config: EngineConfig
+        +priority: int
+        +{abstract} can_handle(data: Dict): bool
+        +{abstract} process(data: Dict): Optional[List[str]]
+    }
+
+    class SentenceGeneratorManager {
+        -generators: List[BaseSentenceGenerator]
+        +register_generator(generator)
+        +auto_discover_generators(engine_type: str)
+        +process_row(row_data: Dict): Optional[List[str]]
+    }
+
+    SentenceGeneratorManager o-- BaseSentenceGenerator
+    BaseSentenceGenerator --> ParamTranslator
+}
+
+' Ren'Py 引擎
+package "Ren'Py Engine" {
+    class RenpyEngine {
+        12个生成器
+        ----
+        Note, Audio, Background
+        Character, Hide, Voice
+        Text, Transition, Pause
+        SceneClear, ATL, CharacterATL
+    }
+
+    BaseSentenceGenerator <|.. RenpyEngine
+}
+
+' Naninovel 引擎
+package "Naninovel Engine" {
+    class NaninovelEngine {
+        7个生成器
+        ----
+        Note, Audio, Background
+        Character, Hide
+        Text, Transition
+    }
+
+    BaseSentenceGenerator <|.. NaninovelEngine
+}
+
+' 引擎处理器
+package "Engine Processor" {
+    class EngineProcessor {
+        -engine_type: str
+        -translator: ParamTranslator
+        -generator_manager: SentenceGeneratorManager
+        +setup()
+        +process_excel_file(file_path: Path, output_dir: Path)
+        +process_sheet(sheet_data: DataFrame): List[str]
+    }
+
+    EngineProcessor --> SentenceGeneratorManager
+    EngineProcessor --> ParamTranslator
+}
+
+' 主程序
+class ScenarioGenerator {
+    -config: AppConfig
+    +run()
+    -find_excel_files(): List[Path]
+    -process_file(file_path: Path)
+}
+
+ScenarioGenerator --> AppConfig
+ScenarioGenerator --> EngineRegistry
+ScenarioGenerator --> EngineProcessor : creates
+ScenarioGenerator --> ScenarioToolLogger
+
+note right of EngineRegistry
+  装饰器注册模式
+  @register_engine(...)
+end note
+
+note right of AppConfig
+  配置驱动
+  只需修改 engine_type
+  自动应用引擎配置
+end note
+
+@enduml

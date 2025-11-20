@@ -1,89 +1,82 @@
+"""
+Ren'Py Character Generator
+生成角色立绘相关命令
+"""
 from core.base_sentence_generator import BaseSentenceGenerator
 
+
 class CharacterGenerator(BaseSentenceGenerator):
+    """角色生成器"""
 
     param_config = {
-            "SpriteCommand": {
-                "translate_type": "Command",
-                "default": "show",
-            },
+        "SpriteCommand": {
+            "translate_type": "Command",
+            "default": "show",
+        },
+        "Character": {
+            "translate_type": "Character",
+        },
+        "Sprite": {
+            "translate_type": "Sprite",
+        },
+        "Varient": {
+            "translate_type": "Varient",
+        },
+        "Atr1": {},
+        "Atr2": {},
+        "Atr3": {},
+        "SpriteAt": {
+            "translate_type": "Transform",
+            "format": " at {value}"
+        },
+        "SpriteOnlayer": {
+            "translate_type": "Layer",
+            "format": " onlayer {value}",
+        },
+        "SpriteWith": {
+            "translate_type": "Transition",
+            "format": " with {value}",
+            "default": "dissolve"
+        },
+        "SpriteWithAtr": {
+            "format": "({value})",
+        },
+        "SpriteATLType": {},
+    }
 
-            "Character": {
-                "translate_type": "Character",
-            },
-
-            "Sprite": {
-                "translate_type": "Sprite",
-            },
-
-            "Varient": {
-                "translate_type": "Varient",
-            },
-
-            "Atr1": {
-            },
-
-            "Atr2": {
-            },
-
-            "Atr3": {
-            },
-
-            "SpriteAt": {
-                "translate_type": "Transform",
-                "format": " at {value}"
-            },
-
-            "SpriteOnlayer": {
-                "translate_type": "Layer",
-                "format": " onlayer {value}",
-            },
-
-            "SpriteWith": {
-                "translate_type": "Transition",
-                "format": " with {value}",
-                "default": "dissolve"
-            },
-
-            "SpriteWithAtr": {
-                "format": "({value})",
-            },
-
-            "SpriteATLType": {
-            },
-        }
-    
     @property
     def category(self):
         return "Character"
 
-
-    
     @property
     def priority(self) -> int:
         return 250
 
     def process(self, data):
+        """
+        构建立绘命令
+
+        Args:
+            data: 参数字典
+
+        Returns:
+            List[str]: 生成的角色命令
+        """
         if not self.can_process(data):
-            return
+            return None
 
         data = self.do_translate(data)
-
         lines = []
 
-        """构建立绘命令"""
-        # 检查是否有足够的上下文生成立绘命令
-        
-        if self.exsits_param("Character", data) or self.exsits_param("Sprite", data):
-
-            line = ""
+        if self.exists_param("Character", data) or self.exists_param("Sprite", data):
             character = self.get_value("Character", data)
-            sprite = self. get_value("Sprite", data)
+            sprite = self.get_value("Sprite", data)
 
             image = character or sprite
             # 构建立绘命令
-            command = self.get_value_default("CharacterCommand", data) + " "
-            # 添加非层叠式图像属性 (ShowAtr0)
+            command = self.get_value_default("SpriteCommand", data) + " "
+
+            # 添加非层叠式图像属性
             varient = self.get_value("Varient", data)
             if varient:
                 image = f"{image} {varient}"
@@ -91,7 +84,7 @@ class CharacterGenerator(BaseSentenceGenerator):
             # 添加所有属性（差分）
             for i in range(1, 4):  # 支持最多3个属性
                 atr_key = f"Atr{i}"
-                if self.exsits_param(atr_key, data):
+                if self.exists_param(atr_key, data):
                     atr_value = self.get_value(atr_key, data)
                     image += f" {atr_value}"
 
@@ -114,7 +107,7 @@ class CharacterGenerator(BaseSentenceGenerator):
             # 构建最终命令
             line = f"{command}{image}{at}{onlayer}{transition}"
 
-            if self.exsits_param("SpriteATLType", data):
+            if self.exists_param("SpriteATLType", data):
                 line = f"{line}:"
 
             lines.append(line)

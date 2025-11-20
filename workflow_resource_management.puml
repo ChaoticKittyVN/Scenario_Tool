@@ -1,0 +1,139 @@
+@startuml 资源验证与同步流程
+
+title 资源验证与同步流程
+
+|验证阶段 (validate_resources.py)|
+
+start
+
+:读取配置文件 config.yaml;
+
+:初始化日志系统;
+
+:创建参数翻译器;
+
+:扫描 input/ 目录;
+
+if (找到 Excel 文件?) then (是)
+
+  repeat
+    :读取 Excel 文件;
+
+    :收集资源引用;
+    note right
+      从工作表中提取：
+      - 图片文件名
+      - 音频文件名
+      - 视频文件名
+    end note
+
+    :翻译资源参数;
+    note right
+      使用参数翻译器
+      转换为实际文件名
+    end note
+
+    :检查项目库中资源是否存在;
+    note right
+      在项目目录中查找：
+      - project/images/
+      - project/audio/
+      - project/video/
+    end note
+
+    :生成验证报告;
+    note right
+      统计：
+      - 总文件数
+      - 找到的文件
+      - 缺失的文件
+      - 完成率
+    end note
+
+    :保存报告到 output/validation_reports/;
+
+  repeat while (还有 Excel 文件?)
+
+  :输出验证统计;
+
+else (否)
+  :输出错误信息;
+  stop
+endif
+
+|同步阶段 (sync_resources.py)|
+
+:读取验证报告;
+note right
+  从 validation_reports/
+  提取缺失文件列表
+end note
+
+if (有缺失文件?) then (是)
+
+  :在资源库中查找缺失文件;
+  note right
+    在资源库目录中查找：
+    - resource_library/images/
+    - resource_library/audio/
+    - resource_library/video/
+  end note
+
+  :生成同步计划;
+  note right
+    分类：
+    - 找到的文件（可同步）
+    - 未找到的文件（警告）
+  end note
+
+  :显示同步计划;
+  note right
+    显示：
+    - 可同步文件列表
+    - 未找到文件列表
+    - 统计信息
+  end note
+
+  :询问用户确认;
+
+  if (用户确认?) then (是)
+
+    :询问是否干跑模式;
+
+    if (干跑模式?) then (是)
+      :预览复制操作;
+      note right
+        仅显示将要执行的操作
+        不实际复制文件
+      end note
+    else (否)
+      :执行文件复制;
+      note right
+        - 检查目标文件是否存在
+        - 创建目标目录
+        - 复制文件
+        - 记录操作日志
+      end note
+    endif
+
+    :显示同步结果;
+    note right
+      统计：
+      - 成功
+      - 失败
+      - 跳过
+    end note
+
+  else (否)
+    :取消同步;
+  endif
+
+  :对未找到的文件发出警告;
+
+else (否)
+  :没有缺失文件;
+endif
+
+stop
+
+@enduml

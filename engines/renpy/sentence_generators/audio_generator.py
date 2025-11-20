@@ -1,39 +1,27 @@
+"""
+Ren'Py Audio Generator
+生成音频相关命令（音乐、音效、语音）
+"""
 from core.base_sentence_generator import BaseSentenceGenerator
 
+
 class AudioGenerator(BaseSentenceGenerator):
+    """音频生成器"""
 
-    param_config ={
-            "Music": {
-                "translate_type": "Music",
-                "match_word": "stop",
-                "stop_format": "stop music",
-                "format": "play music {value}",
-            },
+    param_config = {
+        "Music": {
+            "translate_type": "Music",
+        },
+        "Sound": {
+            "translate_type": "Sound",
+        },
+        "Ambience": {
+            "translate_type": "Ambience",
+        },
+        "Volume": {},
+        "AudioFade": {},
+    }
 
-            "Ambience": {
-                "translate_type": "Ambience",
-                "match_word": "stop",
-                "stop_format": "stop ambience",
-                "format": "play ambience {value}",
-            },
-
-            "Sound": {
-                "translate_type": "Sound",
-                "match_word": "stop",
-                "stop_format": "stop sound",
-                "format": "play sound {value}",
-            },
-
-            "Volume": {
-                "format": " volume {value}",
-            },
-
-            "AudioFade": {
-                "fadeout_format": " fadeout {value}",
-                "format": " fadein {value}",
-            },
-        }
-    
     @property
     def category(self):
         return "Audio"
@@ -43,43 +31,48 @@ class AudioGenerator(BaseSentenceGenerator):
         return 100
 
     def process(self, data):
-        if not self.can_process(data):
-            return
+        """
+        处理音频参数
 
+        Args:
+            data: 参数字典
+
+        Returns:
+            List[str]: 生成的音频命令
+        """
+        if not self.can_process(data):
+            return None
 
         data = self.do_translate(data)
-
         results = []
-        
-        music = self.get_value("Music", data)
-        ambience = self.get_value("Ambience", data)
-        sound = self.get_value("Sound", data)
-        volume = self.get_value("Volume", data)
-        audio_fade = self.get_value("AudioFade", data)
 
-        for param_name,param_value in {"Music": music, "Ambience": ambience, "Sound": sound}.items():
-            if param_value:
-                config = self.param_config[param_name]
-                if param_value == config["match_word"]:
-                    # 停止命令
-                    line = config["stop_format"]
-                    if audio_fade:
-                        fade_config = self.param_config["AudioFade"]
-                        fade = fade_config["fadeout_format"].format(value=audio_fade)
-                        line = f"{line}{fade}"
-                else:
-                    # 播放命令
-                    line = self.get_sentence(param_name, data)
-                    
-                    # 如果有Volume，合并到播放命令中
-                    if volume:
-                        volume_cmd = self.get_sentence("Volume", data)
-                        line = f"{line}{volume_cmd}"
-                    
-                    if audio_fade:
-                        fade = self.get_sentence("AudioFade", data)
-                        line = f"{line}{fade}"
+        # 处理音乐
+        if "Music" in data:
+            music = data["Music"]
+            if music == "stop":
+                results.append("stop music")
+            else:
+                cmd = f"play music {music}"
+                if "Volume" in data:
+                    cmd += f" volume {data['Volume']}"
+                if "AudioFade" in data:
+                    cmd += f" fadein {data['AudioFade']}"
+                results.append(cmd)
 
-                results.append(line)
+        # 处理音效
+        if "Sound" in data:
+            sound = data["Sound"]
+            if sound == "stop":
+                results.append("stop sound")
+            else:
+                results.append(f"play sound {sound}")
+
+        # 处理环境音
+        if "Ambience" in data:
+            ambience = data["Ambience"]
+            if ambience == "stop":
+                results.append("stop ambience")
+            else:
+                results.append(f"play ambience {ambience}")
 
         return results

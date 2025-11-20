@@ -1,59 +1,50 @@
-# from core.base_sentence_generator import BaseSentenceGenerator
-# from engines.renpy.param_processor import ParamProcessor as pm
-
-# param_processor = pm()
-
-# class HiedeGenerator(BaseSentenceGenerator):
-    
-#     @property
-#     def category(self):
-#         return "Hide"
-
-#     @property
-#     def param_config(self) -> dict[str, dict]:
-#         return {
-#             "Hide": {
-#                 "translate_types": ["Figure", "Background", "Event"],
-#                 "default_type": "Figure"
-#             },
-#             "HideOnlayer": {
-#                 "translate_type": "Layer",
-#             },
-#             "HideWith": {
-#                 "translate_type": "Transition",
-#             },
-#             "HideWithAtr": {
-#             },
-#         }    
-    
-#     @property
-#     def priority(self) -> int:
-#         return 400
-
-#     def process(self, data):
-#         if not self.can_process(data):
-#             return
-
-#         data = self.do_translate(data)
+"""
+Ren'Py Hide Generator
+生成隐藏命令
+"""
+from core.base_sentence_generator import BaseSentenceGenerator
 
 
-#         """构建隐藏和转场命令"""
-#         results = []
+class HideGenerator(BaseSentenceGenerator):
+    """隐藏生成器"""
 
-#         # 处理隐藏命令
-#         hide = data.get("Hide")
-#         if hide:
-#             command = "hide "
-#             image = hide
-            
-#             # 添加图层
-#             onlayer = param_processor._process_onlayer_parameter(data.get("HideOnlayer"))
-            
-#             # 添加过渡效果
-#             transition = param_processor._process_transition_parameter(data.get("HideWith"), data.get("HideWithAtr"), "dissolve")
-            
-#             # 构建隐藏命令
-#             result = f"{command}{image}{onlayer}{transition}"
-#             results.append(result)
+    param_config = {
+        "Hide": {
+            "translate_types": ["Character", "Background", "Event"]
+        },
+        "HideWith": {
+            "translate_type": "Transition",
+            "format": " with {value}"
+        }
+    }
 
-#         return results
+    @property
+    def category(self):
+        return "Hide"
+
+    @property
+    def priority(self) -> int:
+        return 300
+
+    def process(self, data):
+        """
+        处理隐藏参数
+
+        Args:
+            data: 参数字典
+
+        Returns:
+            List[str]: 生成的隐藏命令
+        """
+        if not self.can_process(data):
+            return None
+
+        data = self.do_translate(data)
+
+        hide_target = self.get_value("Hide", data)
+        if not hide_target:
+            return []
+
+        transition = self.get_sentence("HideWith", data)
+        result = f"hide {hide_target}{transition}"
+        return [result]

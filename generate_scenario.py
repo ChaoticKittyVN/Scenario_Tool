@@ -1,125 +1,203 @@
+"""
+场景脚本生成主程序
+从 Excel 文件生成视觉小说引擎脚本
+"""
 import pandas as pd
 import os
-from core.engine_processor import EngineProcessor
+from pathlib import Path
 from tqdm import tqdm
-from core.config import TARGET_PATH, OUTPUT_PATH, ENGINE_TYPE, get_engine_config, IGNORE_MODE, IGNORE_WORDS
+from core.config_manager import AppConfig
+from core.param_translator import ParamTranslator
+from core.engine_registry import EngineRegistry
+from core.logger import get_logger
+from core.exceptions import ExcelParseError, GeneratorError
+from core.constants import SheetName, ColumnName, Marker, TEMP_FILE_PREFIX
 
-def create_processor():
-    """创建处理器实例"""
-    
-    from core.param_translator import ParamTranslator
-    
-    # 创建翻译器和上下文管理器实例
-    translator = ParamTranslator()
-    
-    # 创建处理器 - 现在只需要传入引擎类型和依赖组件
-    processor = EngineProcessor(ENGINE_TYPE, translator)
-    processor.setup()
-    
+# 导入引擎模块以触发注册
+import engines.renpy
+import engines.naninovel
+
+logger = get_logger()
+
+
+def create_processor(config: AppConfig):
+    """
+    创建处理器实例
+
+    Args:
+        config: 应用配置
+
+    Returns:
+        处理器实例
+    """
+    # 创建翻译器
+    translator = ParamTranslator(
+        module_file=str(config.paths.param_config_dir / "param_mappings.py"),
+        varient_module_file=str(config.paths.param_config_dir / "varient_mappings.py")
+    )
+
+    # 从注册表获取引擎元数据
+    engine_meta = EngineRegistry.get(config.engine.engine_type)
+
+    # 使用工厂函数创建处理器
+    processor = engine_meta.processor_factory(config.engine, translator)
+
     return processor
 
-# TODO 方法过大，需要解耦，读表部分需要改为使用目前名为param_extractor和data_reader的对象
-def process_excel_file(file_path, output_path):
-    """处理单个Excel文件"""
+
+def process_excel_file(file_path: Path, config: AppConfig):
+    """
+    处理单个Excel文件
+
+    Args:
+        file_path: Excel 文件路径
+        config: 应用配置
+    """
     try:
-        processor = create_processor()
-    
+        logger.info(f"开始处理文件: {file_path.name}")
+        processor = create_processor(config)
+
         # 读取Excel文件
-        test_file = pd.read_excel(file_path, sheet_name=None, dtype=str)
-        sheet_names = list(test_file.keys())
+        excel_data = pd.read_excel(file_path, sheet_name=None, dtype=str)
+        sheet_names = list(excel_data.keys())
 
         # 获取文件基本名（不含扩展名）
-        file_basename = os.path.splitext(os.path.basename(file_path))[0]
-        
+        file_basename = file_path.stem
+
         # 处理每个工作表
         for sheet in sheet_names:
-            if sheet == '参数表':
+            # 跳过参数表
+            if sheet == SheetName.PARAM_SHEET.value:
+                logger.debug(f"跳过参数表: {sheet}")
                 continue
-                
-            # 根据引擎类型确定输出文件扩展名
-            if ENGINE_TYPE == "renpy":
-                scenario_name = f"{sheet}.rpy"
-            elif ENGINE_TYPE == "naninovel":
-                scenario_name = f"{sheet}.nani"
-            else:
-                scenario_name = f"{sheet}.txt"
-            
-            # 检查结束标记
-            if "Note" not in test_file[sheet].columns or "END" not in test_file[sheet]["Note"].tolist():
-                print(f"工作表 {sheet} 不包含Note列或END标记，跳过")
-                continue
-                
-            i = test_file[sheet]["Note"].tolist().index("END")
-            j = 0
-            out_put_list = []
 
-            # 批量提取需要处理的行数据
+            # 生成输出文件名
+            scenario_name = config.engine.get_output_filename(sheet)
+
+            # 检查结束标记
+            if (ColumnName.NOTE.value not in excel_data[sheet].columns or
+                    Marker.END.value not in excel_data[sheet][ColumnName.NOTE.value].tolist()):
+                logger.warning(f"工作表 {sheet} 不包含Note列或END标记，跳过")
+                continue
+
+            # 找到 END 标记的位置
+            end_index = excel_data[sheet][ColumnName.NOTE.value].tolist().index(Marker.END.value)
+
+            # 提取需要处理的行
             valid_indices = []
-            for j in range(i):
-                if test_file[sheet].iloc[j].get("Ignore") in IGNORE_WORDS and IGNORE_MODE:
-                    continue
+            for j in range(end_index):
+                # 检查是否需要忽略
+                if config.processing.ignore_mode:
+                    ignore_value = excel_data[sheet].iloc[j].get(ColumnName.IGNORE.value)
+                    if ignore_value in config.processing.ignore_words:
+                        logger.debug(f"忽略行 {j}: {ignore_value}")
+                        continue
                 valid_indices.append(j)
 
-            # 一次性获取所有需要处理的行
-            if valid_indices:
-                valid_rows_df = test_file[sheet].loc[valid_indices]
+            # 获取有效行数据
+            if not valid_indices:
+                logger.warning(f"工作表 {sheet} 没有有效数据")
+                continue
 
-            with tqdm(total=len(valid_indices), desc=f"处理 {file_basename} - {sheet}") as pbar:
-                # 批量处理
-                for idx in range(len(valid_rows_df)):
-                    row_data = valid_rows_df.iloc[idx]
-                    out_put_list.extend(processor.process_row(row_data))
-                    pbar.update(1)
+            valid_rows_df = excel_data[sheet].loc[valid_indices]
+            output_list = []
+
+            # 使用进度条处理
+            desc = f"处理 {file_basename} - {sheet}"
+            if config.processing.enable_progress_bar:
+                iterator = tqdm(range(len(valid_rows_df)), desc=desc)
+            else:
+                iterator = range(len(valid_rows_df))
+
+            for idx in iterator:
+                row_data = valid_rows_df.iloc[idx]
+                try:
+                    commands = processor.process_row(row_data)
+                    if commands:
+                        output_list.extend(commands)
+                except Exception as e:
+                    logger.error(f"处理第 {idx} 行时出错: {e}", exc_info=True)
 
             # 确保输出目录存在
-            os.makedirs(output_path, exist_ok=True)
-            
-            # 根据引擎配置处理输出格式
-            output_file_path = os.path.join(output_path, scenario_name)
-            with open(output_file_path, "w", encoding="utf-8") as out_put:
-                for line in out_put_list:
-                    # Ren'Py 特定的缩进处理
-                    if ENGINE_TYPE == "renpy":
-                        if line.strip().startswith("label "):
-                            out_put.write(line.strip() + "\n")
-                        else:
-                            out_put.write("    " + line + "\n")
-                    else:
-                        # 其他引擎的默认处理
-                        out_put.write(line + "\n")
-                        
-            print(f"已生成: {output_file_path}")
-            
+            config.paths.output_dir.mkdir(parents=True, exist_ok=True)
+
+            # 写入输出文件
+            output_file_path = config.paths.output_dir / scenario_name
+            write_output_file(output_file_path, output_list, config)
+
+            logger.info(f"已生成: {output_file_path}")
+
     except Exception as e:
-        print(f"处理文件 {file_path} 时出错: {e}")
+        logger.error(f"处理文件 {file_path} 时出错: {e}", exc_info=True)
+        raise ExcelParseError(f"处理文件失败: {file_path}") from e
+
+
+def write_output_file(output_path: Path, lines: list, config: AppConfig):
+    """
+    写入输出文件
+
+    Args:
+        output_path: 输出文件路径
+        lines: 输出行列表
+        config: 应用配置
+    """
+    with open(output_path, "w", encoding="utf-8") as f:
+        for line in lines:
+            # Ren'Py 特定的缩进处理
+            if config.engine.engine_type == "renpy":
+                if line.strip().startswith("label "):
+                    f.write(line.strip() + "\n")
+                else:
+                    indent = " " * config.engine.indent_size
+                    f.write(indent + line + "\n")
+            else:
+                # 其他引擎的默认处理
+                f.write(line + "\n")
+
 
 def main():
     """主函数"""
-    # 获取当前引擎配置
-    engine_config = get_engine_config()
-    
-    # 确保目标路径存在
-    if not os.path.exists(TARGET_PATH):
-        print(f"错误: 目标路径不存在: {TARGET_PATH}")
-        return
-    
-    # 获取所有Excel文件
-    excel_files = [f for f in os.listdir(TARGET_PATH) 
-                  if f.endswith('.xlsx') and not f.startswith('~')]
-    
-    if not excel_files:
-        print(f"在 {TARGET_PATH} 中没有找到Excel文件")
-        return
-    
-    print(f"找到 {len(excel_files)} 个Excel文件，开始处理...")
-    
-    # 处理每个Excel文件
-    for excel_file in excel_files:
-        file_path = os.path.join(TARGET_PATH, excel_file)
-        print(f"\n处理文件: {excel_file}")
-        process_excel_file(file_path, OUTPUT_PATH)
-    
-    print("\n所有文件处理完成")
+    try:
+        # 加载配置
+        config_path = Path("config.yaml")
+        if config_path.exists():
+            logger.info(f"从配置文件加载: {config_path}")
+            config = AppConfig.from_file(config_path)
+        else:
+            logger.info("使用默认配置")
+            config = AppConfig.create_default("naninovel")
+
+        # 确保目录存在
+        config.paths.ensure_dirs_exist()
+
+        # 确保输入路径存在
+        if not config.paths.input_dir.exists():
+            logger.error(f"输入路径不存在: {config.paths.input_dir}")
+            return
+
+        # 获取所有Excel文件
+        excel_files = [
+            f for f in config.paths.input_dir.iterdir()
+            if f.suffix in ['.xlsx', '.xls'] and not f.name.startswith(TEMP_FILE_PREFIX)
+        ]
+
+        if not excel_files:
+            logger.warning(f"在 {config.paths.input_dir} 中没有找到Excel文件")
+            return
+
+        logger.info(f"找到 {len(excel_files)} 个Excel文件，开始处理...")
+        logger.info(f"使用引擎: {config.engine.engine_type}")
+
+        # 处理每个Excel文件
+        for excel_file in excel_files:
+            process_excel_file(excel_file, config)
+
+        logger.info("所有文件处理完成")
+
+    except Exception as e:
+        logger.critical(f"程序执行失败: {e}", exc_info=True)
+        raise
+
 
 if __name__ == "__main__":
     main()

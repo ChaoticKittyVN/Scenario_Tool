@@ -1,47 +1,44 @@
+"""
+Ren'Py Transition Generator
+生成转场命令
+"""
 from core.base_sentence_generator import BaseSentenceGenerator
 
+
 class TransitionGenerator(BaseSentenceGenerator):
+    """转场生成器"""
 
     param_config = {
-            "UseTrans":{
-            },
-            "TransWith": {
-                "translate_type": "Transition",
-                "format": " with {value}",
-                "default": "Dissolve"
-            },
-            "TransWithAtr": {
-                "format": "({value})",
-                "default": "1.0"
-            },
+        "Transition": {
+            "translate_type": "Transition"
         }
-    
+    }
+
     @property
     def category(self):
         return "Transition"
-    
+
     @property
     def priority(self) -> int:
-        return 800
+        return 400
 
     def process(self, data):
+        """
+        处理转场参数
+
+        Args:
+            data: 参数字典
+
+        Returns:
+            List[str]: 生成的转场命令
+        """
         if not self.can_process(data):
-            return
+            return None
 
         data = self.do_translate(data)
 
-        lines = []
-        
-        # 处理全局转场效果
-        trans_with = self.get_value_default("TransWith", data)
+        transition = self.get_value("Transition", data)
+        if not transition or transition == "empty":
+            return []
 
-        # 处理转场效果属性
-        if trans_with.istitle():
-            trans_with_atr = self.get_sentence_default("TransWithAtr", data)
-            trans_with = f"{trans_with}{trans_with_atr}"
-        
-        # 构建转场命令
-        line = f"with {trans_with}"
-        lines.append(line)
-        
-        return lines
+        return [f"with {transition}"]

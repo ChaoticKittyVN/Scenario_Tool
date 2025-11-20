@@ -1,0 +1,105 @@
+@startuml 脚本生成流程
+
+title 脚本生成流程 (generate_scenario.py)
+
+start
+
+:读取配置文件 config.yaml;
+note right
+  配置引擎类型
+  配置路径和处理选项
+end note
+
+:初始化日志系统;
+
+:加载参数映射配置;
+note right
+  从 param_config/ 目录
+  加载参数翻译规则
+end note
+
+:从引擎注册表获取引擎信息;
+note right
+  根据 engine_type
+  获取引擎元数据
+end note
+
+:创建引擎处理器;
+
+:自动发现并注册生成器;
+note right
+  Ren'Py: 12个生成器
+  Naninovel: 7个生成器
+end note
+
+:扫描 input/ 目录;
+
+if (找到 Excel 文件?) then (是)
+
+  repeat
+    :读取 Excel 文件;
+
+    repeat
+      :遍历工作表;
+
+      if (是参数表?) then (是)
+        :跳过;
+      else (否)
+        if (包含 END 标记?) then (是)
+
+          :逐行处理数据;
+
+          repeat
+            :读取一行数据;
+
+            :参数翻译;
+            note right
+              将中文参数名
+              翻译为引擎参数
+            end note
+
+            :生成器管道处理;
+            note right
+              按优先级遍历生成器
+              第一个匹配的生成器处理
+            end note
+
+            if (生成器匹配?) then (是)
+              :生成脚本命令;
+            else (否)
+              :记录警告日志;
+            endif
+
+          repeat while (还有数据行?)
+
+          :生成脚本文件;
+          note right
+            Ren'Py: .rpy 文件
+            Naninovel: .nani 文件
+          end note
+
+          :保存到 output/ 目录;
+
+        else (否)
+          :跳过该工作表;
+        endif
+      endif
+
+    repeat while (还有工作表?)
+
+  repeat while (还有 Excel 文件?)
+
+  :输出处理统计;
+
+else (否)
+  :输出错误信息;
+  note right
+    未找到 Excel 文件
+  end note
+endif
+
+:记录完成日志;
+
+stop
+
+@enduml

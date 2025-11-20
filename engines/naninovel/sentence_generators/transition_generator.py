@@ -1,35 +1,45 @@
-# from core.base_sentence_generator import BaseSentenceGenerator
+"""
+Naninovel Transition Generator
+生成转场命令
+"""
+from core.base_sentence_generator import BaseSentenceGenerator
 
-# class TextGenerator(BaseSentenceGenerator):
 
-#     @property
-#     def category(self):
-#         return "Transition"
+class TransitionGenerator(BaseSentenceGenerator):
+    """转场生成器"""
 
-#     @property
-#     def priority(self) -> int:
-#         return 800
+    param_config = {
+        "Transition": {
+            "translate_type": "Transition"
+        }
+    }
 
-#     def process(self, data):
-#         if not self.can_process(data):
-#             return
+    @property
+    def category(self):
+        return "Transition"
 
-#         results = []
+    @property
+    def priority(self) -> int:
+        return 400
 
-#         # 处理全局转场效果
-#         trans_with = data.get("TransWith")
-#         if trans_with:
-#             # 处理转场效果属性
-#             trans_with = self.translator.translate("Transition", trans_with)
-#             trans_with_atr = data.get("TransWithAtr")
-#             if trans_with_atr:
-#                 if trans_with == "dissolve":
-#                     trans_with = f"Dissolve({trans_with_atr})"
-#                 else:
-#                     trans_with = f"{trans_with}({trans_with_atr})"
-            
-#             # 构建转场命令
-#             result = f"with {trans_with}"
-#             results.append(result)
-        
-#         return results
+    def process(self, data):
+        """
+        处理转场参数
+
+        Args:
+            data: 参数字典
+
+        Returns:
+            List[str]: 生成的转场命令
+        """
+        if not self.can_process(data):
+            return None
+
+        data = self.do_translate(data)
+
+        transition = data.get("Transition")
+        if not transition:
+            return []
+
+        result = f"@transition {transition}"
+        return [result]

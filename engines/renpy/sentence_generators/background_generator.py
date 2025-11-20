@@ -1,65 +1,69 @@
+"""
+Ren'Py Background Generator
+生成背景和事件相关命令
+"""
 from core.base_sentence_generator import BaseSentenceGenerator
 
+
 class BackgroundGenerator(BaseSentenceGenerator):
+    """背景生成器"""
 
     param_config = {
-            "Command": {
-                "translate_type": "Command",
-                "default": "show"
-            },
-            "Background": {
-                "translate_type": "Background",
-            },
-            "Event": {
-                "translate_type": "Event",
-            },
-            "EventVarient": {
-            },
-            "At": {
-                "translate_type": "Transform",
-                "format": " at {value}"
-            },
-            "Onlayer": {
-                "translate_type": "Layer",
-                "format": " onlayer {value}"
-            },
-            "With": {
-                "translate_type": "Transition",
-                "format": " with {value}",
-                "default": "dissolve",
-                "match_word": "empty",
-                "format_matched": ""
-            },
-            "WithAtr": {
-                "format": "({value})"
-            },
-            "ATLType":{
-            }
-        }        
-    
+        "Command": {
+            "translate_type": "Command",
+            "default": "show"
+        },
+        "Background": {
+            "translate_type": "Background",
+        },
+        "Event": {
+            "translate_type": "Event",
+        },
+        "EventVarient": {},
+        "At": {
+            "translate_type": "Transform",
+            "format": " at {value}"
+        },
+        "Onlayer": {
+            "translate_type": "Layer",
+            "format": " onlayer {value}"
+        },
+        "With": {
+            "translate_type": "Transition",
+            "format": " with {value}",
+            "default": "dissolve",
+        },
+        "WithAtr": {
+            "format": "({value})"
+        },
+        "ATLType": {}
+    }
+
     @property
     def category(self):
         return "Background"
 
-
-    
     @property
     def priority(self) -> int:
         return 200
 
     def process(self, data):
-        """构建场景命令"""
-        # 检查是否有足够的上下文生成场景命令
+        """
+        构建场景命令
+
+        Args:
+            data: 参数字典
+
+        Returns:
+            List[str]: 生成的背景命令
+        """
         if not self.can_process(data):
-            return
+            return None
 
         data = self.do_translate(data)
-
         lines = []
 
-
-        if self.exsits_param("Background", data) or self.exsits_param("Event", data):
-            line = ""
+        if self.exists_param("Background", data) or self.exists_param("Event", data):
             background = self.get_value("Background", data)
             event = self.get_value("Event", data)
 
@@ -91,12 +95,9 @@ class BackgroundGenerator(BaseSentenceGenerator):
             # 构建最终命令
             line = f"{command}{image}{at}{onlayer}{transition}"
 
-            if self.exsits_param("ATLType", data):
+            if self.exists_param("ATLType", data):
                 line = f"{line}:"
 
             lines.append(line)
-
-
-
 
         return lines

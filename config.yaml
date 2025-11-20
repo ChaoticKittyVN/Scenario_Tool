@@ -1,0 +1,30 @@
+# Scenario Tool 配置文件
+
+# 路径配置（可选，使用默认值）
+paths:
+  input_dir: "./input"
+  output_dir: "./output"
+  param_config_dir: "./param_config"
+  log_dir: "./logs"
+
+# 处理配置（可选，使用默认值）
+processing:
+  ignore_mode: true
+  ignore_words: ["忽略", ""]
+  batch_size: 100
+  enable_progress_bar: true
+
+# 引擎配置
+# 支持的引擎: "renpy" 或 "naninovel"
+engine:
+  engine_type: "renpy"
+
+# 引擎的其他配置会自动应用：
+# - renpy: 自动配置 .rpy 文件、4空格缩进等
+# - naninovel: 自动配置 .nani 文件、@ 命令前缀等
+#
+# 如果需要自定义引擎配置，可以添加额外参数：
+# engine:
+#   engine_type: "renpy"
+#   indent_size: 2              # 自定义缩进（可选）
+#   default_transition: "fade"  # 自定义默认转场（可选）

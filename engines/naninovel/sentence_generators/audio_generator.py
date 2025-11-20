@@ -1,38 +1,24 @@
+"""
+Naninovel Audio Generator
+生成音频相关命令（音乐、音效、语音）
+"""
 from core.base_sentence_generator import BaseSentenceGenerator
 
+
 class AudioGenerator(BaseSentenceGenerator):
-    
-    param_config ={
-            "Music": {
-                "translate_type": "Music",
-                "match_word": "stop",
-                "stop_format": "@stopBgm wait:False",
-                "format": '@bgm Music/{value}',
-            },
+    """音频生成器"""
 
-            "Ambience": {
-                "translate_type": "Ambience",
-                "match_word": "stop",
-                "stop_format": "stop ambience",
-                "format": "play ambience {value}",
-            },
-
-            "Sound": {
-                "translate_type": "Sound",
-                "match_word": "stop",
-                "stop_format": "stop sound",
-                "format": "play sound {value}",
-            },
-
-            "Volume": {
-                "format": " volume {value}",
-            },
-
-            "AudioFade": {
-                "fadeout_format": " fadeout {value}",
-                "format": " fadein {value}",
-            },
-        }
+    param_config = {
+        "Music": {
+            "translate_type": "Music",
+        },
+        "Sound": {
+            "translate_type": "Sound",
+        },
+        "Voice": {
+            "translate_type": "Voice",
+        },
+    }
 
     @property
     def category(self):
@@ -43,18 +29,43 @@ class AudioGenerator(BaseSentenceGenerator):
         return 100
 
     def process(self, data):
-        if not self.can_process(data):
-            return
-        
-        data = self.do_translate(data)
+        """
+        处理音频参数
 
+        Args:
+            data: 参数字典
+
+        Returns:
+            List[str]: 生成的音频命令
+        """
+        if not self.can_process(data):
+            return None
+
+        data = self.do_translate(data)
         results = []
 
-        for name,value in data.items():
-            if value == "stop":
-                temp = self.format_config.get(name).get("format_stop")
+        # 处理音乐
+        if "Music" in data:
+            music = data["Music"]
+            if music == "stop":
+                results.append("@stopBgm")
             else:
-                temp = self.format_config.get(name).get("format").format(value=value)
-            results.append(temp)
+                results.append(f"@bgm Music/{music}")
+
+        # 处理音效
+        if "Sound" in data:
+            sound = data["Sound"]
+            if sound == "stop":
+                results.append("@stopSfx")
+            else:
+                results.append(f"@sfx SFX/{sound}")
+
+        # 处理语音
+        if "Voice" in data:
+            voice = data["Voice"]
+            if voice == "stop":
+                results.append("@stopVoice")
+            else:
+                results.append(f"@voice {voice}")
 
         return results

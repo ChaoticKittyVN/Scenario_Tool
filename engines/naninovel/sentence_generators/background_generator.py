@@ -1,23 +1,32 @@
+"""
+Naninovel Background Generator
+生成背景相关命令
+"""
 from core.base_sentence_generator import BaseSentenceGenerator
-from engines.naninovel.param_processor import ParamProcessor as pm
+from engines.naninovel.param_processor import ParamProcessor
 
-param_processor = pm()
 
 class BackgroundGenerator(BaseSentenceGenerator):
-    
-    @property
-    def param_config(self) -> dict[str, dict]:
-        return {
-            "Back": "",
-            "BackID": "",
-            "BackScale": "",
-            "BackPos": "",
-            "BackVisible": "",
-            "BackWait": "",
-            "Dissolve": "",
-            "DissolveParam": "",
-            "BackTime": ""
-        }
+    """背景生成器"""
+
+    param_config = {
+        "Back": {
+            "translate_type": "Background"
+        },
+        "BackID": {},
+        "BackScale": {},
+        "BackPos": {},
+        "BackVisible": {},
+        "BackWait": {},
+        "Dissolve": {},
+        "DissolveParam": {},
+        "BackTime": {}
+    }
+
+    def __init__(self, translator, engine_config):
+        super().__init__(translator, engine_config)
+        self.param_processor = ParamProcessor()
+
     @property
     def category(self):
         return "Background"
@@ -27,43 +36,39 @@ class BackgroundGenerator(BaseSentenceGenerator):
         return 200
 
     def process(self, data):
-        """构建场景命令"""
-        # 检查是否有足够的上下文生成场景命令
+        """
+        处理背景参数
+
+        Args:
+            data: 参数字典
+
+        Returns:
+            List[str]: 生成的背景命令
+        """
         if not self.can_process(data):
-            return
+            return None
 
         data = self.do_translate(data)
 
-        """构建场景命令"""
-        # 检查是否有足够的上下文生成场景命令
         background = data.get("Back")
-        
         if not background:
             return []
-        
+
         # 构建场景命令
         image = background
-        
-        # 添加图层
-        id = param_processor._process_id_parameter(data.get("BackID"))
-        
-        # 添加位置和缩放变换
-        pos = param_processor._process_pos_parameter(data.get("BackPos"))
-        
-        scale = param_processor._process_scale_parameter(data.get("BackScale"))
 
-        # 是否可见
-        visible = param_processor._process_visible_parameter(data.get("BackVisible"))
-
-        # 添加渐变遮罩
-        dissolve = param_processor._process_dissolve_parameter(data.get("Dissolve"),data.get("DissolveParam"))
-
-        # 是否等待
-        wait = param_processor._process_wait_parameter(data.get("BackWait"))
-
-        # 等待时间
-        time = param_processor._process_time_parameter(data.get("BackTime"))
+        # 添加各种参数
+        id_param = self.param_processor._process_id_parameter(data.get("BackID"))
+        pos = self.param_processor._process_pos_parameter(data.get("BackPos"))
+        scale = self.param_processor._process_scale_parameter(data.get("BackScale"))
+        visible = self.param_processor._process_visible_parameter(data.get("BackVisible"))
+        dissolve = self.param_processor._process_dissolve_parameter(
+            data.get("Dissolve"),
+            data.get("DissolveParam")
+        )
+        wait = self.param_processor._process_wait_parameter(data.get("BackWait"))
+        time = self.param_processor._process_time_parameter(data.get("BackTime"))
 
         # 构建最终命令
-        result = f"@back {image}{id}{pos}{scale}{visible}{dissolve}{wait}{time}"
+        result = f"@back {image}{id_param}{pos}{scale}{visible}{dissolve}{wait}{time}"
         return [result]

@@ -1,48 +1,52 @@
+"""
+Naninovel Hide Generator
+生成隐藏命令
+"""
 from core.base_sentence_generator import BaseSentenceGenerator
-from engines.naninovel.param_processor import ParamProcessor as pm
+from engines.naninovel.param_processor import ParamProcessor
 
-param_processor = pm()
 
-class HiedeGenerator(BaseSentenceGenerator):
-    
-    @property
-    def param_config(self) -> dict[str, dict]:
-        return {
-            "Hide": "",
-            "HideWait": "",
-            "HideChars": "",
-            "HideCharsWait": ""
-        }
-    
+class HideGenerator(BaseSentenceGenerator):
+    """隐藏生成器"""
+
+    param_config = {
+        "Hide": {
+            "translate_type": "Character"
+        },
+        "HideWait": {}
+    }
+
+    def __init__(self, translator, engine_config):
+        super().__init__(translator, engine_config)
+        self.param_processor = ParamProcessor()
+
     @property
     def category(self):
         return "Hide"
 
     @property
     def priority(self) -> int:
-        return 400
+        return 300
 
     def process(self, data):
+        """
+        处理隐藏参数
+
+        Args:
+            data: 参数字典
+
+        Returns:
+            List[str]: 生成的隐藏命令
+        """
         if not self.can_process(data):
-            return
+            return None
 
         data = self.do_translate(data)
 
+        hide_target = data.get("Hide")
+        if not hide_target:
+            return []
 
-        """构建隐藏和转场命令"""
-        results = []
-        
-        # 处理隐藏命令
-        if "Hide" in data:
-            hide_target = data.get("Hide")
-            wait = param_processor._process_wait_parameter(data.get("HideWait"))
-            result = f"@hide {hide_target}{wait}"
-            results.append(result)
-        
-        # 处理隐藏角色命令
-        if "HideChars" in data:
-            wait = param_processor._process_wait_parameter(data.get("HideCharsWait"))
-            result = f"@hideChars{wait}"
-            results.append(result)
-
-        return results
+        wait = self.param_processor._process_wait_parameter(data.get("HideWait"))
+        result = f"@hide {hide_target}{wait}"
+        return [result]
