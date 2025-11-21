@@ -93,6 +93,7 @@ QPushButton[objectName*="reset"]:hover {
 
 /* 输入框样式 */
 QLineEdit {
+    color: black;
     border: 1px solid #dcdcdc;
     border-radius: 4px;
     padding: 6px 10px;
@@ -100,16 +101,19 @@ QLineEdit {
 }
 
 QLineEdit:focus {
+    color: black;
     border: 2px solid #2196F3;
 }
 
 QLineEdit:disabled {
+    color: black;
     background-color: #f5f5f5;
     color: #9e9e9e;
 }
 
 /* 下拉框样式 */
 QComboBox {
+    color: black;
     border: 1px solid #dcdcdc;
     border-radius: 4px;
     padding: 6px 10px;
@@ -117,10 +121,12 @@ QComboBox {
 }
 
 QComboBox:focus {
+    color: black;
     border: 2px solid #2196F3;
 }
 
 QComboBox QAbstractItemView {
+    color: black;
     border: 1px solid #dcdcdc;
     background-color: white;
     selection-background-color: #E3F2FD;
