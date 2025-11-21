@@ -74,7 +74,7 @@ class CharacterGenerator(BaseSentenceGenerator):
 
             image = character or sprite
             # 构建立绘命令
-            command = self.get_value_default("SpriteCommand", data) + " "
+            command = self.get_value("SpriteCommand", data, use_default=True) + " "
 
             # 添加非层叠式图像属性
             varient = self.get_value("Varient", data)
@@ -95,10 +95,10 @@ class CharacterGenerator(BaseSentenceGenerator):
             onlayer = self.get_sentence("SpriteOnlayer", data)
 
             # 添加过渡效果
-            transition = self.get_value_default("SpriteWith", data)
+            transition = self.get_value("SpriteWith", data, use_default=True)
             if transition != "empty":
-                transition = self.get_sentence_default("SpriteWith", data)
-                with_atr = self.get_sentence("SpriteWithAtr", data)
+                transition = self.get_sentence("SpriteWith", data, use_default=True)
+                with_atr = self.get_sentence("SpriteWithAtr", data, use_default=True)
                 if with_atr:
                     transition += with_atr
             else:

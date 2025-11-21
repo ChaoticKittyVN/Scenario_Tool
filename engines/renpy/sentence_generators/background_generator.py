@@ -68,7 +68,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             event = self.get_value("Event", data)
 
             # 构建场景命令
-            command = self.get_value_default("Command", data) + " "
+            command = self.get_value("Command", data, use_default=True) + " "
             image = background or event
 
             # 添加事件属性（差分）
@@ -85,8 +85,8 @@ class BackgroundGenerator(BaseSentenceGenerator):
             # 添加过渡效果
             transition = self.get_value("With", data)
             if transition != "empty":
-                transition = self.get_sentence_default("With", data)
-                with_atr = self.get_sentence("WithAtr", data)
+                transition = self.get_sentence("With", data, use_default=True)
+                with_atr = self.get_sentence("WithAtr", data, use_default=True)
                 if with_atr:
                     transition += with_atr
             else:

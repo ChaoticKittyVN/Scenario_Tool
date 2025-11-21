@@ -6,13 +6,28 @@
 
 ## 快速开始
 
-### 1. 安装依赖
+### GUI 模式
+
+```bash
+pip install pandas openpyxl pyyaml PySide6
+py run_gui.py
+```
+
+GUI 提供四个功能标签页：
+- **脚本生成**：从 Excel 生成引擎脚本
+- **参数映射**：更新参数映射配置
+- **资源管理**：验证和同步资源文件（支持干跑模式）
+- **默认配置**：修改全局配置
+
+### 命令行模式
+
+#### 1. 安装依赖
 
 ```bash
 pip install pandas openpyxl pyyaml
 ```
 
-### 2. 配置引擎
+#### 2. 配置引擎
 
 编辑 `config.yaml`，选择目标引擎：
 
@@ -21,11 +36,11 @@ engine:
   engine_type: "renpy"  # 或 "naninovel"
 ```
 
-### 3. 准备数据
+#### 3. 准备数据
 
 将 Excel 文件放入 `input/` 目录。
 
-### 4. 生成脚本
+#### 4. 生成脚本
 
 ```bash
 py generate_scenario.py
@@ -227,7 +242,7 @@ py test_all.py
 ## 项目结构
 
 ```
-new/
+scenario_tool/
 ├── core/                          # 核心框架
 │   ├── logger.py                  # 日志系统
 │   ├── exceptions.py              # 异常类
@@ -241,6 +256,11 @@ new/
 ├── engines/
 │   ├── renpy/                     # Ren'Py 引擎（12个生成器）
 │   └── naninovel/                 # Naninovel 引擎（7个生成器）
+├── gui/                           # GUI 界面
+│   ├── main.py                    # GUI 主程序
+│   ├── ui/                        # UI 定义
+│   ├── controllers/               # 控制器
+│   └── utils/                     # GUI 工具
 ├── param_config/                  # 参数映射配置
 │   ├── param_data_renpy.xlsx      # Ren'Py 参数文件
 │   ├── param_data_naninovel.xlsx  # Naninovel 参数文件
@@ -251,6 +271,7 @@ new/
 ├── output/                        # 脚本输出目录
 ├── logs/                          # 日志目录
 ├── config.yaml                    # 配置文件
+├── run_gui.py                     # GUI 启动脚本
 ├── generate_scenario.py           # 脚本生成工具
 ├── update_param.py                # 参数映射更新工具
 ├── validate_resources.py          # 资源验证工具

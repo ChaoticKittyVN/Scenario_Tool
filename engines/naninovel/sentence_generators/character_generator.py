@@ -145,7 +145,7 @@ class CharacterGenerator(BaseSentenceGenerator):
             line = (f"{command}{image}{pose}{position}{scale}{visible}{tint}{wait}")
             # 构建最终命令
             if trans == "转场":
-                time = self.get_sentence_default("Time", data)
+                time = self.get_sentence("Time", data, use_default=True)
                 lines.append(f"@trans{time}")
                 lines.append("    @hideChars")
                 lines.append(line)

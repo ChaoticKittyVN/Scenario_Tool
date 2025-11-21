@@ -55,19 +55,19 @@ class ATLGenerator(BaseSentenceGenerator):
             transform = self.get_value(param_names[3], data)
             line = f"    {transform}"
         elif atl_type == "动画":
-            warp = self.get_value_default(param_names[1], data)
-            time = self.get_value_default(param_names[2], data)
+            warp = self.get_value(param_names[1], data, use_default=True)
+            time = self.get_value(param_names[2], data, use_default=True)
             transform = self.get_value(param_names[3], data)
             line = f"    {warp} {time} {transform}"
         elif atl_type == "等待":
-            time = self.get_value_default(param_names[2], data)
+            time = self.get_value(param_names[2], data, use_default=True)
             line = f"    pause {time}"
         elif atl_type == "直接输入":
             value = self.get_value(param_names[4], data)
             line = f"    {value}"
         elif atl_type == "自定义动画":
-            warp = self.get_value_default(param_names[1], data)
-            time = self.get_value_default(param_names[2], data)
+            warp = self.get_value(param_names[1], data, use_default=True)
+            time = self.get_value(param_names[2], data, use_default=True)
             value = self.get_value(param_names[4], data)
             line = f"    {warp} {time} {value}"
         elif atl_type == "动画开始":

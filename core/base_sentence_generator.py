@@ -149,67 +149,45 @@ class BaseSentenceGenerator(ABC):
         """
         return self.param_config.get(name, {}).get("format")
 
-    def get_value(self, name: str, data: Dict[str, Any]) -> str:
+    def get_value(self, name: str, data: Dict[str, Any], use_default: bool = False) -> str:
         """
         从数据中获取参数值
 
         Args:
             name: 参数名
             data: 数据字典
+            use_default: 是否使用配置中的默认值
 
         Returns:
-            str: 参数值，如果不存在则返回空字符串
-        """
-        return data.get(name, "")
-
-    def get_value_default(self, name: str, data: Dict[str, Any]) -> str:
-        """
-        从数据中获取参数值，如果不存在则使用默认值
-
-        Args:
-            name: 参数名
-            data: 数据字典
-
-        Returns:
-            str: 参数值或默认值
+            str: 参数值
         """
         if name in data:
             return str(data[name])
-        elif self.param_config.get(name, {}).get("default") is not None:
-            return str(self.param_config.get(name, {}).get("default"))
-        else:
-            return ""
 
-    def get_sentence(self, name: str, data: Dict[str, Any]) -> str:
+        if use_default:
+            default = self.param_config.get(name, {}).get("default")
+            if default is not None:
+                return str(default)
+
+        return ""
+
+    def get_sentence(self, name: str, data: Dict[str, Any], use_default: bool = False) -> str:
         """
         根据格式字符串生成句子
 
         Args:
             name: 参数名
             data: 数据字典
+            use_default: 是否使用配置中的默认值
 
         Returns:
             str: 格式化后的句子
         """
         format_str = self.param_config.get(name, {}).get("format", "")
-        if format_str:
-            return format_str.format(value=data[name])
-        else:
+        if not format_str:
             return ""
 
-    def get_sentence_default(self, name: str, data: dict) -> str:
-        """
-        根据格式字符串生成句子，使用默认值
-
-        Args:
-            name: 参数名
-            data: 数据字典
-
-        Returns:
-            str: 格式化后的句子
-        """
-        format_str = self.param_config.get(name, {}).get("format", "")
-        value = self.get_value_default(name, data)
+        value = self.get_value(name, data, use_default=use_default)
         if value:
             return format_str.format(value=value)
         return ""

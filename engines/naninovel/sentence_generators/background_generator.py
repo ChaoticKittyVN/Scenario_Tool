@@ -102,13 +102,13 @@ class BackgroundGenerator(BaseSentenceGenerator):
         # 添加渐变遮罩
         dissolve = self.get_sentence("Dissolve", data)
         if dissolve:
-            dissolve += self.get_sentence_default("DissolveParam", data)
+            dissolve += self.get_sentence("DissolveParam", data, use_default=True)
 
         # 是否等待
         wait = self.get_sentence("BackWait", data)
 
         # 等待时间
-        time = self.get_sentence_default("BackTime", data)
+        time = self.get_sentence("BackTime", data, use_default=True)
 
         if trans == "模块":
             command = "    "
@@ -121,7 +121,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
 
             if background:
                 # 添加图层
-                id = self.get_value_default("BackID", data)
+                id = self.get_value("BackID", data, use_default=True)
             else:
                 id = "CG"
 

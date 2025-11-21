@@ -1,0 +1,104 @@
+@startuml 参数映射更新流程
+
+skinparam backgroundColor #FEFEFE
+skinparam activity {
+  BackgroundColor #E3F2FD
+  BorderColor #1976D2
+  FontSize 13
+  ArrowColor #1976D2
+}
+
+start
+
+:读取 config.yaml;
+
+:初始化 ParamUpdater;
+note right
+  获取引擎类型
+  (renpy/naninovel)
+end note
+
+partition "阶段1: 基础参数映射" {
+  :读取 param_data_{engine}.xlsx;
+
+  if (文件存在?) then (是)
+    :读取所有工作表;
+
+    repeat
+      :处理工作表;
+
+      if (是模板工作表?) then (是)
+        :跳过;
+      else (否)
+        if (包含必需列?) then (是)
+          :构建参数映射;
+          note right
+            ExcelParam -> ScenarioParam
+          end note
+        else (否)
+          :跳过该工作表;
+        endif
+      endif
+
+    repeat while (还有工作表?) is (是)
+    ->否;
+
+    :生成 param_mappings.py;
+    note right
+      变量名: PARAM_MAPPINGS
+    end note
+
+    :输出统计信息;
+
+  else (否)
+    :报错: 参数文件不存在;
+    stop
+  endif
+}
+
+partition "阶段2: 差分参数映射" {
+  :检查 varient_data.xlsx;
+
+  if (文件存在?) then (是)
+    :读取所有工作表;
+    note right
+      **不跳过**模板工作表
+      保持与原项目一致
+    end note
+
+    repeat
+      :处理工作表;
+
+      if (包含必需列?) then (是)
+        :构建参数映射;
+        note right
+          包括空映射
+          (如: 基础参数模板)
+        end note
+      else (否)
+        :跳过该工作表;
+      endif
+
+    repeat while (还有工作表?) is (是)
+    ->否;
+
+    :生成 varient_mappings.py;
+    note right
+      变量名: VARIENT_MAPPINGS
+    end note
+
+    :统计有效映射;
+    note right
+      排除模板工作表
+    end note
+
+  else (否)
+    :跳过差分参数处理;
+  endif
+}
+
+:输出完成信息;
+
+stop
+
+@enduml
