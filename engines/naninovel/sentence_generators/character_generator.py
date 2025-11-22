@@ -53,14 +53,14 @@ class CharacterGenerator(BaseSentenceGenerator):
         },
 
         "CharAnim": {
+            "translate_type": "Character",
         },
 
         "CharAnimParam": {
-            "translate_type": "CharAnimParam"
+            "translate_type": "Animation"
         },
 
-        "CharAnimWait": {
-        },
+        "CharAnimWait": {},
     }
 
     def __init__(self, translator, engine_config):
@@ -100,7 +100,7 @@ class CharacterGenerator(BaseSentenceGenerator):
         lines = []
         trans = self.get_value("TransChar", data)
 
-        if trans == "模块":
+        if trans == "block":
             command = "    "
         else:
             command = ""
@@ -119,7 +119,7 @@ class CharacterGenerator(BaseSentenceGenerator):
             # 差分名，如有需要使用多参数组合
             image += f".{varient}"
 
-            if trans == "隐藏":
+            if trans == "hide":
                 command += "@hide"
             else:
                 command += "@char"
@@ -144,7 +144,7 @@ class CharacterGenerator(BaseSentenceGenerator):
 
             line = (f"{command}{image}{pose}{position}{scale}{visible}{tint}{wait}")
             # 构建最终命令
-            if trans == "转场":
+            if trans == "trans":
                 time = self.get_sentence("Time", data, use_default=True)
                 lines.append(f"@trans{time}")
                 lines.append("    @hideChars")

@@ -3,7 +3,7 @@ Naninovel Text Generator
 生成文本和对话命令
 """
 from core.base_sentence_generator import BaseSentenceGenerator
-from core.constants import SpecialSpeaker
+from core.constants import WindowMode, SpecialSpeaker
 
 
 class TextGenerator(BaseSentenceGenerator):
@@ -48,15 +48,16 @@ class TextGenerator(BaseSentenceGenerator):
         lines = []
 
         # 处理打印机设置
-        if printer != "隐藏":
-            printer = self.translator.translate("Printer", printer)
-            printer_pos = self.get_sentence("PrinterPos", data)
-            line = f"@printer {printer}"
-            if printer_pos:
-                line += printer_pos
+        if printer != WindowMode.HIDE.value:
+            if printer in [WindowMode.SHOW.value, WindowMode.SHOW_AND_HIDE.value]:
+                line = f"@printer"
+            else:
+                printer = self.translator.translate('Printer', printer)
+                printer_pos = self.get_sentence("PrinterPos", data)
+                line = f"@printer {printer}"
+                if printer_pos:
+                    line += printer_pos
             lines.append(line)
-        else:
-            lines.append("@hidePrinter wait:true")
 
         # 处理对话文本
         if speaker:
@@ -69,5 +70,8 @@ class TextGenerator(BaseSentenceGenerator):
         else:
             if text:
                 lines.append(text)
+
+        if printer in [WindowMode.HIDE.value, WindowMode.SHOW_AND_HIDE.value]:
+            lines.append("@hidePrinter wait:true")
 
         return lines

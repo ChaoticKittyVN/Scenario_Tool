@@ -1,6 +1,14 @@
 from core.base_sentence_generator import BaseSentenceGenerator
 
-class PuaseWaitGenerator(BaseSentenceGenerator):
+class PauseWaitGenerator(BaseSentenceGenerator):
+    """等待时间生成器"""
+
+
+    param_config = {
+        "PauseWait": {
+            "format": "@wait {value}"
+        }
+    }
 
     @property
     def category(self):
@@ -23,7 +31,6 @@ class PuaseWaitGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return None
 
-        wait = data.get("WaitPause")
-        if wait:
-            return [f"@wait {wait}"]
-        return []
+        wait = self.get_sentence("WaitPause", data)
+
+        return [wait]

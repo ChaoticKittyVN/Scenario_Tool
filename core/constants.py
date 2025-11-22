@@ -6,7 +6,7 @@ from enum import Enum
 
 
 class WindowMode(str, Enum):
-    """窗口模式"""
+    """对话框模式"""
     SHOW = "显示"
     HIDE = "隐藏"
     SHOW_AND_HIDE = "显示和隐藏"

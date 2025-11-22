@@ -16,7 +16,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             "translate_type": "Background",
         },
         "Event": {
-            "translate_type": "Background",
+            "translate_type": "Event",
         },
         "BackID": {
             "translate_type": "Id",
@@ -54,7 +54,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             "translate_type": "Background",
         },
         "BackAnimParam": {
-            "translate_type": "Background",
+            "translate_type": "Animation",
         },
     }
 
@@ -110,12 +110,12 @@ class BackgroundGenerator(BaseSentenceGenerator):
         # 等待时间
         time = self.get_sentence("BackTime", data, use_default=True)
 
-        if trans == "模块":
+        if trans == "block":
             command = "    "
         else:
             command = ""
 
-        if "隐藏" in [background,event] or trans == "隐藏":
+        if "hide" in [background,event] or trans == "hide":
             command += "@hide "
             image = ""
 
@@ -156,7 +156,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             line = f"{command}{image}{id}{pos}{scale}{visible}{tint}{dissolve}{wait}"
 
         # 构建最终命令
-        if trans == "转场":
+        if trans == "trans":
             lines.append(f"@trans{time}")
             lines.append(line)
         else:

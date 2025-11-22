@@ -98,7 +98,7 @@ class CharacterGenerator(BaseSentenceGenerator):
             transition = self.get_value("SpriteWith", data, use_default=True)
             if transition != "empty":
                 transition = self.get_sentence("SpriteWith", data, use_default=True)
-                with_atr = self.get_sentence("SpriteWithAtr", data, use_default=True)
+                with_atr = self.get_sentence("SpriteWithAtr", data)
                 if with_atr:
                     transition += with_atr
             else:

@@ -39,8 +39,16 @@ class CameraGenerator(BaseSentenceGenerator):
     def priority(self) -> int:
         return 140
 
-    # TODO 注释文档
     def process(self, data):
+        """
+        处理镜头参数
+
+        Args:
+            data: 参数字典
+
+        Returns:
+            List[str]: 生成的镜头命令
+        """
         if not self.can_process(data):
             return None
         
