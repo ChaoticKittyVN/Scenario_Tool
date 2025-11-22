@@ -10,7 +10,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
 
     param_config ={
         "TransBack": {
-            "translate_type": "Background",
+            "translate_type": "TransitionType",
         },
         "Back": {
             "translate_type": "Background",
@@ -36,7 +36,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             "format":" wait:{value}"
         },
         "Dissolve": {
-            "translate_type": "Transition",
+            "translate_type": "Dissolve",
             "format": " dissolve:{value}"
         },
         "DissolveParam": {
@@ -121,7 +121,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
 
             if background:
                 # 添加图层
-                id = self.get_value("BackID", data, use_default=True)
+                id = self.get_sentence("BackID", data, use_default=True)
             else:
                 id = "CG"
 
@@ -135,7 +135,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             # 构建场景命令
             if background:
                 image = background
-                id = self.get_value("BackID", data)
+                id = self.get_sentence("BackID", data)
             else:
                 image = event
                 id = " id:CG"

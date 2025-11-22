@@ -46,9 +46,8 @@ class TextGenerator(BaseSentenceGenerator):
         printer = self.get_value("Printer", data)
 
         lines = []
-
         # 处理打印机设置
-        if printer != WindowMode.HIDE.value:
+        if printer != WindowMode.HIDE.value and printer:
             if printer in [WindowMode.SHOW.value, WindowMode.SHOW_AND_HIDE.value]:
                 line = f"@printer"
             else:

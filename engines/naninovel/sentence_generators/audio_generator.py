@@ -59,17 +59,19 @@ class AudioGenerator(BaseSentenceGenerator):
         lines = []
 
         for param_name in ["Music", "Ambience", "Sound"]:
+            line = ""
             param_value = self.get_value(param_name, data)
             if param_value == "stop":
                 line = self.param_config[param_name].get("format_stop","")
             else:
                 line = self.get_sentence(param_name, data)
-                if self.exists_param("Volume", data):
+                if self.exists_param("Volume", data) and line:
                     line += self.get_sentence("Volume", data)
 
-            if self.exists_param("AudioFade", data):
+            if self.exists_param("AudioFade", data) and line:
                 line += self.get_sentence("AudioFade", data)
             
-            lines.append(line)
+            if line:
+                lines.append(line)
 
         return lines

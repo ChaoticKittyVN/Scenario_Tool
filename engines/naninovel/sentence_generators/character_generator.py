@@ -120,9 +120,9 @@ class CharacterGenerator(BaseSentenceGenerator):
             image += f".{varient}"
 
             if trans == "hide":
-                command += "@hide"
+                command += "@hide "
             else:
-                command += "@char"
+                command += "@char "
 
             # 添加姿势
             pose = self.get_sentence("Pose", data)
