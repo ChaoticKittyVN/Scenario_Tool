@@ -1,19 +1,26 @@
-# Scenario Tool - 使用手册
+# Scenario Tool
 
 视觉小说脚本生成工具，支持从 Excel 表格生成 Ren'Py 和 Naninovel 引擎脚本。
 
 ---
 
-## 快速开始
+## ✨ 核心特性
+
+- 🎮 **多引擎支持** - 支持 Ren'Py 和 Naninovel 引擎
+- 📊 **Excel 驱动** - 使用熟悉的 Excel 编写脚本
+- 🎨 **GUI 界面** - 提供友好的图形界面
+- 🔧 **参数映射** - 灵活的参数翻译系统
+- 📦 **资源管理** - 自动验证和同步资源文件
+- 🧪 **高测试覆盖率** - 92% 测试覆盖率（250 个测试）
+
+---
+
+## 🚀 快速开始
 
 ### 安装依赖
 
 ```bash
-# 安装生产环境依赖
 pip install -r requirements.txt
-
-# 如果需要开发和测试，安装开发依赖
-pip install -r requirements-dev.txt
 ```
 
 ### GUI 模式
@@ -22,30 +29,12 @@ pip install -r requirements-dev.txt
 py run_gui.py
 ```
 
-GUI 提供四个功能标签页：
-- **脚本生成**：从 Excel 生成引擎脚本
-- **参数映射**：更新参数映射配置
-- **资源管理**：验证和同步资源文件
-- **默认配置**：修改全局配置
-
 ### 命令行模式
 
-#### 1. 配置引擎
-
-编辑 `config.yaml`，选择目标引擎：
-
-```yaml
-engine:
-  engine_type: "renpy"  # 或 "naninovel"
-```
-
-#### 2. 准备数据
-
-将 Excel 文件放入 `input/` 目录。
-
-#### 3. 生成脚本
-
 ```bash
+# 1. 配置引擎（编辑 config.yaml）
+# 2. 将 Excel 文件放入 input/ 目录
+# 3. 生成脚本
 py generate_scenario.py
 ```
 
@@ -53,384 +42,83 @@ py generate_scenario.py
 
 ---
 
-## 参数映射管理
+## 📚 文档
 
-### 更新参数映射
+### 用户文档
 
-当需要修改参数映射时，编辑对应引擎的参数文件，然后运行更新脚本：
+- [快速开始](docs/getting-started.md) - 安装和基本使用
+- [配置说明](docs/configuration.md) - 引擎配置和路径设置
+- [参数映射](docs/param-mapping.md) - 参数映射管理
+- [资源管理](docs/resource-management.md) - 资源验证和同步
+- [常见问题](docs/faq.md) - 常见问题解答
 
-```bash
-py update_param.py
-```
+### 开发文档
 
-**参数文件位置**：
-- Ren'Py: `param_config/param_data_renpy.xlsx`
-- Naninovel: `param_config/param_data_naninovel.xlsx`
-
-**参数文件格式**：
-
-每个工作表代表一个参数类型，包含两列：
-- `ExcelParam`: Excel 中使用的中文参数
-- `ScenarioParam`: 引擎脚本中的实际参数
-
-示例（Speaker 工作表）：
-```
-ExcelParam | ScenarioParam
------------|---------------
-说话人      | the_speaker
-```
-
-**工作流程**：
-1. 编辑参数文件（Excel）
-2. 运行 `py update_param.py`
-3. 自动生成 `param_config/param_mappings.py`
-4. 重新运行 `py generate_scenario.py` 生成脚本
+- [测试指南](docs/testing.md) - 运行和编写测试
+- [开发指南](docs/development.md) - 贡献代码和开发环境
+- [架构设计](docs/architecture.md) - 项目架构和设计理念
 
 ---
 
-## 配置说明
-
-### 引擎配置
-
-**切换引擎**：只需修改 `engine_type` 即可
-
-```yaml
-# Ren'Py 引擎
-engine:
-  engine_type: "renpy"
-
-# Naninovel 引擎
-engine:
-  engine_type: "naninovel"
-```
-
-**自定义配置**（可选）：
-
-```yaml
-engine:
-  engine_type: "renpy"
-  indent_size: 4              # 缩进大小
-  default_transition: "dissolve"  # 默认转场
-```
-
-### 路径配置
-
-```yaml
-paths:
-  input_dir: "./input"        # Excel 输入目录
-  output_dir: "./output"      # 脚本输出目录
-  param_config_dir: "./param_config"  # 参数映射目录
-```
-
-### 处理配置
-
-```yaml
-processing:
-  ignore_mode: true           # 启用忽略模式
-  ignore_words: ["忽略", ""]  # 忽略标记词
-  enable_progress_bar: true   # 显示进度条
-```
-
----
-
-## Excel 格式要求
-
-### 必需列
-
-- `Note`: 注释列，必须包含 "END" 标记表示数据结束
-- `Ignore`: 忽略标记列（可选）
-
-### 数据列
-
-根据引擎不同，支持的列有所不同：
-
-**Ren'Py**：
-- `Speaker`, `Text` - 对话
-- `Character`, `Sprite` - 角色立绘
-- `Background` - 背景
-- `Music`, `Sound`, `Voice` - 音频
-- 等等...
-
-**Naninovel**：
-- `Speaker`, `Text` - 对话
-- `Char` - 角色
-- `Background` - 背景
-- `Music`, `Sound` - 音频
-- 等等...
-
-### 特殊工作表
-
-- `参数表`: 将被跳过，不生成脚本
-
----
-
-## 资源管理
-
-### 验证资源完整性
-
-检查 Excel 中引用的资源文件是否存在：
-
-```bash
-py validate_resources.py
-```
-
-**配置项目目录**：
-
-编辑 `validate_resources.py` 中的 `project_dirs`：
-
-```python
-project_dirs = {
-    "图片": Path("project/images"),
-    "音频": Path("project/audio"),
-    "视频": Path("project/video"),
-}
-```
-
-**验证报告**：
-
-报告保存在 `output/validation_reports/` 目录，包含：
-- 各类资源的统计信息
-- 缺失文件列表
-- 总体完成率
-
-### 同步缺失资源
-
-从资源库同步缺失的资源到项目：
-
-```bash
-py sync_resources.py
-```
-
-**配置资源库目录**：
-
-编辑 `sync_resources.py` 中的 `source_dirs`：
-
-```python
-source_dirs = {
-    "图片": Path("resource_library/images"),
-    "音频": Path("resource_library/audio"),
-    "视频": Path("resource_library/video"),
-}
-```
-
-**工作流程**：
-1. 读取验证报告，获取缺失文件列表
-2. 在资源库中查找这些文件
-3. 显示同步计划（找到的 + 未找到的）
-4. 询问用户确认
-5. 执行复制（支持干跑模式）
-
----
-
-## 测试
-
-### 集成测试
-
-运行集成测试：
-
-```bash
-py test_all.py
-```
-
-测试内容：
-- 模块导入
-- 彩色日志系统
-- 配置管理（引擎切换）
-- 引擎注册表
-- 参数翻译器
-- 异常系统
-- 常量管理
-- 参数映射更新
-
-### 单元测试
-
-安装测试依赖：
-
-```bash
-pip install -r requirements-dev.txt
-```
-
-运行单元测试：
-
-```bash
-# 运行所有测试
-pytest tests/ -v
-
-# 运行测试并生成覆盖率报告
-pytest --cov=. --cov-report=term-missing --cov-report=html
-
-# 运行特定模块的测试
-pytest tests/core/ -v
-
-# 运行特定测试文件
-pytest tests/core/test_param_translator.py -v
-```
-
-**测试覆盖率现状**：
-
-✅ **当前覆盖率：92%**（250 个测试）
-
-核心模块覆盖率：
-- ✅ `core/config_manager.py` - 100% 覆盖（31 个测试）
-- ✅ `core/constants.py` - 100% 覆盖（42 个测试）
-- ✅ `core/engine_processor.py` - 100% 覆盖（19 个测试）
-- ✅ `core/engine_registry.py` - 100% 覆盖（19 个测试）
-- ✅ `core/exceptions.py` - 100% 覆盖
-- ✅ `core/base_sentence_generator.py` - 97% 覆盖（44 个测试）
-- ✅ `core/param_translator.py` - 85% 覆盖（19 个测试）
-- ✅ `core/sentence_generator_manager.py` - 82% 覆盖（23 个测试）
-- ✅ `update_param.py` - 89% 覆盖（34 个测试）
-
-**测试目录结构**：
-```
-tests/
-├── core/                                    # 核心模块测试
-│   ├── test_base_sentence_generator.py      # 基础生成器测试
-│   ├── test_config_manager.py               # 配置管理测试
-│   ├── test_constants.py                    # 常量定义测试
-│   ├── test_engine_processor.py             # 引擎处理器测试
-│   ├── test_engine_registry.py              # 引擎注册表测试
-│   ├── test_param_translator.py             # 参数翻译器测试
-│   └── test_sentence_generator_manager.py   # 生成器管理器测试
-├── engines/                                 # 引擎模块测试（待扩展）
-├── gui/                                     # GUI 模块测试（待扩展）
-└── test_param_updater.py                    # 参数更新器测试
-```
-
-**测试特性**：
-- 使用 `@pytest.mark.parametrize` 实现参数化测试，减少代码重复
-- 完整的 fixture 支持，提供可复用的测试组件
-- Mock 对象隔离测试，确保单元测试的独立性
-- 临时文件系统支持，避免测试污染
-- 详细的测试报告和覆盖率分析
-
-**待完成测试**：
-- [ ] `tests/test_resource_validator.py` - 资源验证测试
-- [ ] `tests/test_resource_syncer.py` - 资源同步测试
-- [ ] `tests/engines/renpy/` - Ren'Py 引擎生成器测试
-- [ ] `tests/engines/naninovel/` - Naninovel 引擎生成器测试
-- [ ] `tests/gui/` - GUI 模块测试
-
----
-
-## 项目结构
+## 🏗️ 项目结构
 
 ```
 scenario_tool/
-├── core/                          # 核心框架
-│   ├── logger.py                  # 日志系统
-│   ├── exceptions.py              # 异常类
-│   ├── constants.py               # 常量定义
-│   ├── config_manager.py          # 配置管理
-│   ├── engine_registry.py         # 引擎注册表
-│   ├── param_translator.py        # 参数翻译器
-│   ├── base_sentence_generator.py # 生成器基类
-│   ├── sentence_generator_manager.py  # 生成器管理器
-│   └── engine_processor.py        # 引擎处理器
-├── engines/
-│   ├── renpy/                     # Ren'Py 引擎（12个生成器）
-│   └── naninovel/                 # Naninovel 引擎（7个生成器）
-├── gui/                           # GUI 界面
-│   ├── main.py                    # GUI 主程序
-│   ├── ui/                        # UI 定义
-│   ├── controllers/               # 控制器
-│   └── utils/                     # GUI 工具
-├── param_config/                  # 参数映射配置
-│   ├── param_data_renpy.xlsx      # Ren'Py 参数文件
-│   ├── param_data_naninovel.xlsx  # Naninovel 参数文件
-│   ├── varient_data.xlsx          # 差分参数文件（可选）
-│   ├── param_mappings.py          # 生成的参数映射（自动生成）
-│   └── varient_mappings.py        # 生成的差分参数映射（自动生成）
-├── input/                         # Excel 输入目录
-├── output/                        # 脚本输出目录
-├── logs/                          # 日志目录
-├── config.yaml                    # 配置文件
-├── run_gui.py                     # GUI 启动脚本
-├── generate_scenario.py           # 脚本生成工具
-├── update_param.py                # 参数映射更新工具
-├── validate_resources.py          # 资源验证工具
-├── sync_resources.py              # 资源同步工具
-├── test_all.py                    # 集成测试
-└── README.md                      # 本文件
+├── core/           # 核心框架
+├── engines/        # 引擎实现（Ren'Py, Naninovel）
+├── gui/            # GUI 界面
+├── tests/          # 测试代码
+├── docs/           # 文档
+├── param_config/   # 参数映射配置
+├── input/          # Excel 输入目录
+└── output/         # 脚本输出目录
 ```
 
 ---
 
-## 日志
+## 📊 测试覆盖率
 
-日志文件保存在 `logs/scenario_tool.log`，包含详细的执行信息。
+✅ **当前覆盖率：92%**（250 个测试）
 
-控制台输出彩色日志：
-- DEBUG: 青色
-- INFO: 绿色
-- WARNING: 黄色
-- ERROR: 红色
-- CRITICAL: 紫色
+核心模块 100% 覆盖：
+- `core/config_manager.py`
+- `core/constants.py`
+- `core/engine_processor.py`
+- `core/engine_registry.py`
+- `core/exceptions.py`
+
+详见 [测试指南](docs/testing.md)
 
 ---
 
-## 扩展新引擎
+## 🤝 贡献
 
-要添加新引擎支持：
+欢迎贡献！请查看 [开发指南](docs/development.md) 了解如何参与项目。
 
-1. 在 `engines/` 下创建新目录
-2. 创建 `__init__.py` 并使用 `@register_engine` 装饰器
-3. 创建 `sentence_generators/` 目录
-4. 实现各种生成器类
+### 开发环境设置
 
-示例：
+```bash
+# 安装开发依赖
+pip install -r requirements-dev.txt
 
-```python
-from core.engine_registry import register_engine
-from core.config_manager import EngineConfig
-from core.engine_processor import EngineProcessor
-
-@register_engine(
-    name="my_engine",
-    display_name="My Engine",
-    file_extension=".txt",
-    config_class=EngineConfig,
-    description="My custom engine"
-)
-def create_my_engine_processor(config, translator):
-    processor = EngineProcessor("my_engine", translator, config)
-    processor.setup()
-    return processor
+# 运行测试
+pytest tests/ -v
 ```
 
 ---
 
-## 常见问题
-
-### Q: 如何切换引擎？
-
-A: 只需修改 `config.yaml` 中的 `engine_type`：
-
-```yaml
-engine:
-  engine_type: "renpy"  # 或 "naninovel"
-```
-
-### Q: 生成的脚本在哪里？
-
-A: 在 `output/` 目录中，文件扩展名根据引擎自动确定：
-- Ren'Py: `.rpy`
-- Naninovel: `.nani`
-
-### Q: 如何查看详细日志？
-
-A: 查看 `logs/scenario_tool.log` 文件。
-
-### Q: 资源验证报告在哪里？
-
-A: 在 `output/validation_reports/` 目录中。
-
-### Q: 如何添加新的参数映射？
-
-A: 编辑对应引擎的参数文件（`param_config/param_data_renpy.xlsx` 或 `param_config/param_data_naninovel.xlsx`），然后运行 `py update_param.py` 自动生成参数映射。
-
----
-
-## 许可证
+## 📄 许可证
 
 与原项目保持一致
+
+---
+
+## 🔗 相关链接
+
+- [快速开始指南](docs/getting-started.md) - 5 分钟上手
+- [完整文档](docs/) - 查看所有文档
+- [常见问题](docs/faq.md) - 遇到问题？先看这里
+
+---
+
+**最后更新**: 2025-11-23
