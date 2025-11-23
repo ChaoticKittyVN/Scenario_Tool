@@ -9,19 +9,34 @@ class AudioGenerator(BaseSentenceGenerator):
     """音频生成器"""
 
     param_config = {
-        "Music": {
-            "translate_type": "Music",
-        },
-        "Sound": {
-            "translate_type": "Sound",
-        },
-        "Ambience": {
-            "translate_type": "Ambience",
-        },
-        "Volume": {},
-        "AudioFade": {},
-    }
+            "Music": {
+                "translate_type": "Music",
+                "match_word": "stop",
+                "stop_format": "stop music",
+                "format": "play music {value}",
+            },
 
+            "Ambience": {
+                "translate_type": "Ambience",
+                "match_word": "stop",
+                "stop_format": "stop ambience",
+                "format": "play ambience {value}",
+            },
+
+            "Sound": {
+                "translate_type": "Sound",
+                "match_word": "stop",
+                "stop_format": "stop sound",
+                "format": "play sound {value}",
+            },
+            "Volume": {
+                "format": " volume {value}",
+            },
+
+            "AudioFade": {
+                "format": " fadein {value}",
+            },
+        }
     @property
     def category(self):
         return "Audio"
@@ -44,35 +59,23 @@ class AudioGenerator(BaseSentenceGenerator):
             return None
 
         data = self.do_translate(data)
-        results = []
+        lines = []
 
-        # 处理音乐
-        if "Music" in data:
-            music = data["Music"]
-            if music == "stop":
-                results.append("stop music")
-            else:
-                cmd = f"play music {music}"
-                if "Volume" in data:
-                    cmd += f" volume {data['Volume']}"
-                if "AudioFade" in data:
-                    cmd += f" fadein {data['AudioFade']}"
-                results.append(cmd)
 
-        # 处理音效
-        if "Sound" in data:
-            sound = data["Sound"]
-            if sound == "stop":
-                results.append("stop sound")
-            else:
-                results.append(f"play sound {sound}")
+        for audio in ["Music", "Sound", "Ambience"]:
+            if audio in data:
+                audio_value = data[audio]
+                line = []
+                if audio_value == "stop":
+                    line = self.param_config[audio]["stop_format"]
+                    if self.exists_param("AudioFade", data):
+                        line += f" fadeout {self.get_value('AudioFade', data)}"
+                else:
+                    line = self.get_sentence(audio, data)
+                    if self.exists_param("Volume", data):
+                        line += self.get_sentence("Volume", data)
+                    if self.exists_param("AudioFade", data):
+                        line += self.get_sentence("AudioFade", data)
+                lines.append(line)
 
-        # 处理环境音
-        if "Ambience" in data:
-            ambience = data["Ambience"]
-            if ambience == "stop":
-                results.append("stop ambience")
-            else:
-                results.append(f"play ambience {ambience}")
-
-        return results
+        return lines

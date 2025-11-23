@@ -19,6 +19,9 @@ class TextGenerator(BaseSentenceGenerator):
         "Text": {},
     }
 
+    SPECIAL_SPEAKER_VALUES = {member.value for member in SpecialSpeaker}
+
+
     @property
     def category(self):
         return "Text"
@@ -52,9 +55,15 @@ class TextGenerator(BaseSentenceGenerator):
 
         # 处理对话文本
         if speaker:
-            if speaker == SpecialSpeaker.RENPY_COMMAND.value:
-                # 直接输入 Ren'Py 命令
-                lines.append(text)
+            if speaker in self.SPECIAL_SPEAKER_VALUES:
+                if speaker == SpecialSpeaker.RENPY_COMMAND.value:
+                    # 直接输入 Ren'Py 命令
+                    lines.append(text)
+                    #
+                elif speaker == SpecialSpeaker.LABEL_CAMMAND.value:
+                    lines.append(f"label {text}:")
+                else:
+                    raise ValueError(f"不支持的特殊说话者：{speaker}。")
             else:
                 speaker = self.translator.translate("Speaker", speaker)
                 lines.append(f'{speaker} "{text}"')

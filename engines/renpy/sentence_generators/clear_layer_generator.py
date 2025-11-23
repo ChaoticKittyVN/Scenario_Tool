@@ -5,18 +5,18 @@ Ren'Py Scene Clear Generator
 from core.base_sentence_generator import BaseSentenceGenerator
 
 
-class SceneClearGenerator(BaseSentenceGenerator):
+class ClearLayerGenerator(BaseSentenceGenerator):
     """场景清除生成器"""
 
     param_config = {
-        "SceneClear": {
+        "ClearLayer": {
             "translate_type": "Layer"
         }
     }
 
     @property
     def category(self):
-        return "SceneClear"
+        return "ClearLayer"
 
     @property
     def priority(self) -> int:
@@ -37,7 +37,7 @@ class SceneClearGenerator(BaseSentenceGenerator):
 
         data = self.do_translate(data)
 
-        layer = self.get_value("SceneClear", data)
+        layer = self.get_value("ClearLayer", data)
         if not layer:
             return []
 

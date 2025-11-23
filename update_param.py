@@ -46,7 +46,7 @@ class ParamUpdater:
 
         try:
             # 读取所有工作表
-            sheets = pd.read_excel(param_file, sheet_name=None)
+            sheets = pd.read_excel(param_file, sheet_name=None, dtype=str, keep_default_na=False, na_values=[''])
             logger.info(f"读取到 {len(sheets)} 个工作表")
 
             mappings = {}
@@ -67,7 +67,8 @@ class ParamUpdater:
                 for _, row in df.iterrows():
                     excel_param = row["ExcelParam"]
                     scenario_param = row["ScenarioParam"]
-
+                    if sheet_name == "Transition":
+                        print(scenario_param)
                     if pd.notna(excel_param) and pd.notna(scenario_param):
                         sheet_mapping[str(excel_param)] = str(scenario_param)
 
