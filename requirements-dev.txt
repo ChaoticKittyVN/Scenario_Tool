@@ -1,0 +1,15 @@
+# 开发和测试依赖
+
+# 测试框架
+pytest>=7.0.0
+pytest-cov>=4.0.0          # 测试覆盖率
+pytest-mock>=3.10.0        # Mock 工具
+
+# 代码质量
+black>=23.0.0              # 代码格式化
+flake8>=6.0.0              # 代码检查
+mypy>=1.0.0                # 类型检查
+
+# 其他测试工具
+pytest-xdist>=3.0.0        # 并行测试
+pytest-timeout>=2.1.0      # 测试超时

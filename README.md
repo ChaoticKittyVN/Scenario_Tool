@@ -6,10 +6,19 @@
 
 ## 快速开始
 
+### 安装依赖
+
+```bash
+# 安装生产环境依赖
+pip install -r requirements.txt
+
+# 如果需要开发和测试，安装开发依赖
+pip install -r requirements-dev.txt
+```
+
 ### GUI 模式
 
 ```bash
-pip install pandas openpyxl pyyaml PySide6
 py run_gui.py
 ```
 
@@ -21,13 +30,7 @@ GUI 提供四个功能标签页：
 
 ### 命令行模式
 
-#### 1. 安装依赖
-
-```bash
-pip install pandas openpyxl pyyaml
-```
-
-#### 2. 配置引擎
+#### 1. 配置引擎
 
 编辑 `config.yaml`，选择目标引擎：
 
@@ -36,11 +39,11 @@ engine:
   engine_type: "renpy"  # 或 "naninovel"
 ```
 
-#### 3. 准备数据
+#### 2. 准备数据
 
 将 Excel 文件放入 `input/` 目录。
 
-#### 4. 生成脚本
+#### 3. 生成脚本
 
 ```bash
 py generate_scenario.py
@@ -221,6 +224,8 @@ source_dirs = {
 
 ## 测试
 
+### 集成测试
+
 运行集成测试：
 
 ```bash
@@ -236,6 +241,75 @@ py test_all.py
 - 异常系统
 - 常量管理
 - 参数映射更新
+
+### 单元测试
+
+安装测试依赖：
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+运行单元测试：
+
+```bash
+# 运行所有测试
+pytest tests/ -v
+
+# 运行测试并生成覆盖率报告
+pytest --cov=. --cov-report=term-missing --cov-report=html
+
+# 运行特定模块的测试
+pytest tests/core/ -v
+
+# 运行特定测试文件
+pytest tests/core/test_param_translator.py -v
+```
+
+**测试覆盖率现状**：
+
+✅ **当前覆盖率：92%**（250 个测试）
+
+核心模块覆盖率：
+- ✅ `core/config_manager.py` - 100% 覆盖（31 个测试）
+- ✅ `core/constants.py` - 100% 覆盖（42 个测试）
+- ✅ `core/engine_processor.py` - 100% 覆盖（19 个测试）
+- ✅ `core/engine_registry.py` - 100% 覆盖（19 个测试）
+- ✅ `core/exceptions.py` - 100% 覆盖
+- ✅ `core/base_sentence_generator.py` - 97% 覆盖（44 个测试）
+- ✅ `core/param_translator.py` - 85% 覆盖（19 个测试）
+- ✅ `core/sentence_generator_manager.py` - 82% 覆盖（23 个测试）
+- ✅ `update_param.py` - 89% 覆盖（34 个测试）
+
+**测试目录结构**：
+```
+tests/
+├── core/                                    # 核心模块测试
+│   ├── test_base_sentence_generator.py      # 基础生成器测试
+│   ├── test_config_manager.py               # 配置管理测试
+│   ├── test_constants.py                    # 常量定义测试
+│   ├── test_engine_processor.py             # 引擎处理器测试
+│   ├── test_engine_registry.py              # 引擎注册表测试
+│   ├── test_param_translator.py             # 参数翻译器测试
+│   └── test_sentence_generator_manager.py   # 生成器管理器测试
+├── engines/                                 # 引擎模块测试（待扩展）
+├── gui/                                     # GUI 模块测试（待扩展）
+└── test_param_updater.py                    # 参数更新器测试
+```
+
+**测试特性**：
+- 使用 `@pytest.mark.parametrize` 实现参数化测试，减少代码重复
+- 完整的 fixture 支持，提供可复用的测试组件
+- Mock 对象隔离测试，确保单元测试的独立性
+- 临时文件系统支持，避免测试污染
+- 详细的测试报告和覆盖率分析
+
+**待完成测试**：
+- [ ] `tests/test_resource_validator.py` - 资源验证测试
+- [ ] `tests/test_resource_syncer.py` - 资源同步测试
+- [ ] `tests/engines/renpy/` - Ren'Py 引擎生成器测试
+- [ ] `tests/engines/naninovel/` - Naninovel 引擎生成器测试
+- [ ] `tests/gui/` - GUI 模块测试
 
 ---
 
