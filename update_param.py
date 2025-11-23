@@ -9,6 +9,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
+from core.sentence_generator_manager import SentenceGeneratorManager
 from core.config_manager import AppConfig
 from core.logger import get_logger
 
@@ -185,6 +186,22 @@ class ParamUpdater:
 
         return validation_data
 
+    def get_all_param_translate_types(self) -> List[str]:
+        """
+        获取所有句子生成器的参数翻译类型
+        
+        Returns:
+            List[str]: 去重后的参数翻译类型列表
+        """
+        try:
+            # 创建管理器实例
+            manager = SentenceGeneratorManager(self.engine_type)
+            # 调用我们之前写的方法
+            return manager.get_all_translate_types()
+        except Exception as e:
+            logger.error(f"获取参数翻译类型时发生错误: {e}")
+            return []
+
     def update_scenario_param_sheets(self, validation_data: Dict[str, List[str]]) -> bool:
         """
         更新演出表格中的参数表工作表
@@ -197,6 +214,12 @@ class ParamUpdater:
         """
         if not validation_data:
             logger.error("没有收集到验证数据")
+            return False
+        
+        # 获取参数翻译类型列表
+        param_types = self.get_all_param_translate_types()
+        if not param_types:
+            logger.error("无法获取参数翻译类型列表")
             return False
 
         # 获取 input 目录
@@ -213,70 +236,93 @@ class ParamUpdater:
             logger.warning(f"在 {input_dir} 中没有找到 Excel 文件")
             return True
 
-        logger.info(f"\n找到 {len(excel_files)} 个演出表格文件")
+        logger.info(f"找到 {len(excel_files)} 个演出表格文件")
 
         success_count = 0
         for excel_file in excel_files:
             try:
-                logger.info(f"\n处理文件: {excel_file.name}")
+                logger.info(f"处理文件: {excel_file.name}")
 
                 # 加载工作簿
                 wb = load_workbook(excel_file)
 
                 # 检查是否存在"参数表"工作表
                 if "参数表" not in wb.sheetnames:
-                    logger.warning(f"  {excel_file.name} 中没有'参数表'工作表，跳过")
-                    wb.close()
-                    continue
-
-                validation_ws = wb["参数表"]
+                    logger.info(f"  创建新的'参数表'工作表")
+                    validation_ws = wb.create_sheet("参数表")
+                    # logger.warning(f"  {excel_file.name} 中没有'参数表'工作表，跳过")
+                    # wb.close()
+                    # continue
+                else:
+                    validation_ws = wb["参数表"]
 
                 # 创建居中对齐样式
                 center_alignment = Alignment(horizontal='center', vertical='center')
 
-                # 获取当前参数表的列顺序
-                current_headers = []
-                for col_idx in range(1, validation_ws.max_column + 1):
-                    header = validation_ws.cell(row=1, column=col_idx).value
-                    if header:
-                        current_headers.append(header)
+                # # 获取当前参数表的列顺序
+                # current_headers = []
+                # for col_idx in range(1, validation_ws.max_column + 1):
+                #     header = validation_ws.cell(row=1, column=col_idx).value
+                #     if header:
+                #         current_headers.append(header)
 
-                logger.info(f"  当前参数表列: {current_headers}")
+                # logger.info(f"  当前参数表列: {current_headers}")
 
                 # 跟踪是否有任何更新
                 has_updates = False
 
                 # 按照当前列顺序更新参数表
-                for col_idx, param_name in enumerate(current_headers, 1):
+                for col_idx, param_type in enumerate(param_types, 1):
                     # 获取这个参数的数据
-                    params = validation_data.get(param_name, [])
+                    params = validation_data.get(param_type, [])
 
-                    # 检查参数内容是否匹配
-                    current_params = []
-                    read_row = 2
-                    while read_row <= validation_ws.max_row:
-                        cell_value = validation_ws.cell(row=read_row, column=col_idx).value
-                        if cell_value is None:
-                            break
-                        current_params.append(str(cell_value))
-                        read_row += 1
+                    
+                    # 检查表头是否匹配
+                    current_header = validation_ws.cell(row=1, column=col_idx).value
+                    needs_update = False
 
-                    # 如果参数数量或内容有变化，需要更新
-                    if current_params != [str(p) for p in params]:
-                        logger.info(f"  更新 {param_name}: 当前 {len(current_params)} 个，新 {len(params)} 个")
+                    if current_header != param_type:
+                        needs_update = True
+                        logger.info(f"  表头不匹配: 当前'{current_header}'，期望'{param_type}'")
+                    else: 
+                        # 检查参数内容是否匹配
+                        current_params = []
+                        read_row = 2
+                        while read_row <= validation_ws.max_row:
+                            cell_value = validation_ws.cell(row=read_row, column=col_idx).value
+                            if cell_value is None:
+                                break
+                            current_params.append(str(cell_value))
+                            read_row += 1
+
+                        # 如果参数数量或内容有变化，需要更新
+                        if current_params != [str(p) for p in params]:
+                            needs_update = True
+                            logger.info(f"  更新 {param_type}: 当前 {len(current_params)} 个，新 {len(params)} 个")
+                    # 如果需要更新，重新写入这一列
+                    if needs_update: 
+                            
                         has_updates = True
 
-                        # 清除这一列的内容（从第2行开始）
-                        for clear_row in range(2, validation_ws.max_row + 1):
+                        # 清除这一列的内容（从第1行开始）
+                        for clear_row in range(1, validation_ws.max_row + 1):
                             validation_ws.cell(row=clear_row, column=col_idx).value = None
+
+                        # 写入表头
+                        header_cell = validation_ws.cell(row=1, column=col_idx, value=param_type)
+                        header_cell.alignment = center_alignment
 
                         # 写入参数数据
                         for write_row, param_value in enumerate(params, 2):
                             cell = validation_ws.cell(row=write_row, column=col_idx, value=param_value)
                             cell.alignment = center_alignment
 
+                        logger.info(f" 更新 {param_type} 参数 写入 {len(params)} 个参数")
+                    else:
+                        logger.debug(f"  {param_type} 列无需更新")
+
                     # 创建或更新命名区域
-                    range_name = f"{param_name}List"
+                    range_name = f"{param_type}List"
                     col_letter = get_column_letter(col_idx)
                     expected_dynamic_range = f"OFFSET(参数表!${col_letter}$2,0,0,COUNTA(参数表!${col_letter}:${col_letter})-1,1)"
 
@@ -308,6 +354,17 @@ class ParamUpdater:
                         except Exception as e:
                             logger.warning(f"  处理命名区域 {range_name} 时发生错误: {e}")
 
+                # 清理多余的列（如果参数翻译类型列表比当前列少）
+                current_column_count = validation_ws.max_column
+                if current_column_count > len(param_types):
+                    logger.info(f"  清理多余的列: 当前{current_column_count}列，期望{len(param_types)}列")
+                    has_updates = True
+                    # 删除多余的列
+                    for col_idx in range(len(param_types) + 1, current_column_count + 1):
+                        for row_idx in range(1, validation_ws.max_row + 1):
+                            validation_ws.cell(row=row_idx, column=col_idx).value = None
+
+
                 # 保存工作簿（仅当有更新时）
                 if has_updates:
                     try:
@@ -325,7 +382,7 @@ class ParamUpdater:
             except Exception as e:
                 logger.error(f"  处理文件 {excel_file.name} 时发生错误: {e}", exc_info=True)
 
-        logger.info(f"\n处理完成，成功更新 {success_count}/{len(excel_files)} 个文件")
+        logger.info(f"处理完成，成功更新 {success_count}/{len(excel_files)} 个文件")
         return success_count > 0
 
     def update_mappings(self):
@@ -360,7 +417,7 @@ class ParamUpdater:
         varient_file = Path(self.config.paths.param_config_dir) / "varient_data.xlsx"
 
         if varient_file.exists():
-            logger.info(f"\n读取差分参数文件: {varient_file}")
+            logger.info(f"读取差分参数文件: {varient_file}")
             # 差分参数文件不跳过模板工作表，保持与原项目一致
             varient_mappings = self.read_param_file(varient_file, skip_template=False)
 
@@ -381,7 +438,7 @@ class ParamUpdater:
             logger.info("差分参数文件不存在，跳过")
 
         # 阶段3: 更新演出表格的参数表
-        logger.info("\n" + "=" * 60)
+        logger.info("=" * 60)
         logger.info("更新演出表格参数表")
         logger.info("=" * 60)
 
@@ -392,7 +449,7 @@ class ParamUpdater:
         else:
             logger.warning("未能收集到验证数据，跳过演出表格更新")
 
-        logger.info("\n" + "=" * 60)
+        logger.info("=" * 60)
         logger.info(f"参数映射更新完成")
         logger.info("=" * 60)
 
