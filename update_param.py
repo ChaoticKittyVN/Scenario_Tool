@@ -187,21 +187,21 @@ class ParamUpdater:
 
         return validation_data
 
-    def get_all_param_translate_types(self) -> List[str]:
+    def get_all_validate_params(self) -> Dict[str, List[str]]:
         """
         获取所有句子生成器的参数翻译类型
         
         Returns:
-            List[str]: 去重后的参数翻译类型列表
+            Dict[str, Dict[str, list[str]]]: 去重后的数据验证参数类型列表
         """
         try:
             # 创建管理器实例
             manager = SentenceGeneratorManager(self.engine_type)
             # 调用我们之前写的方法
-            return manager.get_all_translate_types()
+            return manager.get_validate_params()
         except Exception as e:
-            logger.error(f"获取参数翻译类型时发生错误: {e}")
-            return []
+            logger.error(f"获取数据验证参数类型时发生错误: {e}")
+            return {}
 
     def update_scenario_param_sheets(self, validation_data: Dict[str, List[str]]) -> bool:
         """
@@ -218,10 +218,15 @@ class ParamUpdater:
             return False
         
         # 获取参数翻译类型列表
-        param_types = self.get_all_param_translate_types()
+        param_types = self.get_all_validate_params()
         if not param_types:
-            logger.error("无法获取参数翻译类型列表")
+            logger.error("无法获取参数翻译类型词典")
             return False
+        
+        translate_params = param_types.get("translate_types", [])
+        validate_params = param_types.get("validate_types", [])
+
+        all_params = sorted(validate_params + translate_params)
 
         # 获取 input 目录
         input_dir = Path(self.config.paths.input_dir)
@@ -273,7 +278,7 @@ class ParamUpdater:
                 has_updates = False
 
                 # 按照当前列顺序更新参数表
-                for col_idx, param_type in enumerate(param_types, 1):
+                for col_idx, param_type in enumerate(all_params, 1):
                     # 获取这个参数的数据
                     params = validation_data.get(param_type, [])
 
@@ -284,7 +289,7 @@ class ParamUpdater:
 
                     if current_header != param_type:
                         needs_update = True
-                        logger.info(f"  表头不匹配: 当前'{current_header}'，期望'{param_type}'")
+                        logger.info(f" 表头不匹配: 当前'{current_header}'，期望'{param_type}'")
                     else: 
                         # 检查参数内容是否匹配
                         current_params = []
@@ -299,7 +304,7 @@ class ParamUpdater:
                         # 如果参数数量或内容有变化，需要更新
                         if current_params != [str(p) for p in params]:
                             needs_update = True
-                            logger.info(f"  更新 {param_type}: 当前 {len(current_params)} 个，新 {len(params)} 个")
+                            logger.info(f" 更新 {param_type}: 当前 {len(current_params)} 个，新 {len(params)} 个")
                     # 如果需要更新，重新写入这一列
                     if needs_update: 
                             
@@ -320,7 +325,7 @@ class ParamUpdater:
 
                         logger.info(f" 更新 {param_type} 参数 写入 {len(params)} 个参数")
                     else:
-                        logger.debug(f"  {param_type} 列无需更新")
+                        logger.debug(f" {param_type} 列无需更新")
 
                     # 创建或更新命名区域
                     range_name = f"{param_type}List"
@@ -357,11 +362,11 @@ class ParamUpdater:
 
                 # 清理多余的列（如果参数翻译类型列表比当前列少）
                 current_column_count = validation_ws.max_column
-                if current_column_count > len(param_types):
-                    logger.info(f"  清理多余的列: 当前{current_column_count}列，期望{len(param_types)}列")
+                if current_column_count > len(all_params):
+                    logger.info(f"  清理多余的列: 当前{current_column_count}列，期望{len(all_params)}列")
                     has_updates = True
                     # 删除多余的列
-                    for col_idx in range(len(param_types) + 1, current_column_count + 1):
+                    for col_idx in range(len(all_params) + 1, current_column_count + 1):
                         for row_idx in range(1, validation_ws.max_row + 1):
                             validation_ws.cell(row=row_idx, column=col_idx).value = None
 

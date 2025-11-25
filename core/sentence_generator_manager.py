@@ -99,26 +99,35 @@ class SentenceGeneratorManager:
         self.load()
         return sorted(list(self.param_configs.keys()))
 
-    def get_all_translate_types(self) -> List[str]:
+    def get_validate_params(self) -> Dict[str, list[str]]:
         """
-        收集所有参数配置中的translate_type值
+        收集所有参数配置中的translate_type值和validate_type值
         
         Returns:
-            List[str]: 去重后的translate_type列表
+            Dict[str, list[str]]: 去重后的数据验证参数列表词典
         """
         translate_types = set()
+        validate_types = set()
+        result = {}
         self.load()
         for generator_class in self.generator_classes:
             param_config = getattr(generator_class, 'param_config', {})
             
             if param_config and isinstance(param_config, dict):
                 for param_name, config in param_config.items():
-                    if isinstance(config, dict) and "translate_type" in config:
-                        translate_type = config["translate_type"]
-                        if translate_type:
-                            translate_types.add(translate_type)
-        
+                    if isinstance(config, dict):
+                        if "translate_type" in config:
+                            translate_type = config["translate_type"]
+                            if translate_type:
+                                translate_types.add(translate_type)
+                        elif "validate_type" in config:
+                            validate_type = config["validate_type"]
+                            if validate_type:
+                                validate_types.add(validate_type)
+
         # 转换为排序后的列表
-        result = sorted(list(translate_types))
-        logger.info(f"收集到 {len(result)} 个不同的 translate_type: {result}")
+        result["translate_types"] = sorted(list(translate_types))
+        result["validate_types"] = sorted(list(validate_types))
+        logger.info(f"收集到 {len(translate_types)} 个翻译参数: {result['translate_types']}")
+        logger.info(f"收集到 {len(validate_types)} 个验证参数: {result['validate_types']}")
         return result
