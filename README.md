@@ -46,17 +46,17 @@ py generate_scenario.py
 
 ### 用户文档
 
-- [快速开始](docs/getting-started.md) - 安装和基本使用
-- [配置说明](docs/configuration.md) - 引擎配置和路径设置
-- [参数映射](docs/param-mapping.md) - 参数映射管理
-- [资源管理](docs/resource-management.md) - 资源验证和同步
-- [常见问题](docs/faq.md) - 常见问题解答
+- [快速开始](docs/markdown/getting-started.md) - 安装和基本使用
+- [配置说明](docs/markdown/configuration.md) - 引擎配置和路径设置
+- [参数映射](docs/markdown/param-mapping.md) - 参数映射管理
+- [资源管理](docs/markdown/resource-management.md) - 资源验证和同步
+- [常见问题](docs/markdown/faq.md) - 常见问题解答
 
 ### 开发文档
 
-- [测试指南](docs/testing.md) - 运行和编写测试
-- [开发指南](docs/development.md) - 贡献代码和开发环境
-- [架构设计](docs/architecture.md) - 项目架构和设计理念
+- [测试指南](docs/markdown/testing.md) - 运行和编写测试
+- [开发指南](docs/markdown/development.md) - 贡献代码和开发环境
+- [架构设计](docs/markdown/architecture.md) - 项目架构和设计理念
 
 ---
 
@@ -87,13 +87,13 @@ scenario_tool/
 - `core/engine_registry.py`
 - `core/exceptions.py`
 
-详见 [测试指南](docs/testing.md)
+详见 [测试指南](docs/markdown/testing.md)
 
 ---
 
 ## 🤝 贡献
 
-欢迎贡献！请查看 [开发指南](docs/development.md) 了解如何参与项目。
+欢迎贡献！请查看 [开发指南](docs/markdown/development.md) 了解如何参与项目。
 
 ### 开发环境设置
 
@@ -115,9 +115,9 @@ pytest tests/ -v
 
 ## 🔗 相关链接
 
-- [快速开始指南](docs/getting-started.md) - 5 分钟上手
-- [完整文档](docs/) - 查看所有文档
-- [常见问题](docs/faq.md) - 遇到问题？先看这里
+- [快速开始指南](docs/markdown/getting-started.md) - 5 分钟上手
+- [完整文档](docs/markdown/) - 查看所有文档
+- [常见问题](docs/markdown/faq.md) - 遇到问题？先看这里
 
 ---
 
