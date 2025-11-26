@@ -130,16 +130,15 @@ def process_excel_file(file_path: Path, config: AppConfig):
 
             # 统计字数
             word_counter = BasicWordCounter()
-            valid_speaker_and_text = valid_rows_df[[ColumnName.SPEAKER.value, ColumnName.TEXT.value]].dropna()
 
             # 统计总字数
-            total_words = word_counter.count(list(valid_speaker_and_text[ColumnName.TEXT.value]))
+            total_words = word_counter.count(list(valid_rows_df[ColumnName.TEXT.value]))
             logger.info(f"工作表 {sheet} 总字数: {total_words}")
             
             # 按说话者统计字数
             total_words_by_speaker = word_counter.count_by(list(zip(
-                valid_speaker_and_text[ColumnName.SPEAKER.value],
-                valid_speaker_and_text[ColumnName.TEXT.value]
+                valid_rows_df[ColumnName.SPEAKER.value],
+                valid_rows_df[ColumnName.TEXT.value]
             )))
             for speaker, count in total_words_by_speaker.items():
                 logger.info(f"  说话者 '{speaker}' 字数: {count}")

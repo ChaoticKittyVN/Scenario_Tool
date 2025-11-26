@@ -150,7 +150,7 @@ class ChineseExtractor(TextProcessor):
 class PunctuationFilter(TextProcessor):
     """
     标点符号过滤器
-    过滤文本中的所有标点符号
+    过滤文本中的所有标点符号和空格
     """
 
     def __init__(self, punctuations: Optional[str] = None):
@@ -158,13 +158,13 @@ class PunctuationFilter(TextProcessor):
         初始化过滤器
 
         Args:
-            punctuations: 要过滤的标点符号字符串，默认为所有非字母数字字符
+            punctuations: 要过滤的标点符号字符串，默认为所有非字母数字字符和空格
         """
         if punctuations is not None:
             escaped_punctuations = re.escape(punctuations)
             self.pattern = re.compile(f'[{escaped_punctuations}]')
         else:
-            self.pattern = re.compile(r'[^\w\s]', re.UNICODE)
+            self.pattern = re.compile(r'[^\w]', re.UNICODE)
 
     def process(self, text: str) -> str:
         """
@@ -177,21 +177,3 @@ class PunctuationFilter(TextProcessor):
             str: 过滤后的文本
         """
         return self.pattern.sub('', text)
-
-
-if __name__ == "__main__":
-    # 示例用法
-    extractor = RegexExtractor(r'\[(\w+?)\]', get_result=lambda match: '[[' + match.group(1) + ']]')  # 提取所有4个字母的单词
-    input_text = "This is a [test] text with some four [letter] words like test and text."
-    output_text = extractor(input_text)
-    print(output_text)
-
-    extractor = SimpleDialogueContentExtractor()
-    input_text = "他说：「你好！」然后离开了。她回答：「再见！」测试嵌套：「他说：「你好吗？」」"
-    output_text = extractor(input_text)
-    print(output_text)
-
-    extractor = PunctuationFilter()
-    input_text = output_text
-    output_text = extractor(input_text)
-    print(output_text)
