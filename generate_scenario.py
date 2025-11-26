@@ -12,6 +12,7 @@ from core.engine_registry import EngineRegistry
 from core.logger import get_logger
 from core.exceptions import ExcelParseError, GeneratorError
 from core.constants import SheetName, ColumnName, Marker, TEMP_FILE_PREFIX
+from core.word_counter import BasicWordCounter
 
 # 导入引擎模块以触发注册
 import engines.renpy
@@ -126,6 +127,22 @@ def process_excel_file(file_path: Path, config: AppConfig):
             write_output_file(output_file_path, output_list, config)
 
             logger.info(f"已生成: {output_file_path}")
+
+            # 统计字数
+            word_counter = BasicWordCounter()
+            valid_speaker_and_text = valid_rows_df[[ColumnName.SPEAKER.value, ColumnName.TEXT.value]].dropna()
+
+            # 统计总字数
+            total_words = word_counter.count(list(valid_speaker_and_text[ColumnName.TEXT.value]))
+            logger.info(f"工作表 {sheet} 总字数: {total_words}")
+            
+            # 按说话者统计字数
+            total_words_by_speaker = word_counter.count_by(list(zip(
+                valid_speaker_and_text[ColumnName.SPEAKER.value],
+                valid_speaker_and_text[ColumnName.TEXT.value]
+            )))
+            for speaker, count in total_words_by_speaker.items():
+                logger.info(f"  说话者 '{speaker}' 字数: {count}")
 
     except Exception as e:
         logger.error(f"处理文件 {file_path} 时出错: {e}", exc_info=True)
