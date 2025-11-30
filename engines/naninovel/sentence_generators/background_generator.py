@@ -51,7 +51,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             "default": "1.0"
         },
         "BackAnim": {
-            "translate_type": "Background",
+            "translate_type": "Id",
         },
         "BackAnimParam": {
             "translate_type": "Animation",

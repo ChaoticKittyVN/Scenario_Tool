@@ -4,7 +4,7 @@ class CameraGenerator(BaseSentenceGenerator):
 
     param_config = {   
         "Camera": {
-            "translate_type": "Camera"
+            "validate_type": "Camera"
             },
 
         "Zoom": {

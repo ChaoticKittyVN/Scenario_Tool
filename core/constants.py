@@ -12,7 +12,7 @@ class WindowMode(str, Enum):
     SHOW_AND_HIDE = "显示和隐藏"
 
 
-class SpecialSpeaker(str, Enum):
+class SpecialName(str, Enum):
     """特殊说话者（用于直接输入引擎命令）"""
     RENPY_COMMAND = "renpy"
     NANINOVEL_COMMAND = "naninovel"
@@ -38,7 +38,7 @@ class ColumnName(str, Enum):
     """Excel 列名"""
     NOTE = "Note"
     IGNORE = "Ignore"
-    SPEAKER = "Speaker"
+    NAME = "Name"
     TEXT = "Text"
     CHARACTER = "Character"
     BACKGROUND = "Background"

@@ -136,12 +136,12 @@ def process_excel_file(file_path: Path, config: AppConfig):
             logger.info(f"工作表 {sheet} 总字数: {total_words}")
             
             # 按说话者统计字数
-            total_words_by_speaker = word_counter.count_by(list(zip(
-                valid_rows_df[ColumnName.SPEAKER.value],
+            total_words_by_chara_name = word_counter.count_by(list(zip(
+                valid_rows_df[ColumnName.NAME.value],
                 valid_rows_df[ColumnName.TEXT.value]
             )))
-            for speaker, count in total_words_by_speaker.items():
-                logger.info(f"  说话者 '{speaker}' 字数: {count}")
+            for chara_name, count in total_words_by_chara_name.items():
+                logger.info(f"  说话者 '{chara_name}' 字数: {count}")
 
     except Exception as e:
         logger.error(f"处理文件 {file_path} 时出错: {e}", exc_info=True)
