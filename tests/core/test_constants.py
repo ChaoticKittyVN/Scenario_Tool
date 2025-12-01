@@ -4,7 +4,7 @@
 import pytest
 from core.constants import (
     WindowMode,
-    SpecialSpeaker,
+    SpecialName,
     FileType,
     SheetName,
     ColumnName,
@@ -27,9 +27,9 @@ class TestEnumValues:
         (WindowMode.SHOW, "显示"),
         (WindowMode.HIDE, "隐藏"),
         (WindowMode.SHOW_AND_HIDE, "显示和隐藏"),
-        # SpecialSpeaker
-        (SpecialSpeaker.RENPY_COMMAND, "renpy"),
-        (SpecialSpeaker.NANINOVEL_COMMAND, "naninovel"),
+        # SpecialName
+        (SpecialName.RENPY_COMMAND, "renpy"),
+        (SpecialName.NANINOVEL_COMMAND, "naninovel"),
         # FileType
         (FileType.BACKGROUND, "Background"),
         (FileType.CHARACTER, "Character"),
@@ -60,7 +60,7 @@ class TestEnumMembers:
 
     @pytest.mark.parametrize("enum_class,expected_values,expected_count", [
         (WindowMode, ["显示", "隐藏", "显示和隐藏"], 3),
-        (SpecialSpeaker, ["renpy", "naninovel"], 2),
+        (SpecialName, ["renpy", "naninovel"], 2),
         (FileType, ["Background", "Character", "Music", "Sound", "Voice", "Event"], 6),
         (SheetName, ["参数表"], 1),
         (ColumnName, ["Note", "Ignore", "Speaker", "Text", "Character", "Background"], 6),
@@ -139,7 +139,7 @@ class TestEnumComparison:
 
     @pytest.mark.parametrize("enum_member,string_value", [
         (WindowMode.SHOW, "显示"),
-        (SpecialSpeaker.RENPY_COMMAND, "renpy"),
+        (SpecialName.RENPY_COMMAND, "renpy"),
         (FileType.MUSIC, "Music"),
     ])
     def test_enum_string_comparison(self, enum_member, string_value):

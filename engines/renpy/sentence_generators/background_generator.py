@@ -8,6 +8,26 @@ from core.base_sentence_generator import BaseSentenceGenerator
 class BackgroundGenerator(BaseSentenceGenerator):
     """背景生成器"""
 
+    # 背景资源配置
+    resource_config = {
+        "resource_type": "Background",
+        "resource_category": "图片",
+        "main_param": "Background",
+        "part_params": [],
+        "separator": " ",
+        "folder": "images/Background/"
+    }
+
+    # 事件CG资源配置
+    resource_config_event = {
+        "resource_type": "Event",
+        "resource_category": "图片",
+        "main_param": "Event",
+        "part_params": ["EventVarient"],
+        "separator": " ",
+        "folder": "images/Event/"
+    }
+
     param_config = {
         "Command": {
             "translate_type": "Command",

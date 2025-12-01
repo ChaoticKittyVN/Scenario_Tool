@@ -80,11 +80,29 @@ class NaninovelConfig(EngineConfig):
 
 
 @dataclass
+class ResourceConfig:
+    """资源配置"""
+    project_root: Path = Path("./project")
+    source_root: Path = Path("./resource_library")
+    extensions: Dict[str, List[str]] = field(default_factory=lambda: {
+        "图片": [".png", ".jpg", ".jpeg", ".webp"],
+        "音频": [".ogg", ".mp3", ".wav", ".m4a"],
+        "视频": [".mp4", ".webm", ".ogv"]
+    })
+
+    def __post_init__(self):
+        """确保路径是 Path 对象"""
+        self.project_root = Path(self.project_root)
+        self.source_root = Path(self.source_root)
+
+
+@dataclass
 class AppConfig:
     """应用总配置"""
     paths: PathConfig = field(default_factory=PathConfig)
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
     engine: EngineConfig = field(default_factory=NaninovelConfig)
+    resources: ResourceConfig = field(default_factory=ResourceConfig)
 
     @classmethod
     def from_file(cls, config_path: Path) -> 'AppConfig':
@@ -126,6 +144,7 @@ class AppConfig:
         """
         paths = PathConfig(**data.get('paths', {}))
         processing = ProcessingConfig(**data.get('processing', {}))
+        resources = ResourceConfig(**data.get('resources', {}))
 
         # 根据引擎类型创建对应配置
         engine_data = data.get('engine', {})
@@ -153,7 +172,7 @@ class AppConfig:
         else:
             raise ValueError(f"不支持的引擎类型: {engine_type}")
 
-        return cls(paths=paths, processing=processing, engine=engine)
+        return cls(paths=paths, processing=processing, engine=engine, resources=resources)
 
     def to_file(self, config_path: Path):
         """
@@ -181,6 +200,11 @@ class AppConfig:
                 'engine_type': self.engine.engine_type,
                 'file_extension': self.engine.file_extension,
                 'indent_size': self.engine.indent_size,
+            },
+            'resources': {
+                'project_root': str(self.resources.project_root),
+                'source_root': str(self.resources.source_root),
+                'extensions': self.resources.extensions,
             }
         }
 
@@ -219,5 +243,6 @@ class AppConfig:
         return cls(
             paths=PathConfig(),
             processing=ProcessingConfig(),
-            engine=engine
+            engine=engine,
+            resources=ResourceConfig()
         )

@@ -8,6 +8,26 @@ from core.base_sentence_generator import BaseSentenceGenerator
 class CharacterGenerator(BaseSentenceGenerator):
     """角色生成器"""
 
+    # 资源配置 - 用于资源验证
+    resource_config = {
+        "resource_type": "Character",
+        "resource_category": "图片",
+        "main_param": "Character",
+        "part_params": ["Varient", "Atr1", "Atr2", "Atr3"],
+        "separator": " ",
+        "folder": "images/Character/"
+    }
+
+    # Sprite 资源配置
+    resource_config_sprite = {
+        "resource_type": "Sprite",
+        "resource_category": "图片",
+        "main_param": "Sprite",
+        "part_params": ["Varient", "Atr1", "Atr2", "Atr3"],
+        "separator": " ",
+        "folder": "images/Sprite/"
+    }
+
     param_config = {
         "SpriteCommand": {
             "translate_type": "Command",

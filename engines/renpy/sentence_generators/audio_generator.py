@@ -8,6 +8,36 @@ from core.base_sentence_generator import BaseSentenceGenerator
 class AudioGenerator(BaseSentenceGenerator):
     """音频生成器"""
 
+    # Music 资源配置
+    resource_config_music = {
+        "resource_type": "Music",
+        "resource_category": "音频",
+        "main_param": "Music",
+        "part_params": [],
+        "separator": "",
+        "folder": "audio/Music/"
+    }
+
+    # Sound 资源配置
+    resource_config_sound = {
+        "resource_type": "Sound",
+        "resource_category": "音频",
+        "main_param": "Sound",
+        "part_params": [],
+        "separator": "",
+        "folder": "audio/Sound/"
+    }
+
+    # Ambience 资源配置
+    resource_config_ambience = {
+        "resource_type": "Ambience",
+        "resource_category": "音频",
+        "main_param": "Ambience",
+        "part_params": [],
+        "separator": "",
+        "folder": "audio/Ambience/"
+    }
+
     param_config = {
             "Music": {
                 "translate_type": "Music",

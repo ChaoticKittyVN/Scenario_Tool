@@ -8,6 +8,16 @@ from core.base_sentence_generator import BaseSentenceGenerator
 class VoiceGenerator(BaseSentenceGenerator):
     """语音生成器"""
 
+    # Voice 资源配置
+    resource_config = {
+        "resource_type": "Voice",
+        "resource_category": "音频",
+        "main_param": "Voice",
+        "part_params": [],
+        "separator": "",
+        "folder": "audio/Voice/"
+    }
+
     param_config = {
         "Voice": {
             "translate_type": "Voice"

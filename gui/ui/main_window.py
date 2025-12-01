@@ -212,10 +212,21 @@ class MainWindowUI:
         config_group = QGroupBox("资源管理配置")
         config_layout = QVBoxLayout()
 
-        # 项目目录（输入目录）
+        # 演出表格目录
+        excel_layout = QHBoxLayout()
+        excel_label = QLabel("演出表格目录:")
+        excel_label.setMinimumWidth(80)
+        excel_layout.addWidget(excel_label)
+        self.resource_excel_edit = DragDropLineEdit()
+        excel_layout.addWidget(self.resource_excel_edit)
+        self.resource_excel_btn = QPushButton("浏览...")
+        excel_layout.addWidget(self.resource_excel_btn)
+        config_layout.addLayout(excel_layout)
+
+        # 项目库目录
         project_layout = QHBoxLayout()
-        project_label = QLabel("项目目录:")
-        project_label.setMinimumWidth(60)
+        project_label = QLabel("项目库:")
+        project_label.setMinimumWidth(80)
         project_layout.addWidget(project_label)
         self.resource_project_edit = DragDropLineEdit()
         project_layout.addWidget(self.resource_project_edit)
@@ -226,7 +237,7 @@ class MainWindowUI:
         # 资源库目录
         library_layout = QHBoxLayout()
         library_label = QLabel("资源库:")
-        library_label.setMinimumWidth(60)
+        library_label.setMinimumWidth(80)
         library_layout.addWidget(library_label)
         self.resource_library_edit = DragDropLineEdit()
         library_layout.addWidget(self.resource_library_edit)
@@ -327,6 +338,24 @@ class MainWindowUI:
         self.config_log_btn = QPushButton("浏览...")
         log_layout.addWidget(self.config_log_btn)
         path_layout.addLayout(log_layout)
+
+        # 项目库目录
+        project_root_layout = QHBoxLayout()
+        project_root_layout.addWidget(QLabel("项目库目录:"))
+        self.config_project_root_edit = DragDropLineEdit()
+        project_root_layout.addWidget(self.config_project_root_edit)
+        self.config_project_root_btn = QPushButton("浏览...")
+        project_root_layout.addWidget(self.config_project_root_btn)
+        path_layout.addLayout(project_root_layout)
+
+        # 资源库目录
+        source_root_layout = QHBoxLayout()
+        source_root_layout.addWidget(QLabel("资源库目录:"))
+        self.config_source_root_edit = DragDropLineEdit()
+        source_root_layout.addWidget(self.config_source_root_edit)
+        self.config_source_root_btn = QPushButton("浏览...")
+        source_root_layout.addWidget(self.config_source_root_btn)
+        path_layout.addLayout(source_root_layout)
 
         path_group.setLayout(path_layout)
         layout.addWidget(path_group)

@@ -8,6 +8,16 @@ from core.base_sentence_generator import BaseSentenceGenerator
 class CharacterGenerator(BaseSentenceGenerator):
     """角色生成器"""
 
+    # 资源配置 - 用于资源验证
+    resource_config = {
+        "resource_type": "Char",
+        "resource_category": "图片",
+        "main_param": "Char",
+        "part_params": ["Varient"],
+        "separator": ".",
+        "folder": "Characters/"
+    }
+
     param_config = {
         "TransChar": {
             "category": "Character"

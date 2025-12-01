@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -27,6 +28,11 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+
+        # 设置窗口图标
+        icon_path = Path(__file__).parent / "assets" / "icon.png"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
 
         # 设置 UI
         self.ui = MainWindowUI()
@@ -119,13 +125,17 @@ class MainWindow(QMainWindow):
         self._update_param_file_labels()
 
         # 设置资源管理页面的值
-        self.ui.resource_project_edit.setText(str(self.config.paths.input_dir))
+        self.ui.resource_excel_edit.setText(str(self.config.paths.input_dir))
+        self.ui.resource_project_edit.setText(str(self.config.resources.project_root))
+        self.ui.resource_library_edit.setText(str(self.config.resources.source_root))
 
         # 设置配置页面的值
         self.ui.config_input_edit.setText(str(self.config.paths.input_dir))
         self.ui.config_output_edit.setText(str(self.config.paths.output_dir))
         self.ui.config_param_edit.setText(str(self.config.paths.param_config_dir))
         self.ui.config_log_edit.setText(str(self.config.paths.log_dir))
+        self.ui.config_project_root_edit.setText(str(self.config.resources.project_root))
+        self.ui.config_source_root_edit.setText(str(self.config.resources.source_root))
         self.ui.config_ignore_check.setChecked(self.config.processing.ignore_mode)
         self.ui.config_ignore_edit.setText(", ".join(self.config.processing.ignore_words))
 
@@ -161,6 +171,7 @@ class MainWindow(QMainWindow):
         self.param_controller.worker_finished.connect(self._on_param_finished)
 
         # === 资源管理页面 ===
+        self.ui.resource_excel_btn.clicked.connect(self._browse_resource_excel)
         self.ui.resource_project_btn.clicked.connect(self._browse_resource_project)
         self.ui.resource_library_btn.clicked.connect(self._browse_resource_library)
         self.ui.resource_reset_btn.clicked.connect(self._on_reset_resource)
@@ -183,6 +194,8 @@ class MainWindow(QMainWindow):
         self.ui.config_output_btn.clicked.connect(self._browse_config_output)
         self.ui.config_param_btn.clicked.connect(self._browse_config_param)
         self.ui.config_log_btn.clicked.connect(self._browse_config_log)
+        self.ui.config_project_root_btn.clicked.connect(self._browse_config_project_root)
+        self.ui.config_source_root_btn.clicked.connect(self._browse_config_source_root)
         self.ui.config_save_btn.clicked.connect(self._on_save_config)
 
         # 监听配置修改
@@ -190,6 +203,8 @@ class MainWindow(QMainWindow):
         self.ui.config_output_edit.textChanged.connect(self._mark_config_modified)
         self.ui.config_param_edit.textChanged.connect(self._mark_config_modified)
         self.ui.config_log_edit.textChanged.connect(self._mark_config_modified)
+        self.ui.config_project_root_edit.textChanged.connect(self._mark_config_modified)
+        self.ui.config_source_root_edit.textChanged.connect(self._mark_config_modified)
         self.ui.config_ignore_edit.textChanged.connect(self._mark_config_modified)
         self.ui.config_ignore_check.stateChanged.connect(self._mark_config_modified)
         self.ui.config_engine_combo.currentTextChanged.connect(self._mark_config_modified)
@@ -363,11 +378,19 @@ class MainWindow(QMainWindow):
     # === 资源管理相关方法 ===
     def _on_reset_resource(self):
         """恢复资源管理选项卡的默认配置"""
-        self.ui.resource_project_edit.setText(str(self.config.paths.input_dir))
+        self.ui.resource_excel_edit.setText(str(self.config.paths.input_dir))
+        self.ui.resource_project_edit.setText(str(self.config.resources.project_root))
+        self.ui.resource_library_edit.setText(str(self.config.resources.source_root))
+
+    def _browse_resource_excel(self):
+        """浏览 Excel 目录"""
+        dir_path = QFileDialog.getExistingDirectory(self, "选择 Excel 目录", self.ui.resource_excel_edit.text())
+        if dir_path:
+            self.ui.resource_excel_edit.setText(dir_path)
 
     def _browse_resource_project(self):
-        """浏览项目目录"""
-        dir_path = QFileDialog.getExistingDirectory(self, "选择项目目录", self.ui.resource_project_edit.text())
+        """浏览项目库目录"""
+        dir_path = QFileDialog.getExistingDirectory(self, "选择项目库目录", self.ui.resource_project_edit.text())
         if dir_path:
             self.ui.resource_project_edit.setText(dir_path)
 
@@ -385,7 +408,9 @@ class MainWindow(QMainWindow):
         temp_config = deepcopy(self.config)
 
         # 从UI更新临时配置
-        temp_config.paths.input_dir = Path(self.ui.resource_project_edit.text())
+        temp_config.paths.input_dir = Path(self.ui.resource_excel_edit.text())
+        temp_config.resources.project_root = Path(self.ui.resource_project_edit.text())
+        temp_config.resources.source_root = Path(self.ui.resource_library_edit.text())
 
         # 清空日志
         self.ui.resource_log.clear()
@@ -417,12 +442,6 @@ class MainWindow(QMainWindow):
 
     def _on_sync_resources(self):
         """同步资源"""
-        # 检查资源库路径
-        library_path = self.ui.resource_library_edit.text()
-        if not library_path:
-            QMessageBox.warning(self, "警告", "请先设置资源库目录")
-            return
-
         # 清空日志
         self.ui.resource_log.clear()
         self.ui.resource_progress.setValue(0)
@@ -433,8 +452,8 @@ class MainWindow(QMainWindow):
         # 获取干跑模式状态
         dry_run = self.ui.resource_dry_run_check.isChecked()
 
-        # 开始同步
-        self.resource_controller.sync_resources(Path(library_path), dry_run)
+        # 开始同步（从 JSON 报告读取数据）
+        self.resource_controller.sync_resources(dry_run)
 
     def _on_resource_sync_progress(self, message: str):
         """资源同步进度更新"""
@@ -460,6 +479,8 @@ class MainWindow(QMainWindow):
         self.ui.config_output_edit.setText(str(self.config.paths.output_dir))
         self.ui.config_param_edit.setText(str(self.config.paths.param_config_dir))
         self.ui.config_log_edit.setText(str(self.config.paths.log_dir))
+        self.ui.config_project_root_edit.setText(str(self.config.resources.project_root))
+        self.ui.config_source_root_edit.setText(str(self.config.resources.source_root))
         self.ui.config_ignore_check.setChecked(self.config.processing.ignore_mode)
         self.ui.config_ignore_edit.setText(", ".join(self.config.processing.ignore_words))
 
@@ -494,6 +515,18 @@ class MainWindow(QMainWindow):
         if dir_path:
             self.ui.config_log_edit.setText(dir_path)
 
+    def _browse_config_project_root(self):
+        """浏览项目库目录"""
+        dir_path = QFileDialog.getExistingDirectory(self, "选择项目库目录", self.ui.config_project_root_edit.text())
+        if dir_path:
+            self.ui.config_project_root_edit.setText(dir_path)
+
+    def _browse_config_source_root(self):
+        """浏览资源库目录"""
+        dir_path = QFileDialog.getExistingDirectory(self, "选择资源库目录", self.ui.config_source_root_edit.text())
+        if dir_path:
+            self.ui.config_source_root_edit.setText(dir_path)
+
     def _on_save_config(self):
         """保存配置"""
         try:
@@ -527,6 +560,11 @@ class MainWindow(QMainWindow):
                 },
                 "engine": {
                     "engine_type": engine_name if engine_name else "renpy",
+                },
+                "resources": {
+                    "project_root": self.ui.config_project_root_edit.text(),
+                    "source_root": self.ui.config_source_root_edit.text(),
+                    "extensions": self.config.resources.extensions,
                 }
             }
 

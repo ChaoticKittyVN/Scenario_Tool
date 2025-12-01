@@ -7,8 +7,26 @@ paths:
   param_config_dir: param_config
 processing:
   batch_size: 100
-  enable_progress_bar: false
+  enable_progress_bar: true
   ignore_mode: false
   ignore_words:
   - 忽略
   - ''
+resources:
+  extensions:
+    图片:
+    - .png
+    - .jpg
+    - .jpeg
+    - .webp
+    视频:
+    - .mp4
+    - .webm
+    - .ogv
+    音频:
+    - .ogg
+    - .mp3
+    - .wav
+    - .m4a
+  project_root: project
+  source_root: resource_library
