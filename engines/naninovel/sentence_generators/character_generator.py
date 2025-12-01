@@ -10,9 +10,9 @@ class CharacterGenerator(BaseSentenceGenerator):
 
     # 资源配置 - 用于资源验证
     resource_config = {
-        "resource_type": "Char",
+        "resource_type": "Character",
         "resource_category": "图片",
-        "main_param": "Char",
+        "main_param": "Character",
         "part_params": ["Varient"],
         "separator": ".",
         "folder": "Characters/"
@@ -23,7 +23,7 @@ class CharacterGenerator(BaseSentenceGenerator):
             "category": "Character"
         },
 
-        "Char": {
+        "Character": {
             "translate_type": "Character",
         },
 

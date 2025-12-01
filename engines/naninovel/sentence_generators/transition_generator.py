@@ -72,7 +72,7 @@ class TransitionGenerator(BaseSentenceGenerator):
         if transition == "PartTransNew":
             return lines
 
-        lines.append(f'    {self.get_sentence("Transition", data)}')
+        lines.append(self.get_sentence("Transition", data))
 
         if self.exists_param("TransitionWaitPause", data):
             pause = self.get_value("TransitionWaitPause", data)

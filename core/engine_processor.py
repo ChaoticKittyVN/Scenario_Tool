@@ -8,6 +8,7 @@ from core.sentence_generator_manager import SentenceGeneratorManager
 from core.param_translator import ParamTranslator
 from core.config_manager import EngineConfig
 from core.logger import get_logger
+from core.excel_reader import DataFrameProcessor
 
 logger = get_logger()
 
@@ -45,6 +46,9 @@ class EngineProcessor:
         # 初始化生成器管理器
         self.generator_manager = SentenceGeneratorManager(engine_type)
         self.generator_manager.load()
+
+        # DataFrame处理器
+        self.df_processor = DataFrameProcessor(engine_config)
 
         logger.info(f"引擎处理器初始化: {engine_type}")
 
@@ -88,20 +92,14 @@ class EngineProcessor:
         Returns:
             List[str]: 生成的命令列表
         """
-        row_dict = row_data.to_dict()
         results = []
 
-        for generator in self.generators:
-            needed_params = self.generator_param_map.get(generator, [])
-            params = {}
+        # 使用DataFrameProcessor提取所有生成器需要的参数
+        generator_params = self.df_processor.extract_generator_params(
+            row_data, self.generator_param_map
+        )
 
-            # 只提取这个generator需要的参数
-            for param_name in needed_params:
-                if param_name in row_dict:
-                    value = row_dict[param_name]
-                    if not (pd.isna(value) or value == ""):
-                        params[param_name] = value
-
+        for generator, params in generator_params.items():
             # 原有的管道处理逻辑
             if params:
                 try:

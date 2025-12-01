@@ -12,6 +12,7 @@ from openpyxl.workbook.defined_name import DefinedName
 from core.sentence_generator_manager import SentenceGeneratorManager
 from core.config_manager import AppConfig
 from core.logger import get_logger
+from core.excel_reader import ExcelFileManager, DataFrameProcessor
 
 logger = get_logger()
 
@@ -28,6 +29,8 @@ class ParamUpdater:
         """
         self.config = config
         self.engine_type = config.engine.engine_type
+        self.excel_manager = ExcelFileManager(cache_enabled=True)
+        self.df_processor = DataFrameProcessor(config)
 
     def read_param_file(self, param_file: Path, skip_template: bool = True) -> Dict[str, Dict[str, str]]:
         """
@@ -45,8 +48,8 @@ class ParamUpdater:
             return {}
 
         try:
-            # 读取所有工作表
-            sheets = pd.read_excel(param_file, sheet_name=None, dtype=str, keep_default_na=False, na_values=[''])
+            # 使用新的ExcelFileManager读取所有工作表
+            sheets = self.excel_manager.load_excel(param_file)
             logger.info(f"读取到 {len(sheets)} 个工作表")
 
             mappings = {}
@@ -67,8 +70,7 @@ class ParamUpdater:
                 for _, row in df.iterrows():
                     excel_param = row["ExcelParam"]
                     scenario_param = row["ScenarioParam"]
-                    if sheet_name == "Transition":
-                        print(scenario_param)
+
                     if pd.notna(excel_param) and pd.notna(scenario_param):
                         sheet_mapping[str(excel_param)] = str(scenario_param)
 
@@ -127,7 +129,7 @@ class ParamUpdater:
 
         # 1. 收集基础参数
         try:
-            base_sheets = pd.read_excel(param_file, sheet_name=None)
+            base_sheets = self.excel_manager.load_excel(param_file)
 
             for sheet_name, df in base_sheets.items():
                 # 检查是否有 ExcelParam 列
@@ -138,8 +140,9 @@ class ParamUpdater:
                 params = []
                 for _, row in df.iterrows():
                     excel_param = row["ExcelParam"]
+                    # 使用空值检查方法
                     if pd.notna(excel_param):
-                        param_str = str(excel_param).strip()
+                        param_str = str(excel_param)
                         if param_str:
                             params.append(param_str)
 
@@ -155,7 +158,7 @@ class ParamUpdater:
         # 2. 收集差分参数
         if varient_file and varient_file.exists():
             try:
-                varient_sheets = pd.read_excel(varient_file, sheet_name=None)
+                varient_sheets = self.excel_manager.load_excel(varient_file)
 
                 # 收集所有差分参数名
                 all_varient_params = set()

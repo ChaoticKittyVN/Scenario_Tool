@@ -130,7 +130,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
         # 等待时间
         time = self.get_sentence("BackTime", data, use_default=True)
 
-        if trans == "block":
+        if trans in ["block", "trans"]:
             command = "    "
         else:
             command = ""

@@ -13,6 +13,7 @@ from core.resource_extractor import ResourceExtractor
 from core.resource_validator import ResourceValidator
 from core.sentence_generator_manager import SentenceGeneratorManager
 from core.logger import get_logger
+from core.excel_reader import ExcelFileManager, DataFrameProcessor
 
 logger = get_logger()
 
@@ -167,12 +168,15 @@ def main():
 
         logger.info(f"找到 {len(excel_files)} 个 Excel 文件")
 
+        # 创建Excel文件管理器
+        excel_manager = ExcelFileManager(cache_enabled=True)
+
         # 处理每个文件
         for excel_file in excel_files:
             logger.info(f"\n处理文件: {excel_file.name}")
 
             # 读取 Excel
-            excel_data = pd.read_excel(excel_file, sheet_name=None, dtype=str)
+            excel_data = excel_manager.load_excel(excel_file)
 
             # 提取资源
             resources = extractor.extract_from_excel(excel_data)
@@ -223,7 +227,7 @@ def main():
                 json.dump(json_data, f, indent=2, ensure_ascii=False)
             logger.info(f"JSON 报告已保存: {json_report_file}")
 
-        logger.info("\n所有文件验证完成")
+        logger.info("所有文件验证完成")
 
     except Exception as e:
         logger.critical(f"验证过程失败: {e}", exc_info=True)

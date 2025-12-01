@@ -13,6 +13,7 @@ from core.logger import get_logger
 from core.exceptions import ExcelParseError, GeneratorError
 from core.constants import SheetName, ColumnName, Marker, TEMP_FILE_PREFIX
 from core.word_counter import BasicWordCounter
+from core.excel_reader import ExcelFileManager, DataFrameProcessor
 
 # 导入引擎模块以触发注册
 import engines.renpy
@@ -58,9 +59,13 @@ def process_excel_file(file_path: Path, config: AppConfig):
         logger.info(f"开始处理文件: {file_path.name}")
         processor = create_processor(config)
 
-        # 读取Excel文件
-        excel_data = pd.read_excel(file_path, sheet_name=None, dtype=str)
+        # 使用ExcelFileManager读取Excel文件
+        excel_manager = ExcelFileManager(cache_enabled=True)
+        excel_data = excel_manager.load_excel(file_path)
         sheet_names = list(excel_data.keys())
+
+        # 使用DataFrameProcessor处理数据
+        df_processor = DataFrameProcessor(config)
 
         # 获取文件基本名（不含扩展名）
         file_basename = file_path.stem
@@ -75,32 +80,14 @@ def process_excel_file(file_path: Path, config: AppConfig):
             # 生成输出文件名
             scenario_name = config.engine.get_output_filename(sheet)
 
-            # 检查结束标记
-            if (ColumnName.NOTE.value not in excel_data[sheet].columns or
-                    Marker.END.value not in excel_data[sheet][ColumnName.NOTE.value].tolist()):
-                logger.warning(f"工作表 {sheet} 不包含Note列或END标记，跳过")
-                continue
+            # 使用DataFrameProcessor提取有效行
+            sheet_df = excel_data[sheet]
+            valid_rows_df = df_processor.extract_valid_rows(sheet_df, sheet)
 
-            # 找到 END 标记的位置
-            end_index = excel_data[sheet][ColumnName.NOTE.value].tolist().index(Marker.END.value)
-
-            # 提取需要处理的行
-            valid_indices = []
-            for j in range(end_index):
-                # 检查是否需要忽略
-                if config.processing.ignore_mode:
-                    ignore_value = excel_data[sheet].iloc[j].get(ColumnName.IGNORE.value)
-                    if ignore_value in config.processing.ignore_words:
-                        logger.debug(f"忽略行 {j}: {ignore_value}")
-                        continue
-                valid_indices.append(j)
-
-            # 获取有效行数据
-            if not valid_indices:
+            if valid_rows_df.empty:
                 logger.warning(f"工作表 {sheet} 没有有效数据")
                 continue
 
-            valid_rows_df = excel_data[sheet].loc[valid_indices]
             output_list = []
 
             # 使用进度条处理
@@ -131,14 +118,22 @@ def process_excel_file(file_path: Path, config: AppConfig):
             # 统计字数
             word_counter = BasicWordCounter()
 
-            # 统计总字数
-            total_words = word_counter.count(list(valid_rows_df[ColumnName.TEXT.value]))
-            logger.info(f"工作表 {sheet} 总字数: {total_words}")
+            # 使用专用方法提取统计列
+            stat_columns = df_processor.extract_statistical_columns(
+                valid_rows_df, [ColumnName.NAME.value, ColumnName.TEXT.value]
+            )
             
+            name_series = stat_columns.get(ColumnName.NAME.value, pd.Series(dtype=object))
+            text_series = stat_columns.get(ColumnName.TEXT.value, pd.Series(dtype=object))
+
+            # 统计总字数
+            total_words = word_counter.count(text_series.tolist())
+            logger.info(f"工作表 {sheet} 总字数: {total_words}")
+
             # 按说话者统计字数
             total_words_by_chara_name = word_counter.count_by(list(zip(
-                valid_rows_df[ColumnName.NAME.value],
-                valid_rows_df[ColumnName.TEXT.value]
+                name_series,
+                text_series
             )))
             for chara_name, count in total_words_by_chara_name.items():
                 logger.info(f"  说话者 '{chara_name}' 字数: {count}")
