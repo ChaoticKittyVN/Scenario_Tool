@@ -13,7 +13,14 @@ from core.logger import get_logger
 from core.exceptions import ExcelParseError, GeneratorError
 from core.constants import SheetName, ColumnName, Marker, TEMP_FILE_PREFIX
 from core.word_counter import BasicWordCounter
-from core.excel_reader import ExcelFileManager, DataFrameProcessor
+from core.excel_manager import ExcelFileManager, DataFrameProcessor
+
+from core.excel_manager import (
+    ExcelManagerError,
+    ExcelFileNotFoundError,
+    ExcelFormatError,
+    ExcelDataError
+)
 
 # 导入引擎模块以触发注册
 import engines.renpy
@@ -50,10 +57,15 @@ def create_processor(config: AppConfig):
 def process_excel_file(file_path: Path, config: AppConfig):
     """
     处理单个Excel文件
-
+    
     Args:
         file_path: Excel 文件路径
         config: 应用配置
+        
+    Raises:
+        ExcelFileNotFoundError: 文件不存在
+        ExcelFormatError: 文件格式错误
+        ExcelDataError: 数据提取错误
     """
     try:
         logger.info(f"开始处理文件: {file_path.name}")
@@ -119,7 +131,7 @@ def process_excel_file(file_path: Path, config: AppConfig):
             word_counter = BasicWordCounter()
 
             # 使用专用方法提取统计列
-            stat_columns = df_processor.extract_statistical_columns(
+            stat_columns = df_processor.extract_columns_for_statistics(
                 valid_rows_df, [ColumnName.NAME.value, ColumnName.TEXT.value]
             )
             
@@ -138,6 +150,9 @@ def process_excel_file(file_path: Path, config: AppConfig):
             for chara_name, count in total_words_by_chara_name.items():
                 logger.info(f"  说话者 '{chara_name}' 字数: {count}")
 
+    except (ExcelFileNotFoundError, ExcelFormatError, ExcelDataError) as e:
+        # 重新抛出给main函数处理
+        raise
     except Exception as e:
         logger.error(f"处理文件 {file_path} 时出错: {e}", exc_info=True)
         raise ExcelParseError(f"处理文件失败: {file_path}") from e
@@ -201,7 +216,17 @@ def main():
 
         # 处理每个Excel文件
         for excel_file in excel_files:
-            process_excel_file(excel_file, config)
+            try:
+                process_excel_file(excel_file, config)
+            except ExcelFileNotFoundError as e:
+                logger.error(f"文件不存在，跳过: {excel_file} - {e}")
+                continue
+            except ExcelFormatError as e:
+                logger.error(f"Excel格式错误，跳过: {excel_file} - {e}")
+                continue
+            except Exception as e:
+                logger.error(f"处理文件失败: {excel_file} - {e}")
+                continue
 
         logger.info("所有文件处理完成")
 

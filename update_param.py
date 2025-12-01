@@ -4,7 +4,7 @@
 """
 import pandas as pd
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
@@ -12,7 +12,14 @@ from openpyxl.workbook.defined_name import DefinedName
 from core.sentence_generator_manager import SentenceGeneratorManager
 from core.config_manager import AppConfig
 from core.logger import get_logger
-from core.excel_reader import ExcelFileManager, DataFrameProcessor
+from core.excel_manager import (
+    ExcelFileManager, 
+    DataFrameProcessor,
+    ExcelFileNotFoundError,
+    ExcelFormatError,
+    ExcelDataError,
+    ExcelWriteError
+)
 
 logger = get_logger()
 
@@ -82,6 +89,12 @@ class ParamUpdater:
 
             return mappings
 
+        except ExcelFileNotFoundError as e:
+            logger.error(f"参数文件不存在: {param_file} - {e}")
+            return {}
+        except ExcelFormatError as e:
+            logger.error(f"参数文件格式错误: {param_file} - {e}")
+            return {}
         except Exception as e:
             logger.error(f"读取参数文件失败: {e}", exc_info=True)
             return {}
@@ -114,7 +127,11 @@ class ParamUpdater:
         except Exception as e:
             logger.error(f"保存参数映射文件失败: {e}", exc_info=True)
 
-    def collect_validation_data(self, param_file: Path, varient_file: Path = None) -> Dict[str, List[str]]:
+    def collect_validation_data(
+        self, 
+        param_file: Path, 
+        varient_file: Optional[Path] = None  # 修改类型注解
+    ) -> Dict[str, List[str]]:
         """
         收集所有验证数据（基础参数 + 差分参数）
 
@@ -151,12 +168,15 @@ class ParamUpdater:
                     validation_data[sheet_name] = params
                     logger.debug(f"收集参数 {sheet_name}: {len(params)} 个值")
 
+        except (ExcelFileNotFoundError, ExcelFormatError) as e:
+            logger.error(f"读取基础参数文件失败: {param_file} - {e}")
+            return {}
         except Exception as e:
-            logger.error(f"读取基础参数文件失败: {e}", exc_info=True)
+            logger.error(f"读取基础参数文件时发生未知错误: {e}", exc_info=True)
             return {}
 
         # 2. 收集差分参数
-        if varient_file and varient_file.exists():
+        if varient_file is not None and varient_file.exists():
             try:
                 varient_sheets = self.excel_manager.load_excel(varient_file)
 
@@ -185,8 +205,10 @@ class ParamUpdater:
 
                     logger.debug(f"收集差分参数: {len(all_varient_params)} 个值")
 
+            except (ExcelFileNotFoundError, ExcelFormatError) as e:
+                logger.warning(f"读取差分参数文件失败: {varient_file} - {e}")
             except Exception as e:
-                logger.warning(f"读取差分参数文件失败: {e}")
+                logger.warning(f"读取差分参数文件时发生未知错误: {e}")
 
         return validation_data
 
@@ -195,7 +217,7 @@ class ParamUpdater:
         获取所有句子生成器的参数翻译类型
         
         Returns:
-            Dict[str, Dict[str, list[str]]]: 去重后的数据验证参数类型列表
+            Dict[str, List[str]]: 包含translate_types和validate_types的字典
         """
         try:
             # 创建管理器实例
@@ -259,23 +281,11 @@ class ParamUpdater:
                 if "参数表" not in wb.sheetnames:
                     logger.info(f"  创建新的'参数表'工作表")
                     validation_ws = wb.create_sheet("参数表")
-                    # logger.warning(f"  {excel_file.name} 中没有'参数表'工作表，跳过")
-                    # wb.close()
-                    # continue
                 else:
                     validation_ws = wb["参数表"]
 
                 # 创建居中对齐样式
                 center_alignment = Alignment(horizontal='center', vertical='center')
-
-                # # 获取当前参数表的列顺序
-                # current_headers = []
-                # for col_idx in range(1, validation_ws.max_column + 1):
-                #     header = validation_ws.cell(row=1, column=col_idx).value
-                #     if header:
-                #         current_headers.append(header)
-
-                # logger.info(f"  当前参数表列: {current_headers}")
 
                 # 跟踪是否有任何更新
                 has_updates = False
@@ -285,7 +295,6 @@ class ParamUpdater:
                     # 获取这个参数的数据
                     params = validation_data.get(param_type, [])
 
-                    
                     # 检查表头是否匹配
                     current_header = validation_ws.cell(row=1, column=col_idx).value
                     needs_update = False
@@ -308,9 +317,9 @@ class ParamUpdater:
                         if current_params != [str(p) for p in params]:
                             needs_update = True
                             logger.info(f" 更新 {param_type}: 当前 {len(current_params)} 个，新 {len(params)} 个")
+                    
                     # 如果需要更新，重新写入这一列
                     if needs_update: 
-                            
                         has_updates = True
 
                         # 清除这一列的内容（从第1行开始）
@@ -373,13 +382,14 @@ class ParamUpdater:
                         for row_idx in range(1, validation_ws.max_row + 1):
                             validation_ws.cell(row=row_idx, column=col_idx).value = None
 
-
                 # 保存工作簿（仅当有更新时）
                 if has_updates:
                     try:
                         wb.save(excel_file)
                         logger.info(f"  成功保存文件: {excel_file.name}")
                         success_count += 1
+                    except PermissionError as e:
+                        logger.error(f"  保存失败: 文件被其他程序占用或无写入权限 - {e}")
                     except Exception as e:
                         logger.error(f"  保存失败: {e}")
                     finally:
@@ -388,13 +398,15 @@ class ParamUpdater:
                     logger.info(f"  {excel_file.name} 无需更新")
                     wb.close()
 
+            except PermissionError as e:
+                logger.error(f"  处理文件 {excel_file.name} 时权限错误: {e}")
             except Exception as e:
                 logger.error(f"  处理文件 {excel_file.name} 时发生错误: {e}", exc_info=True)
 
         logger.info(f"处理完成，成功更新 {success_count}/{len(excel_files)} 个文件")
         return success_count > 0
 
-    def update_mappings(self):
+    def update_mappings(self) -> bool:
         """更新参数映射"""
         logger.info("=" * 60)
         logger.info(f"开始更新参数映射 (引擎: {self.engine_type})")
@@ -408,42 +420,55 @@ class ParamUpdater:
             logger.info(f"请确保参数文件存在")
             return False
 
-        logger.info(f"读取参数文件: {param_file}")
-        mappings = self.read_param_file(param_file)
+        try:
+            logger.info(f"读取参数文件: {param_file}")
+            mappings = self.read_param_file(param_file)
 
-        if not mappings:
-            logger.error("未能读取到任何参数映射")
+            if not mappings:
+                logger.error("未能读取到任何参数映射")
+                return False
+
+            output_file = self.config.paths.param_config_dir / "param_mappings.py"
+            logger.info(f"生成参数映射文件: {output_file}")
+            self.generate_mappings_file(mappings, output_file)
+
+            total_mappings = sum(len(m) for m in mappings.values())
+            logger.info(f"基础参数映射: {len(mappings)} 个工作表, {total_mappings} 个映射")
+            
+        except Exception as e:
+            logger.error(f"处理基础参数映射时失败: {e}")
             return False
-
-        output_file = self.config.paths.param_config_dir / "param_mappings.py"
-        logger.info(f"生成参数映射文件: {output_file}")
-        self.generate_mappings_file(mappings, output_file)
-
-        total_mappings = sum(len(m) for m in mappings.values())
-        logger.info(f"基础参数映射: {len(mappings)} 个工作表, {total_mappings} 个映射")
 
         # 阶段2: 生成差分参数映射
         varient_file = Path(self.config.paths.param_config_dir) / "varient_data.xlsx"
+        varient_file_path = None  # 明确设置为 None
 
         if varient_file.exists():
             logger.info(f"读取差分参数文件: {varient_file}")
-            # 差分参数文件不跳过模板工作表，保持与原项目一致
-            varient_mappings = self.read_param_file(varient_file, skip_template=False)
+            try:
+                # 差分参数文件不跳过模板工作表，保持与原项目一致
+                varient_mappings = self.read_param_file(varient_file, skip_template=False)
 
-            # 生成差分映射文件（保持与原项目一致，包含空映射）
-            varient_output = self.config.paths.param_config_dir / "varient_mappings.py"
-            logger.info(f"生成差分参数映射文件: {varient_output}")
-            self.generate_mappings_file(varient_mappings, varient_output)
+                # 生成差分映射文件（保持与原项目一致，包含空映射）
+                varient_output = self.config.paths.param_config_dir / "varient_mappings.py"
+                logger.info(f"生成差分参数映射文件: {varient_output}")
+                self.generate_mappings_file(varient_mappings, varient_output)
 
-            # 统计有效映射（排除模板）
-            valid_mappings = {k: v for k, v in varient_mappings.items() if v and "模板" not in k}
-            if valid_mappings:
-                total_varient = sum(len(m) for m in valid_mappings.values())
-                logger.info(f"差分参数映射: {len(valid_mappings)} 个角色, {total_varient} 个映射")
-            else:
-                logger.info("差分参数文件中没有有效的角色映射")
+                # 统计有效映射（排除模板）
+                valid_mappings = {k: v for k, v in varient_mappings.items() if v and "模板" not in k}
+                if valid_mappings:
+                    total_varient = sum(len(m) for m in valid_mappings.values())
+                    logger.info(f"差分参数映射: {len(valid_mappings)} 个角色, {total_varient} 个映射")
+                else:
+                    logger.info("差分参数文件中没有有效的角色映射")
+                    
+                # 将文件路径赋值给变量
+                varient_file_path = varient_file
+                    
+            except Exception as e:
+                logger.error(f"处理差分参数映射时失败: {e}")
+                # 继续执行，不因为差分参数失败而停止整个流程
         else:
-            varient_file = None
             logger.info("差分参数文件不存在，跳过")
 
         # 阶段3: 更新演出表格的参数表
@@ -451,12 +476,18 @@ class ParamUpdater:
         logger.info("更新演出表格参数表")
         logger.info("=" * 60)
 
-        validation_data = self.collect_validation_data(param_file, varient_file)
-        if validation_data:
-            logger.info(f"收集到 {len(validation_data)} 个参数类型的验证数据")
-            self.update_scenario_param_sheets(validation_data)
-        else:
-            logger.warning("未能收集到验证数据，跳过演出表格更新")
+        try:
+            validation_data = self.collect_validation_data(param_file, varient_file_path)
+            if validation_data:
+                logger.info(f"收集到 {len(validation_data)} 个参数类型的验证数据")
+                success = self.update_scenario_param_sheets(validation_data)
+                if not success:
+                    logger.warning("更新演出表格参数表时出现错误，但主流程继续")
+            else:
+                logger.warning("未能收集到验证数据，跳过演出表格更新")
+        except Exception as e:
+            logger.error(f"更新演出表格参数表时失败: {e}")
+            # 不返回False，因为参数映射文件已经生成成功
 
         logger.info("=" * 60)
         logger.info(f"参数映射更新完成")
@@ -487,6 +518,8 @@ def main():
         else:
             logger.error("参数映射更新失败")
 
+    except KeyboardInterrupt:
+        logger.info("用户中断操作")
     except Exception as e:
         logger.critical(f"参数更新过程失败: {e}", exc_info=True)
         raise

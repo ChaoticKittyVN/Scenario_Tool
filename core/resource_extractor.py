@@ -9,6 +9,8 @@ from core.param_translator import ParamTranslator
 from core.config_manager import EngineConfig
 from core.logger import get_logger
 
+from core.excel_manager import DataFrameProcessor
+
 logger = get_logger()
 
 
@@ -57,7 +59,7 @@ class ResourceExtractor:
 
         for generator in self.generators:
             # 获取所有 resource_config
-            configs = self._get_resource_configs(generator)
+            configs = self.get_resource_configs(generator)
 
             for config in configs:
                 resource_name = self._build_resource_name(row_data, config)
@@ -67,7 +69,7 @@ class ResourceExtractor:
 
         return dict(resources)
 
-    def _get_resource_configs(self, generator) -> List[Dict]:
+    def get_resource_configs(self, generator) -> List[Dict]:
         """
         获取 generator 的所有资源配置
 
@@ -134,64 +136,53 @@ class ResourceExtractor:
 
         return result
 
-    def extract_from_excel(self, excel_data: Dict) -> Dict[str, Dict[str, Set[str]]]:
+    def extract_from_excel(self, excel_data: Dict, config=None) -> Dict[str, Dict[str, Set[str]]]:
         """
         从整个 Excel 文件中提取资源
 
         Args:
             excel_data: Excel 数据 {sheet_name: DataFrame}
-
+            config: 应用配置（可选，用于DataFrameProcessor）
+            
         Returns:
             Dict[str, Dict[str, Set[str]]]: {资源类别: {资源类型: {资源名集合}}}
-            例如: {
-                "图片": {
-                    "Character": {"alice happy", "bob normal"},
-                    "Background": {"room", "street"}
-                },
-                "音频": {
-                    "Music": {"bgm01", "bgm02"}
-                }
-            }
         """
-        from core.constants import SheetName, ColumnName, Marker
-        import pandas as pd
-
+        from core.constants import SheetName
+        
         all_resources = defaultdict(lambda: defaultdict(set))
+
+        # 创建DataFrame处理器
+        df_processor = DataFrameProcessor(config)
 
         for sheet_name, sheet_data in excel_data.items():
             # 跳过参数表
             if sheet_name == SheetName.PARAM_SHEET.value:
                 continue
 
-            # 检查是否有 END 标记
-            if (ColumnName.NOTE.value not in sheet_data.columns or
-                    Marker.END.value not in sheet_data[ColumnName.NOTE.value].tolist()):
-                logger.warning(f"工作表 {sheet_name} 不包含Note列或END标记，跳过")
+            # 提取有效行
+            valid_df = df_processor.extract_valid_rows(sheet_data, sheet_name)
+
+            if valid_df.empty:
                 continue
 
-            # 找到 END 标记位置
-            end_index = sheet_data[ColumnName.NOTE.value].tolist().index(Marker.END.value)
-
             # 遍历有效行
-            for idx in range(end_index):
-                row = sheet_data.iloc[idx]
+            for _, row in valid_df.iterrows():
                 row_dict = row.to_dict()
-
+                
                 # 提取这一行的资源
                 row_resources = self.extract_from_row(row_dict)
-
+                
                 # 按资源类别分类
                 for resource_type, resource_names in row_resources.items():
-                    # 查找资源类别
                     category = self._get_resource_category(resource_type)
                     if category:
                         all_resources[category][resource_type].update(resource_names)
-
+        
         # 转换为普通字典
         result = {}
         for category, types in all_resources.items():
             result[category] = {k: v for k, v in types.items()}
-
+        
         return result
 
     def _get_resource_category(self, resource_type: str) -> str:
@@ -205,7 +196,7 @@ class ResourceExtractor:
             str: 资源类别（如 "图片", "音频"）
         """
         for generator in self.generators:
-            configs = self._get_resource_configs(generator)
+            configs = self.get_resource_configs(generator)
             for config in configs:
                 if config["resource_type"] == resource_type:
                     return config.get("resource_category", "")

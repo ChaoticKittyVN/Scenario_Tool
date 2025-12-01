@@ -13,7 +13,13 @@ from core.resource_extractor import ResourceExtractor
 from core.resource_validator import ResourceValidator
 from core.sentence_generator_manager import SentenceGeneratorManager
 from core.logger import get_logger
-from core.excel_reader import ExcelFileManager, DataFrameProcessor
+from core.excel_manager import ExcelFileManager
+
+from core.excel_manager import (
+    ExcelFileNotFoundError,
+    ExcelFormatError,
+    ExcelDataError
+)
 
 logger = get_logger()
 
@@ -28,7 +34,7 @@ def get_resource_folders(extractor: ResourceExtractor) -> Dict[str, str]:
     folders = {}
 
     for generator in extractor.generators:
-        configs = extractor._get_resource_configs(generator)
+        configs = extractor.get_resource_configs(generator)
         for config in configs:
             resource_type = config["resource_type"]
             folder = config.get("folder", "")
@@ -174,12 +180,27 @@ def main():
         # 处理每个文件
         for excel_file in excel_files:
             logger.info(f"\n处理文件: {excel_file.name}")
-
-            # 读取 Excel
-            excel_data = excel_manager.load_excel(excel_file)
+            
+            try:
+                # 读取 Excel
+                excel_data = excel_manager.load_excel(excel_file)
+                
+            except ExcelFileNotFoundError as e:
+                logger.error(f"文件不存在，跳过: {excel_file}")
+                continue
+            except ExcelFormatError as e:
+                logger.error(f"Excel格式错误，跳过: {excel_file} - {e}")
+                continue
+            except Exception as e:
+                logger.error(f"读取Excel失败，跳过: {excel_file} - {e}")
+                continue
 
             # 提取资源
-            resources = extractor.extract_from_excel(excel_data)
+            try:
+                resources = extractor.extract_from_excel(excel_data)
+            except Exception as e:
+                logger.error(f"提取资源失败，跳过: {excel_file} - {e}")
+                continue
 
             if not resources:
                 logger.warning("未找到任何资源引用")
@@ -190,7 +211,11 @@ def main():
             logger.info(f"提取到 {total_resources} 个资源引用")
 
             # 验证资源
-            validation_results = validator.validate_resources(resources, resource_folders)
+            try:
+                validation_results = validator.validate_resources(resources, resource_folders)
+            except Exception as e:
+                logger.error(f"验证资源失败，跳过: {excel_file} - {e}")
+                continue
 
             # 生成文本报告
             report_text = generate_report(resources, validation_results, excel_file.name)
@@ -200,32 +225,36 @@ def main():
             report_dir = config.paths.output_dir / "validation_reports"
             report_dir.mkdir(parents=True, exist_ok=True)
 
-            # 保存文本报告（供用户查看）
-            text_report_file = report_dir / f"{excel_file.stem}_validation.txt"
-            with open(text_report_file, "w", encoding="utf-8") as f:
-                f.write(report_text)
-            logger.info(f"文本报告已保存: {text_report_file}")
+            try:
+                # 保存文本报告（供用户查看）
+                text_report_file = report_dir / f"{excel_file.stem}_validation.txt"
+                with open(text_report_file, "w", encoding="utf-8") as f:
+                    f.write(report_text)
+                logger.info(f"文本报告已保存: {text_report_file}")
+                
+                # 保存 JSON 报告（供程序读取）
+                json_report_file = report_dir / f"{excel_file.stem}_validation.json"
+                json_data = {
+                    "timestamp": time.time(),
+                    "excel_file": str(excel_file),
+                    "excel_name": excel_file.name,
+                    "resources": {
+                        category: {
+                            rtype: list(names)  # 转换 Set 为 List
+                            for rtype, names in types.items()
+                        }
+                        for category, types in resources.items()
+                    },
+                    "validation_results": validation_results,
+                    "resource_folders": resource_folders
+                }
 
-            # 保存 JSON 报告（供程序读取）
-            json_report_file = report_dir / f"{excel_file.stem}_validation.json"
-            json_data = {
-                "timestamp": time.time(),
-                "excel_file": str(excel_file),
-                "excel_name": excel_file.name,
-                "resources": {
-                    category: {
-                        rtype: list(names)  # 转换 Set 为 List
-                        for rtype, names in types.items()
-                    }
-                    for category, types in resources.items()
-                },
-                "validation_results": validation_results,
-                "resource_folders": resource_folders
-            }
-
-            with open(json_report_file, "w", encoding="utf-8") as f:
-                json.dump(json_data, f, indent=2, ensure_ascii=False)
-            logger.info(f"JSON 报告已保存: {json_report_file}")
+                with open(json_report_file, "w", encoding="utf-8") as f:
+                    json.dump(json_data, f, indent=2, ensure_ascii=False)
+                logger.info(f"JSON 报告已保存: {json_report_file}")
+                
+            except Exception as e:
+                logger.error(f"保存报告失败: {excel_file} - {e}")
 
         logger.info("所有文件验证完成")
 
