@@ -42,7 +42,7 @@ class TestEnumValues:
         # ColumnName
         (ColumnName.NOTE, "Note"),
         (ColumnName.IGNORE, "Ignore"),
-        (ColumnName.SPEAKER, "Speaker"),
+        (ColumnName.NAME, "Name"),
         (ColumnName.TEXT, "Text"),
         (ColumnName.CHARACTER, "Character"),
         (ColumnName.BACKGROUND, "Background"),
@@ -153,7 +153,7 @@ class TestEnumIteration:
     @pytest.mark.parametrize("enum_class,expected_members,expected_count", [
         (WindowMode, [WindowMode.SHOW, WindowMode.HIDE, WindowMode.SHOW_AND_HIDE], 3),
         (FileType, [FileType.BACKGROUND, FileType.MUSIC], 6),  # 只检查部分成员
-        (ColumnName, [ColumnName.NOTE, ColumnName.SPEAKER], 6),  # 只检查部分成员
+        (ColumnName, [ColumnName.NOTE, ColumnName.NAME], 6),  # 只检查部分成员
     ])
     def test_enum_iteration(self, enum_class, expected_members, expected_count):
         """测试枚举迭代功能"""

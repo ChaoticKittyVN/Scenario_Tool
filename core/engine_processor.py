@@ -8,7 +8,7 @@ from core.sentence_generator_manager import SentenceGeneratorManager
 from core.param_translator import ParamTranslator
 from core.config_manager import EngineConfig
 from core.logger import get_logger
-from core.excel_manager import DataFrameProcessor
+from core.excel_management.dataframe_processor import DataFrameProcessor
 
 logger = get_logger()
 

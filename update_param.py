@@ -12,13 +12,15 @@ from openpyxl.workbook.defined_name import DefinedName
 from core.sentence_generator_manager import SentenceGeneratorManager
 from core.config_manager import AppConfig
 from core.logger import get_logger
-from core.excel_manager import (
-    ExcelFileManager, 
-    DataFrameProcessor,
+from core.excel_management import (
+    ExcelManagerError,
     ExcelFileNotFoundError,
     ExcelFormatError,
     ExcelDataError,
-    ExcelWriteError
+    ExcelWriteError,
+    ExcelFileManager,
+    DataFrameProcessor,
+    ExcelWriter
 )
 
 logger = get_logger()
@@ -268,138 +270,42 @@ class ParamUpdater:
             return True
 
         logger.info(f"找到 {len(excel_files)} 个演出表格文件")
-
+        # 创建 ExcelWriter 实例
+        excel_writer = ExcelWriter()
         success_count = 0
+
         for excel_file in excel_files:
             try:
                 logger.info(f"处理文件: {excel_file.name}")
 
-                # 加载工作簿
-                wb = load_workbook(excel_file)
-
-                # 检查是否存在"参数表"工作表
-                if "参数表" not in wb.sheetnames:
-                    logger.info(f"  创建新的'参数表'工作表")
-                    validation_ws = wb.create_sheet("参数表")
-                else:
-                    validation_ws = wb["参数表"]
-
-                # 创建居中对齐样式
-                center_alignment = Alignment(horizontal='center', vertical='center')
-
-                # 跟踪是否有任何更新
-                has_updates = False
-
-                # 按照当前列顺序更新参数表
-                for col_idx, param_type in enumerate(all_params, 1):
-                    # 获取这个参数的数据
+                # 准备参数数据（按照 all_params 的顺序）
+                parameter_data = {}
+                for param_type in all_params:
                     params = validation_data.get(param_type, [])
+                    parameter_data[param_type] = params
 
-                    # 检查表头是否匹配
-                    current_header = validation_ws.cell(row=1, column=col_idx).value
-                    needs_update = False
+                # 使用增强的 ExcelWriter 方法更新参数表
+                try:
+                    success = excel_writer.update_parameter_sheet(
+                        excel_file,
+                        "参数表",
+                        parameter_data,
+                        create_named_ranges=True
+                    )
 
-                    if current_header != param_type:
-                        needs_update = True
-                        logger.info(f" 表头不匹配: 当前'{current_header}'，期望'{param_type}'")
-                    else: 
-                        # 检查参数内容是否匹配
-                        current_params = []
-                        read_row = 2
-                        while read_row <= validation_ws.max_row:
-                            cell_value = validation_ws.cell(row=read_row, column=col_idx).value
-                            if cell_value is None:
-                                break
-                            current_params.append(str(cell_value))
-                            read_row += 1
-
-                        # 如果参数数量或内容有变化，需要更新
-                        if current_params != [str(p) for p in params]:
-                            needs_update = True
-                            logger.info(f" 更新 {param_type}: 当前 {len(current_params)} 个，新 {len(params)} 个")
-                    
-                    # 如果需要更新，重新写入这一列
-                    if needs_update: 
-                        has_updates = True
-
-                        # 清除这一列的内容（从第1行开始）
-                        for clear_row in range(1, validation_ws.max_row + 1):
-                            validation_ws.cell(row=clear_row, column=col_idx).value = None
-
-                        # 写入表头
-                        header_cell = validation_ws.cell(row=1, column=col_idx, value=param_type)
-                        header_cell.alignment = center_alignment
-
-                        # 写入参数数据
-                        for write_row, param_value in enumerate(params, 2):
-                            cell = validation_ws.cell(row=write_row, column=col_idx, value=param_value)
-                            cell.alignment = center_alignment
-
-                        logger.info(f" 更新 {param_type} 参数 写入 {len(params)} 个参数")
-                    else:
-                        logger.debug(f" {param_type} 列无需更新")
-
-                    # 创建或更新命名区域
-                    range_name = f"{param_type}List"
-                    col_letter = get_column_letter(col_idx)
-                    expected_dynamic_range = f"OFFSET(参数表!${col_letter}$2,0,0,COUNTA(参数表!${col_letter}:${col_letter})-1,1)"
-
-                    # 检查命名区域是否需要更新
-                    needs_update_range = True
-                    if range_name in wb.defined_names:
-                        existing_named_range = wb.defined_names[range_name]
-                        existing_range = existing_named_range.attr_text
-
-                        # 如果现有区域已经是正确的动态公式，则跳过
-                        if existing_range == expected_dynamic_range:
-                            needs_update_range = False
-
-                    # 创建或更新命名区域
-                    if needs_update_range:
-                        try:
-                            # 删除已存在的区域（如果存在）
-                            if range_name in wb.defined_names:
-                                del wb.defined_names[range_name]
-
-                            # 创建新的命名区域
-                            wb.defined_names[range_name] = DefinedName(
-                                name=range_name,
-                                attr_text=expected_dynamic_range
-                            )
-                            logger.debug(f"  创建命名区域: {range_name}")
-                            has_updates = True
-
-                        except Exception as e:
-                            logger.warning(f"  处理命名区域 {range_name} 时发生错误: {e}")
-
-                # 清理多余的列（如果参数翻译类型列表比当前列少）
-                current_column_count = validation_ws.max_column
-                if current_column_count > len(all_params):
-                    logger.info(f"  清理多余的列: 当前{current_column_count}列，期望{len(all_params)}列")
-                    has_updates = True
-                    # 删除多余的列
-                    for col_idx in range(len(all_params) + 1, current_column_count + 1):
-                        for row_idx in range(1, validation_ws.max_row + 1):
-                            validation_ws.cell(row=row_idx, column=col_idx).value = None
-
-                # 保存工作簿（仅当有更新时）
-                if has_updates:
-                    try:
-                        wb.save(excel_file)
-                        logger.info(f"  成功保存文件: {excel_file.name}")
+                    if success:
+                        logger.info(f"  成功更新参数表: {excel_file.name}")
                         success_count += 1
-                    except PermissionError as e:
-                        logger.error(f"  保存失败: 文件被其他程序占用或无写入权限 - {e}")
-                    except Exception as e:
-                        logger.error(f"  保存失败: {e}")
-                    finally:
-                        wb.close()
-                else:
-                    logger.info(f"  {excel_file.name} 无需更新")
-                    wb.close()
+                    else:
+                        logger.error(f"  更新参数表失败: {excel_file.name}")
+                        
+                except ExcelWriteError as e:
+                    logger.error(f"  写入Excel失败: {excel_file} - {e}")
+                except PermissionError as e:
+                    logger.error(f"  文件被占用或无写入权限: {excel_file} - {e}")
+                except Exception as e:
+                    logger.error(f"  处理文件时发生错误: {excel_file} - {e}")
 
-            except PermissionError as e:
-                logger.error(f"  处理文件 {excel_file.name} 时权限错误: {e}")
             except Exception as e:
                 logger.error(f"  处理文件 {excel_file.name} 时发生错误: {e}", exc_info=True)
 

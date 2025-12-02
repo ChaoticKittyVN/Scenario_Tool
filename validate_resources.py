@@ -13,12 +13,10 @@ from core.resource_extractor import ResourceExtractor
 from core.resource_validator import ResourceValidator
 from core.sentence_generator_manager import SentenceGeneratorManager
 from core.logger import get_logger
-from core.excel_manager import ExcelFileManager
-
-from core.excel_manager import (
+from core.excel_management import (
     ExcelFileNotFoundError,
     ExcelFormatError,
-    ExcelDataError
+    ExcelFileManager,
 )
 
 logger = get_logger()

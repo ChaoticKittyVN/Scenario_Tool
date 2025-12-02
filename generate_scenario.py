@@ -13,13 +13,14 @@ from core.logger import get_logger
 from core.exceptions import ExcelParseError, GeneratorError
 from core.constants import SheetName, ColumnName, Marker, TEMP_FILE_PREFIX
 from core.word_counter import BasicWordCounter
-from core.excel_manager import ExcelFileManager, DataFrameProcessor
 
-from core.excel_manager import (
+from core.excel_management import (
     ExcelManagerError,
     ExcelFileNotFoundError,
     ExcelFormatError,
-    ExcelDataError
+    ExcelDataError,
+    ExcelFileManager,
+    DataFrameProcessor
 )
 
 # 导入引擎模块以触发注册

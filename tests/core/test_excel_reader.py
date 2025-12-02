@@ -8,7 +8,7 @@ import pandas as pd
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from core.excel_manager import ExcelFileManager, DataFrameProcessor
+from core.excel_management import ExcelFileManager, DataFrameProcessor
 from core.config_manager import AppConfig
 
 
