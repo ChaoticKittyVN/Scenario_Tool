@@ -2,4 +2,3 @@ sphinx
 sphinx-autobuild
 sphinx-autodoc-typehints
 sphinx-rtd-theme
-pyyaml
