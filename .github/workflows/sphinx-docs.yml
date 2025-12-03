@@ -32,10 +32,16 @@ jobs:
         run: |
           sh build.sh
 
+      - name: Copy building outputs to dist directory
+        working-directory: docs
+        run: |
+          mkdir -p dist/docs
+          cp -r build/html/* dist/docs/
+
       - name: Upload artifact (for deployment)
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/build/html
+          path: docs/dist
 
   deploy:
     needs: build
