@@ -1,17 +1,26 @@
 ## How to build
 
+Enter the `docs` directory and run the following commands:
+
 ### Dependencies
 
 ```
-pip install sphinx sphinx-autobuild sphinx-autodoc-typehints sphinx-rtd-theme
+pip install -r requirements.txt
 ```
 
 ### Build
 
-Enter the `docs` directory and run:
+Run:
 
 ```shell
-update.bat
+# On Windows
+build.bat
+
+# On Linux/Mac
+sh build.sh
+# or
+chmod +x build.sh
+./build.sh
 ```
 
 This is equivalent to:
