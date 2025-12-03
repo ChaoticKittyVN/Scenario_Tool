@@ -1,0 +1,48 @@
+name: Build and Deploy Sphinx Docs
+
+on:
+  push:
+    branches: ["develop"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install Sphinx and dependencies
+        working-directory: docs
+        run: |
+          pip install -r requirements.txt
+
+      - name: Build Sphinx documentation
+        working-directory: docs
+        run: |
+          sh build.sh
+
+      - name: Upload artifact (for deployment)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/build/html
+
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
