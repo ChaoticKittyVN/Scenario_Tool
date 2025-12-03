@@ -32,6 +32,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs/build/html
+          destination: docs
 
   deploy:
     needs: build
