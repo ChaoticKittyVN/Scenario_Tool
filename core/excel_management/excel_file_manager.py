@@ -10,7 +10,6 @@ from .excel_exceptions import (
     ExcelManagerError,
     ExcelFileNotFoundError,
     ExcelFormatError,
-    ExcelDataError,
     ExcelWriteError,
 )
 

@@ -6,13 +6,7 @@ from core.logger import get_logger
 from core.constants import SheetName, ColumnName, Marker
 
 from .excel_decorators import handle_excel_operation
-from .excel_exceptions import (
-    ExcelManagerError,
-    ExcelFileNotFoundError,
-    ExcelFormatError,
-    ExcelDataError,
-    ExcelWriteError,
-)
+from .excel_exceptions import ExcelDataError
 
 logger = get_logger(__name__)
 
@@ -206,26 +200,6 @@ class DataFrameProcessor:
         
         return params
     
-    def extract_generator_params(self, row_data: pd.Series, generator_param_map: Dict) -> Dict:
-        """
-        为所有生成器提取参数
-        
-        Args:
-            row_data: pandas Series，一行的所有数据
-            generator_param_map: 生成器到参数的映射
-            
-        Returns:
-            Dict: 生成器到参数的映射
-        """
-        generator_params = {}
-
-        for generator, needed_params in generator_param_map.items():
-            params = self.extract_parameters(row_data, needed_params)
-            if params:
-                generator_params[generator] = params
-        
-        return generator_params
-    
     def extract_mapping_columns(self, df: pd.DataFrame, key_column: str, value_column: str) -> Dict[str, str]:
         """
         从DataFrame中提取两列构建映射字典
@@ -239,11 +213,11 @@ class DataFrameProcessor:
             Dict[str, str]: 映射字典
         """
         mapping = {}
-        
+
         if key_column not in df.columns or value_column not in df.columns:
             logger.warning(f"缺少必需的列: {key_column} 或 {value_column}")
             return mapping
-        
+
         for _, row in df.iterrows():
             key = row[key_column]
             value = row[value_column]
@@ -252,7 +226,7 @@ class DataFrameProcessor:
                 mapping[str(key)] = str(value)
 
         return mapping
-    
+
     def extract_param_names(self, df: pd.DataFrame, param_column: str = "ExcelParam") -> List[str]:
         """
         从DataFrame中提取参数名列表（用于填写参数表）
@@ -267,7 +241,7 @@ class DataFrameProcessor:
         if param_column not in df.columns:
             logger.warning(f"参数列不存在: {param_column}")
             return []
-        
+
         param_names = set()
         for _, row in df.iterrows():
             param = row[param_column]
@@ -275,17 +249,17 @@ class DataFrameProcessor:
                 param_names.add(str(param))
 
         return sorted(list(param_names))
-    
+
     def extract_columns_for_statistics(self, df: pd.DataFrame, columns: List[str], 
                                     keep_all_rows: bool = False) -> Dict[str, pd.Series]:
         """
         提取用于统计的列
-        
+
         Args:
             df: 输入的DataFrame
             columns: 要提取的列名列表
             keep_all_rows: 是否保持所有行（用None填充无效值）
-            
+
         Returns:
             Dict[str, pd.Series]: 列名到Series的映射
         """
