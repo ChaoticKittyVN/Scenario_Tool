@@ -45,6 +45,7 @@ QGroupBox {
 }
 
 QGroupBox::title {
+    color: black;
     subcontrol-origin: margin;
     subcontrol-position: top left;
     padding: 0 8px;
@@ -146,6 +147,7 @@ QComboBox QAbstractItemView::item:selected {
 
 /* 复选框样式 */
 QCheckBox {
+    color: black;
     spacing: 8px;
 }
 
@@ -165,6 +167,7 @@ QCheckBox::indicator:checked {
 
 /* 文本编辑框（日志）样式 */
 QTextEdit {
+    color: black;
     border: 1px solid #dcdcdc;
     border-radius: 4px;
     background-color: #fafafa;
