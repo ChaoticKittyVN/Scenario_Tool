@@ -146,7 +146,7 @@ class ExcelFileManager:
             file_path: 保存路径
             data: {工作表名: DataFrame} 的字典
             engine: 写入引擎 ('openpyxl' 或 'xlsxwriter')
-            **kwargs: 传递给 pd.ExcelWriter 的额外参数
+            **kwargs: 传递给 pd.ExcelEditor 的额外参数
             
         Returns:
             bool: 是否保存成功
@@ -160,7 +160,7 @@ class ExcelFileManager:
             
             logger.info(f"保存Excel文件: {file_path}")
             
-            # 使用ExcelWriter保存多个工作表
+            # 使用ExcelEditor保存多个工作表
             with pd.ExcelWriter(file_path, engine=engine, **kwargs) as writer:
                 for sheet_name, df in data.items():
                     df.to_excel(writer, sheet_name=sheet_name, index=False)

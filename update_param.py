@@ -20,7 +20,7 @@ from core.excel_management import (
     ExcelWriteError,
     ExcelFileManager,
     DataFrameProcessor,
-    ExcelWriter
+    ExcelEditor
 )
 
 logger = get_logger()
@@ -249,7 +249,7 @@ class ParamUpdater:
         if not param_types:
             logger.error("无法获取参数翻译类型词典")
             return False
-        
+
         translate_params = param_types.get("translate_types", [])
         validate_params = param_types.get("validate_types", [])
 
@@ -270,8 +270,8 @@ class ParamUpdater:
             return True
 
         logger.info(f"找到 {len(excel_files)} 个演出表格文件")
-        # 创建 ExcelWriter 实例
-        excel_writer = ExcelWriter()
+        # 创建 ExcelEditor 实例
+        excel_writer = ExcelEditor()
         success_count = 0
 
         for excel_file in excel_files:
@@ -284,7 +284,7 @@ class ParamUpdater:
                     params = validation_data.get(param_type, [])
                     parameter_data[param_type] = params
 
-                # 使用增强的 ExcelWriter 方法更新参数表
+                # 使用增强的 ExcelEditor 方法更新参数表
                 try:
                     success = excel_writer.update_parameter_sheet(
                         excel_file,

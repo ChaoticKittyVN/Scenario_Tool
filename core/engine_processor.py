@@ -95,9 +95,13 @@ class EngineProcessor:
         results = []
 
         # 使用DataFrameProcessor提取所有生成器需要的参数
-        generator_params = self.df_processor.extract_generator_params(
-            row_data, self.generator_param_map
-        )
+
+        generator_params = {}
+
+        for generator, needed_params in self.generator_param_map.items():
+            params = self.df_processor.extract_parameters(row_data, needed_params)
+            if params:
+                generator_params[generator] = params
 
         for generator, params in generator_params.items():
             # 原有的管道处理逻辑

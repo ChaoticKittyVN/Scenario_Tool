@@ -14,8 +14,8 @@ from .excel_exceptions import ExcelWriteError
 logger = get_logger(__name__)
 
 
-# ==================== Excel写入器（高级功能） ====================
-class ExcelWriter:
+# ==================== Excel编辑器（高级功能） ====================
+class ExcelEditor:
     """
     Excel写入器（高级功能）
     提供更复杂的Excel写入功能，如样式、公式、命名区域等

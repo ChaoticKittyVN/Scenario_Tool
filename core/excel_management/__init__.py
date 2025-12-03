@@ -8,7 +8,7 @@ from .excel_exceptions import (
 
 from .excel_file_manager import ExcelFileManager
 from .dataframe_processor import DataFrameProcessor
-from .excel_writer import ExcelWriter
+from .excel_editor import ExcelEditor
 from .excel_decorators import handle_excel_operation
 
 __all__ = [
@@ -22,7 +22,7 @@ __all__ = [
     # 核心类
     'ExcelFileManager',
     'DataFrameProcessor',
-    'ExcelWriter',
+    'ExcelEditor',
     
     # 别名
     'ExcelManager',
@@ -44,8 +44,8 @@ def create_excel_manager(cache_enabled: bool = True) -> ExcelFileManager:
 def create_dataframe_processor(config=None) -> DataFrameProcessor:
     return DataFrameProcessor(config)
 
-def create_excel_writer() -> ExcelWriter:
-    return ExcelWriter()
+def create_excel_writer() -> ExcelEditor:
+    return ExcelEditor()
 
 # 别名
 ExcelManager = ExcelFileManager
