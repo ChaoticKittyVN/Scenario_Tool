@@ -58,6 +58,7 @@ class TextGenerator(BaseSentenceGenerator):
             if character_name in self.SPECIAL_NAME_VALUES:
                 if character_name == SpecialName.RENPY_COMMAND.value:
                     # 直接输入 Ren'Py 命令
+                    text = text.replace("\u00a0"," ")
                     lines.append(text)
                     #
                 elif character_name == SpecialName.LABEL_CAMMAND.value:

@@ -92,7 +92,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             image = background or event
 
             # 添加事件属性（差分）
-            varient = self.get_value("Varient", data)
+            varient = self.get_value("EventVarient", data)
             if varient:
                 image += f" {varient}"
 

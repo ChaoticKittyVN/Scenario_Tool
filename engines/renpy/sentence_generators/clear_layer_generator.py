@@ -20,7 +20,7 @@ class ClearLayerGenerator(BaseSentenceGenerator):
 
     @property
     def priority(self) -> int:
-        return 50
+        return 150
 
     def process(self, data):
         """

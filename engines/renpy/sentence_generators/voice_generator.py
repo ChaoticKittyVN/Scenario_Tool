@@ -30,7 +30,7 @@ class VoiceGenerator(BaseSentenceGenerator):
 
     @property
     def priority(self) -> int:
-        return 150
+        return 890
 
     def process(self, data):
         """
@@ -52,6 +52,6 @@ class VoiceGenerator(BaseSentenceGenerator):
             return []
 
         if voice == "stop":
-            return ["stop voice"]
+            return ["voice stop"]
         else:
             return [f"voice {voice}"]
