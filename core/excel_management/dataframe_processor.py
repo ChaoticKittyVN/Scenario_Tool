@@ -178,7 +178,7 @@ class DataFrameProcessor:
             return False
         return True
     
-    def extract_parameters(self, row_data: pd.Series, needed_params: List[str]) -> Dict[str, Any]:
+    def extract_parameters(self, row_data: pd.Series | Dict, needed_params: List[str]) -> Dict[str, Any]:
         """
         从行数据中提取指定参数
         
@@ -189,12 +189,14 @@ class DataFrameProcessor:
         Returns:
             Dict[str, Any]: 提取的参数字典
         """
-        row_dict = row_data.to_dict()
-        params = {}
+        if row_data is pd.Series:
+            row_data = row_data.to_dict()
         
+        params = {}
+
         for param_name in needed_params:
-            if param_name in row_dict:
-                value = row_dict[param_name]
+            if param_name in row_data:
+                value = row_data[param_name]
                 if self.has_valid_data(value):
                     params[param_name] = value
         

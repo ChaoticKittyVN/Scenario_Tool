@@ -82,7 +82,7 @@ class EngineProcessor:
 
         return generator_param_map
 
-    def process_row(self, row_data: pd.Series) -> List[str]:
+    def process_row(self, row_data: pd.Series) -> List[str] | None:
         """
         处理单行数据 - 管道模式
 
@@ -95,32 +95,27 @@ class EngineProcessor:
         results = []
 
         # 使用DataFrameProcessor提取所有生成器需要的参数
-
-        generator_params = {}
+        row_dict = row_data.to_dict()
 
         for generator, needed_params in self.generator_param_map.items():
-            params = self.df_processor.extract_parameters(row_data, needed_params)
-            if params:
-                generator_params[generator] = params
+            # 快速检查：这个generator需要的参数是否存在于行数据中
+            if not any(param in row_dict for param in needed_params):
+                continue
+            
+            # 只提取这个generator需要的参数
+            generator_params = {}
+            for param_name in needed_params:
+                if param_name in row_dict:
+                    value = row_dict[param_name]
+                    if value not in (None, ""):
+                        generator_params[param_name] = value
+            
+            if generator_params:
+                commands = generator.process(generator_params)
+                if commands:
+                    results.extend(commands)
 
-        for generator, params in generator_params.items():
-            # 原有的管道处理逻辑
-            if params:
-                try:
-                    commands = generator.process(params)
-                    if commands:
-                        results.extend(commands)
-                        logger.debug(
-                            f"{generator.__class__.__name__} 生成了 "
-                            f"{len(commands)} 条命令"
-                        )
-                except Exception as e:
-                    logger.error(
-                        f"{generator.__class__.__name__} 处理失败: {e}",
-                        exc_info=True
-                    )
-
-        return results
+            return results
 
     def get_pipeline_info(self) -> Dict[str, Any]:
         """获取管道信息，用于调试"""

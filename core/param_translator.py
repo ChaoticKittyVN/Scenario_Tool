@@ -9,6 +9,7 @@ from pathlib import Path
 from core.logger import get_logger
 from core.exceptions import TranslationError
 
+
 logger = get_logger()
 
 
@@ -33,6 +34,8 @@ class ParamTranslator:
         self.varient_module_file = varient_module_file
         self.mappings = self._load_mappings()
         self.varient_mappings = self._load_varient_mappings()
+        self._translation_cache = {}
+        self._varient_translation_cache = {}
 
         logger.info(f"参数翻译器初始化完成，加载了 {len(self.mappings)} 个参数类型")
 
@@ -97,15 +100,29 @@ class ParamTranslator:
         Returns:
             str: 翻译后的参数值，如果找不到映射则返回原值
         """
+        # 缓存键
+        cache_key = f"{param_type}:{param}"
+        
+        # 检查缓存
+        if cache_key in self._translation_cache:
+            return self._translation_cache[cache_key]
+        
         if param_type in self.mappings:
             if param in self.mappings[param_type]:
                 translated = self.mappings[param_type][param]
-                logger.debug(f"翻译参数: {param_type}.{param} -> {translated}")
+                # 减少日志级别
+                # if logger.isEnabledFor(logging.DEBUG):
+                #     logger.debug(f"翻译参数: {param_type}.{param} -> {translated}")
+                # logger.debug(f"翻译参数: {param_type}.{param} -> {translated}")
+                # 存入缓存
+                self._translation_cache[cache_key] = translated
                 return translated
             else:
                 logger.warning(
                     f"参数 '{param}' 在类型 '{param_type}' 的映射中未找到，返回原值"
                 )
+                # 缓存原值
+                self._translation_cache[cache_key] = param
                 return param
         else:
             logger.warning(f"参数类型 '{param_type}' 在映射中未找到，返回原值")
