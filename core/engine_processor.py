@@ -115,7 +115,7 @@ class EngineProcessor:
                 if commands:
                     results.extend(commands)
 
-            return results
+        return results
 
     def get_pipeline_info(self) -> Dict[str, Any]:
         """获取管道信息，用于调试"""
