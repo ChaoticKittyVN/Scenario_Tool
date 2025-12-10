@@ -20,7 +20,7 @@ class CharacterGenerator(BaseSentenceGenerator):
 
     param_config = {
         "TransChar": {
-            "category": "Character"
+            "translate_type": "TransitionType",
         },
 
         "Character": {
