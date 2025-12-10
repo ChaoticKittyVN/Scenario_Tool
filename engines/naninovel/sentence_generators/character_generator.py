@@ -101,7 +101,7 @@ class CharacterGenerator(BaseSentenceGenerator):
 
         """构建角色命令"""
         # 检查是否有足够的上下文生成角色命令
-        char = self.get_value("Char", data)
+        char = self.get_value("Character", data)
         anim = self.get_value("CharAnimParam", data)
 
         if not char and not anim:
