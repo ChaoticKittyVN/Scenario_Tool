@@ -71,7 +71,7 @@ class TextGenerator(BaseSentenceGenerator):
                 else:
                     raise ValueError(f"不支持的特殊说话者：{character_name}。")
             else:
-                character_name = self.translator.translate("Name", character_name)
+                # character_name = self.translator.translate("Name", character_name)
                 lines.append(f'{character_name}: {text}')
         else:
             if text:

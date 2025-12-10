@@ -40,17 +40,17 @@ class AudioGenerator(BaseSentenceGenerator):
 
     param_config = {
             "Music": {
-                "format_stop": "@stopBgm wait:False",
+                "format_stop": "@stopBgm wait:false",
                 "format": '@bgm Music/{value}',
                 "translate_type": "Music",
             },
             "Sound": {
-                "format_stop": "@stopSound wait:False",
+                "format_stop": "@stopSfx wait:false",
                 "format": '@sfx SFX/{value}',
                 "translate_type": "Sound",
             },
             "Ambience": {
-                "format_stop": "@stopSound wait:False",
+                "format_stop": "@stopSfx wait:false",
                 "format": '@sfx SFX/{value} loop:True',
                 "translate_type": "Ambience",
             },
@@ -93,7 +93,7 @@ class AudioGenerator(BaseSentenceGenerator):
             param_value = self.get_value(param_name, data)
             if param_value == "stop":
                 line = self.param_config[param_name].get("format_stop","")
-            else:
+            elif param_value:
                 line = self.get_sentence(param_name, data)
                 if self.exists_param("Volume", data) and line:
                     line += self.get_sentence("Volume", data)

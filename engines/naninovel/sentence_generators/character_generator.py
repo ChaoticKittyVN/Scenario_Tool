@@ -110,7 +110,7 @@ class CharacterGenerator(BaseSentenceGenerator):
         lines = []
         trans = self.get_value("TransChar", data)
 
-        if trans == "block":
+        if trans in ["block", "trans"]:
             command = "    "
         else:
             command = ""
@@ -121,24 +121,24 @@ class CharacterGenerator(BaseSentenceGenerator):
 
         else:
             image = char
-            varient = self.get_value("Varient", data)
-
-            # 使用varient_data时使用以下指令进行翻译
-            # self.translator._translate_varient(varient,image)
-
-            # 差分名，如有需要使用多参数组合
-            image += f".{varient}"
 
             if trans == "hide":
                 command += "@hide "
             else:
                 command += "@char "
+                varient = self.get_value("Varient", data)
+
+                # 使用varient_data时使用以下指令进行翻译
+                # self.translator._translate_varient(varient,image)
+
+                # 差分名，如有需要使用多参数组合
+                image += f".{varient}"
 
             # 添加姿势
             pose = self.get_sentence("Pose", data)
             
             # 添加位置
-            position = pose = self.get_sentence("Position", data)
+            position = self.get_sentence("Position", data)
             
             # 添加缩放
             scale = self.get_sentence("Scale", data)

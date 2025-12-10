@@ -58,7 +58,7 @@ class EffectGenerator(BaseSentenceGenerator):
             id_ = self.get_value("EffectId", data)
 
             time = self.get_sentence("EffectTime", data)
-            wait = self.get_sentence("EffectWait", data)
+            wait = self.get_sentence("EffectWait", data).lower()
             match effect:
                 case "blur":
                     power = self.get_sentence("EffectPower", data)

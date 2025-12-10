@@ -64,6 +64,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
             "default": "90"
         },
         "BackTint": {
+            "translate_type": "Tint",
             "format":" tint:{value}",
         },
         "BackTime": {

@@ -31,6 +31,6 @@ class PauseWaitGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return None
 
-        wait = self.get_sentence("WaitPause", data)
+        wait = self.get_sentence("PauseWait", data)
 
         return [wait]

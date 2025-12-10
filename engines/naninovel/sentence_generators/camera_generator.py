@@ -76,14 +76,14 @@ class CameraGenerator(BaseSentenceGenerator):
         zoom = self.get_sentence("Zoom", data)
 
         if self.exists_param("OffsetX", data) or self.exists_param("OffsetY", data):
-            offset_x = self.get_sentence("OffsetX", data)
-            offset_y = self.get_sentence("OffsetY", data)
+            offset_x = self.get_sentence("OffsetX", data, use_default=True)
+            offset_y = self.get_sentence("OffsetY", data, use_default=True)
             offset = f"{offset_x}{offset_y}"
         else:
             offset = ""
         
-        wait = self.get_sentence("CameraWait", data)
-        
+        wait = self.get_sentence("CameraWait", data).lower()
+
         line = f"{command}{zoom}{offset}{wait}{time}"
         
         lines.append(line)

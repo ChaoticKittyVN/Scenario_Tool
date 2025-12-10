@@ -4,7 +4,7 @@ class MovieGenerator(BaseSentenceGenerator):
     """视频生成器"""
 
     param_config = {
-        "Moive": {
+        "Movie": {
             "translate_type": "Movie",
             "format": "@movie {value} wait:true"
         }
@@ -31,11 +31,10 @@ class MovieGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return
         
-        results = []
+        data = self.do_translate(data)
 
-        movie = data.get("Moive")
+        movie = self.get_value("Movie", data)
 
-        temp = f"@movie {movie}"
-        results.append(temp)
+        line = f"@movie {movie} wait:true"
 
-        return results
+        return [line]

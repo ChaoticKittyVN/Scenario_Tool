@@ -15,6 +15,7 @@ class TransitionGenerator(BaseSentenceGenerator):
         },
     
         "TransitionDissolve": {
+            "translate_type": "Dissolve",
             "format": " Custom dissolve:Rule/{value} params:95"
         },
 
