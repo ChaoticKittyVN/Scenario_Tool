@@ -110,7 +110,7 @@ def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTran
                 row_data = valid_rows_df.iloc[idx]
                 try:
                     # 设置翻译器上下文信息
-                    translator.set_context(file_basename, sheet, idx)
+                    translator.set_context(file_basename, sheet, idx, row_data.get("Index", ""))
 
                     commands = processor.process_row(row_data)
                     if commands:

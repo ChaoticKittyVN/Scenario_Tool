@@ -41,6 +41,7 @@ class ParamTranslator:
         self.current_file_name: Optional[str] = None
         self.current_sheet_name: Optional[str] = None
         self.current_row_index: Optional[int] = None
+        self.current_scenario_index: Optional[str] = None
 
         # 无法翻译的参数
         self.untranslatable_params: List[Dict[str, Any]] = []
@@ -97,7 +98,7 @@ class ParamTranslator:
             logger.error(f"加载差分映射模块失败: {e}", exc_info=True)
             return {}
 
-    def set_context(self, file_name: str, sheet_name: str, row_index: int):
+    def set_context(self, file_name: str, sheet_name: str, row_index: int ,scenario_index: str):
         """
         设置当前处理的上下文信息
 
@@ -109,6 +110,8 @@ class ParamTranslator:
         self.current_file_name = file_name
         self.current_sheet_name = sheet_name
         self.current_row_index = row_index
+        if scenario_index:
+            self.current_scenario_index = scenario_index
 
     def _collect_untranslatable(
         self,
@@ -128,6 +131,7 @@ class ParamTranslator:
             'file': self.current_file_name,
             'sheet': self.current_sheet_name,
             'row': self.current_row_index,
+            'index': self.current_scenario_index,
             'param_type': param_type,
             'param_value': param_value
         }
@@ -364,13 +368,14 @@ class ParamTranslator:
                         f.write(f"  工作表: {sheet_name}\n")
                         for item in file_sheet_groups[file_name][sheet_name]:
                             row_info = f"行 {item['row']}" if item['row'] is not None else "未知行"
+                            index_info = f"Indx {item['index']}" if item['index'] is not None else "未知序列"
                             param_value = item['param_value']
 
                             # 如果有角色信息（差分参数）
                             if 'role' in item:
-                                f.write(f"    {row_info}: 参数值 '{param_value}' (角色: {item['role']})\n")
+                                f.write(f"    {row_info}|{index_info}: 参数值 '{param_value}' (角色: {item['role']})\n")
                             else:
-                                f.write(f"    {row_info}: 参数值 '{param_value}'\n")
+                                f.write(f"    {row_info}|{index_info}: 参数值 '{param_value}'\n")
 
             f.write("\n")
             f.write("=" * 80 + "\n")
