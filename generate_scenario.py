@@ -30,22 +30,17 @@ import engines.naninovel
 logger = get_logger()
 
 
-def create_processor(config: AppConfig):
+def create_processor(config: AppConfig, translator: ParamTranslator):
     """
     创建处理器实例
 
     Args:
         config: 应用配置
+        translator: 参数翻译器
 
     Returns:
         处理器实例
     """
-    # 创建翻译器
-    translator = ParamTranslator(
-        module_file=str(config.paths.param_config_dir / "param_mappings.py"),
-        varient_module_file=str(config.paths.param_config_dir / "varient_mappings.py")
-    )
-
     # 从注册表获取引擎元数据
     engine_meta = EngineRegistry.get(config.engine.engine_type)
 
@@ -55,14 +50,15 @@ def create_processor(config: AppConfig):
     return processor
 
 
-def process_excel_file(file_path: Path, config: AppConfig):
+def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTranslator):
     """
     处理单个Excel文件
-    
+
     Args:
         file_path: Excel 文件路径
         config: 应用配置
-        
+        translator: 参数翻译器（用于追踪上下文）
+
     Raises:
         ExcelFileNotFoundError: 文件不存在
         ExcelFormatError: 文件格式错误
@@ -70,7 +66,7 @@ def process_excel_file(file_path: Path, config: AppConfig):
     """
     try:
         logger.info(f"开始处理文件: {file_path.name}")
-        processor = create_processor(config)
+        processor = create_processor(config, translator)
 
         # 使用ExcelFileManager读取Excel文件
         excel_manager = ExcelFileManager(cache_enabled=True)
@@ -113,6 +109,9 @@ def process_excel_file(file_path: Path, config: AppConfig):
             for idx in iterator:
                 row_data = valid_rows_df.iloc[idx]
                 try:
+                    # 设置翻译器上下文信息
+                    translator.set_context(file_basename, sheet, idx)
+
                     commands = processor.process_row(row_data)
                     if commands:
                         output_list.extend(commands)
@@ -215,10 +214,16 @@ def main():
         logger.info(f"找到 {len(excel_files)} 个Excel文件，开始处理...")
         logger.info(f"使用引擎: {config.engine.engine_type}")
 
+        # 创建翻译器（用于追踪无法翻译的参数）
+        translator = ParamTranslator(
+            module_file=str(config.paths.param_config_dir / "param_mappings.py"),
+            varient_module_file=str(config.paths.param_config_dir / "varient_mappings.py")
+        )
+
         # 处理每个Excel文件
         for excel_file in excel_files:
             try:
-                process_excel_file(excel_file, config)
+                process_excel_file(excel_file, config, translator)
             except ExcelFileNotFoundError as e:
                 logger.error(f"文件不存在，跳过: {excel_file} - {e}")
                 continue
@@ -230,6 +235,16 @@ def main():
                 continue
 
         logger.info("所有文件处理完成")
+
+        # 导出无法翻译的参数日志
+        untranslatable_count = translator.get_untranslatable_count()
+        if untranslatable_count > 0:
+            logger.info(f"发现 {untranslatable_count} 个无法翻译的参数")
+            log_path = translator.export_untranslatable_log(config.paths.output_dir)
+            if log_path:
+                logger.info(f"无法翻译的参数详细信息已保存至: {log_path}")
+        else:
+            logger.info("所有参数均成功翻译")
 
     except Exception as e:
         logger.critical(f"程序执行失败: {e}", exc_info=True)

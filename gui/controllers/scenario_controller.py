@@ -5,6 +5,7 @@
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal, QThread
 from core.config_manager import AppConfig
+from core.param_translator import ParamTranslator
 from core.logger import get_logger
 
 # 直接导入 CLI 工具的函数
@@ -39,20 +40,37 @@ class ScenarioGeneratorWorker(QThread):
                 self.finished.emit(False, "未找到 Excel 文件")
                 return
 
+            # 创建翻译器（用于追踪无法翻译的参数）
+            translator = ParamTranslator(
+                module_file=str(self.config.paths.param_config_dir / "param_mappings.py"),
+                varient_module_file=str(self.config.paths.param_config_dir / "varient_mappings.py")
+            )
+
             # 处理每个文件
             success_count = 0
             for excel_file in excel_files:
                 try:
                     self.progress.emit(f"处理文件: {excel_file.name}")
-                    process_excel_file(excel_file, self.config)
+                    process_excel_file(excel_file, self.config, translator)
                     success_count += 1
                 except Exception as e:
                     logger.error(f"处理文件 {excel_file.name} 失败: {e}")
                     self.progress.emit(f"处理文件 {excel_file.name} 失败: {str(e)}")
 
+            # 导出无法翻译的参数日志
+            untranslatable_count = translator.get_untranslatable_count()
+            if untranslatable_count > 0:
+                self.progress.emit(f"发现 {untranslatable_count} 个无法翻译的参数")
+                log_path = translator.export_untranslatable_log(self.config.paths.output_dir)
+                if log_path:
+                    self.progress.emit(f"无法翻译的参数详细信息已保存至: {log_path.name}")
+
             if success_count == len(excel_files):
                 self.progress.emit("脚本生成完成")
-                self.finished.emit(True, f"成功生成 {success_count} 个脚本")
+                if untranslatable_count > 0:
+                    self.finished.emit(True, f"成功生成 {success_count} 个脚本（发现 {untranslatable_count} 个无法翻译的参数）")
+                else:
+                    self.finished.emit(True, f"成功生成 {success_count} 个脚本")
             elif success_count > 0:
                 self.finished.emit(False, f"部分成功: {success_count}/{len(excel_files)} 个脚本生成成功")
             else:
