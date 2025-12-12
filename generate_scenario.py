@@ -23,6 +23,9 @@ from core.excel_management import (
     DataFrameProcessor
 )
 
+# 导入输出管理器
+from core.scenario_output import OutputManager, OutputFormat
+
 # 导入引擎模块以触发注册
 import engines.renpy
 import engines.naninovel
@@ -121,11 +124,25 @@ def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTran
             # 确保输出目录存在
             config.paths.output_dir.mkdir(parents=True, exist_ok=True)
 
-            # 写入输出文件
+            # 使用输出管理器写入文件
             output_file_path = config.paths.output_dir / scenario_name
-            write_output_file(output_file_path, output_list, config)
-
-            logger.info(f"已生成: {output_file_path}")
+            
+            # 创建输出管理器（每次创建，或者可以在main中创建一次）
+            output_manager = OutputManager.create_default()
+            
+            # 使用输出管理器输出
+            success = output_manager.output(
+                data=output_list,
+                output_path=output_file_path,
+                format=OutputFormat.TEXT,
+                engine_config=config.engine,
+                apply_formatting=True
+            )
+            
+            if success:
+                logger.info(f"已生成: {output_file_path}")
+            else:
+                logger.error(f"生成文件失败: {output_file_path}")
 
             # 统计字数
             word_counter = BasicWordCounter()
@@ -156,29 +173,6 @@ def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTran
     except Exception as e:
         logger.error(f"处理文件 {file_path} 时出错: {e}", exc_info=True)
         raise ExcelParseError(f"处理文件失败: {file_path}") from e
-
-
-def write_output_file(output_path: Path, lines: list, config: AppConfig):
-    """
-    写入输出文件
-
-    Args:
-        output_path: 输出文件路径
-        lines: 输出行列表
-        config: 应用配置
-    """
-    with open(output_path, "w", encoding="utf-8") as f:
-        for line in lines:
-            # Ren'Py 特定的缩进处理
-            if config.engine.engine_type == "renpy":
-                if line.strip().startswith("label "):
-                    f.write(line.strip() + "\n")
-                else:
-                    indent = " " * config.engine.indent_size
-                    f.write(indent + line + "\n")
-            else:
-                # 其他引擎的默认处理
-                f.write(line + "\n")
 
 
 def main():
