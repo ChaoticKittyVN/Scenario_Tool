@@ -114,8 +114,13 @@ class OutputManager:
         if apply_formatting and hasattr(engine_config, 'engine_type'):
             formatter = self.get_formatter(engine_config.engine_type)
             if formatter:
-                try:
-                    formatted_data = formatter.format_output(data, engine_config)
+                try:                    
+                    if isinstance(data, dict):
+                        formatted_data = {}
+                        for sheet_name, sheet_data in data.items():
+                            formatted_data[sheet_name] = formatter.format_output(sheet_data, engine_config)
+                    else:
+                        formatted_data = formatter.format_output(data, engine_config)
                 except Exception as e:
                     logger.warning(f"格式器处理失败，使用原始数据: {e}")
         

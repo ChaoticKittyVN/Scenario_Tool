@@ -30,17 +30,17 @@ class OutputConfig:
 
 class IOutputWriter(ABC):
     """输出器接口"""
-    
+
     @abstractmethod
     def write(self, data: List[Any], output_path: Path, config: OutputConfig) -> bool:
         """写入数据"""
         pass
-    
+
     @abstractmethod
     def supports_format(self, format: OutputFormat) -> bool:
         """是否支持该格式"""
         pass
-    
+
     @abstractmethod
     def get_extension(self) -> str:
         """获取文件扩展名"""
@@ -48,30 +48,30 @@ class IOutputWriter(ABC):
 
 class IFormatter(ABC):
     """格式器接口 - 负责将结构化数据转换为特定格式"""
-    
+
     @abstractmethod
     def format(self, structured_data: Dict[str, Any]) -> Any:
         """格式化数据"""
         pass
-    
+
     @abstractmethod
     def format_output(self, data: Any, engine_config: Any) -> Any:
         """格式化输出数据
-        
+
         Args:
             data: 输入数据
             engine_config: 引擎配置
-            
+
         Returns:
             格式化后的数据
         """
         pass
-    
+
     @abstractmethod
     def get_format_type(self) -> str:
         """获取格式类型"""
         pass
-    
+
     @abstractmethod
     def get_engine_type(self) -> str:
         """获取引擎类型"""

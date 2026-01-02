@@ -82,7 +82,7 @@ class EngineProcessor:
 
         return generator_param_map
 
-    def process_row(self, row_data: pd.Series) -> List[str] | None:
+    def process_row(self, row_data: pd.Series) -> List[str] | List[Dict[str, Any]] | None:
         """
         处理单行数据 - 管道模式
 

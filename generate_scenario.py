@@ -29,6 +29,7 @@ from core.scenario_output import OutputManager, OutputFormat
 # 导入引擎模块以触发注册
 import engines.renpy
 import engines.naninovel
+import engines.utage
 
 logger = get_logger()
 
@@ -76,6 +77,7 @@ def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTran
         excel_data = excel_manager.load_excel(file_path)
         sheet_names = list(excel_data.keys())
 
+        utage_outputs = {}
         # 使用DataFrameProcessor处理数据
         df_processor = DataFrameProcessor(config)
 
@@ -90,7 +92,12 @@ def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTran
                 continue
 
             # 生成输出文件名
-            scenario_name = config.engine.get_output_filename(sheet)
+            if config.engine.engine_type == "utage":
+                # 对于Utage：原文件名_工作表名.xlsx
+                scenario_name = f"{file_basename}_{sheet}.xlsx"
+            else:
+                # 对于其他引擎：文件名.rpy/.nani
+                scenario_name = config.engine.get_output_filename(sheet)
 
             # 使用DataFrameProcessor提取有效行
             sheet_df = excel_data[sheet]
@@ -121,29 +128,6 @@ def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTran
                 except Exception as e:
                     logger.error(f"处理第 {idx} 行时出错: {e}", exc_info=True)
 
-            # 确保输出目录存在
-            config.paths.output_dir.mkdir(parents=True, exist_ok=True)
-
-            # 使用输出管理器写入文件
-            output_file_path = config.paths.output_dir / scenario_name
-            
-            # 创建输出管理器（每次创建，或者可以在main中创建一次）
-            output_manager = OutputManager.create_default()
-            
-            # 使用输出管理器输出
-            success = output_manager.output(
-                data=output_list,
-                output_path=output_file_path,
-                format=OutputFormat.TEXT,
-                engine_config=config.engine,
-                apply_formatting=True
-            )
-            
-            if success:
-                logger.info(f"已生成: {output_file_path}")
-            else:
-                logger.error(f"生成文件失败: {output_file_path}")
-
             # 统计字数
             word_counter = BasicWordCounter()
 
@@ -151,7 +135,7 @@ def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTran
             stat_columns = df_processor.extract_columns_for_statistics(
                 valid_rows_df, [ColumnName.NAME.value, ColumnName.TEXT.value]
             )
-            
+
             name_series = stat_columns.get(ColumnName.NAME.value, pd.Series(dtype=object))
             text_series = stat_columns.get(ColumnName.TEXT.value, pd.Series(dtype=object))
 
@@ -166,6 +150,56 @@ def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTran
             )))
             for chara_name, count in total_words_by_chara_name.items():
                 logger.info(f"  说话者 '{chara_name}' 字数: {count}")
+
+            # 确保输出目录存在
+            config.paths.output_dir.mkdir(parents=True, exist_ok=True)
+
+            # 使用输出管理器写入文件
+            output_file_path = config.paths.output_dir / scenario_name
+
+            # 创建输出管理器（每次创建，或者可以在main中创建一次）
+            output_manager = OutputManager.create_default()
+
+            # 收集utage输出
+            if config.engine.engine_type == "utage":
+                if output_list:  # 只收集非空sheet
+                    utage_outputs[sheet] = output_list
+            else:
+                out_format = OutputFormat.TEXT
+                success = output_manager.output(
+                    data=output_list,
+                    output_path=output_file_path,
+                    format=out_format,
+                    engine_config=config.engine,
+                    apply_formatting=True
+                )
+
+                if success:
+                    logger.info(f"已生成: {output_file_path}")
+                else:
+                    logger.error(f"生成文件失败: {output_file_path}") 
+
+        # 新增：utage统一输出
+        if config.engine.engine_type == "utage" and utage_outputs:
+            scenario_name = f"{file_basename}.xlsx"
+            output_file_path = config.paths.output_dir / scenario_name
+            output_manager = OutputManager.create_default()
+            # 组装成 {sheet_name: List[Dict]}
+            success = output_manager.output(
+                data=utage_outputs,  # 传递sheet字典
+                output_path=output_file_path,
+                format=OutputFormat.EXCEL,
+                engine_config=config.engine,
+                apply_formatting=True
+            )
+            if success:
+                logger.info(f"已生成: {output_file_path}")
+            else:
+                logger.error(f"生成文件失败: {output_file_path}")
+        elif config.engine.engine_type == "utage" and not utage_outputs:
+            logger.warning(f"{file_path.name} 没有任何有效sheet，未生成utage输出文件。")
+
+
 
     except (ExcelFileNotFoundError, ExcelFormatError, ExcelDataError) as e:
         # 重新抛出给main函数处理

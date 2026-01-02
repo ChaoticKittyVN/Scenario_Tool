@@ -78,6 +78,22 @@ class NaninovelConfig(EngineConfig):
     file_extension: str = ".nani"
     command_prefix: str = "@"
 
+@dataclass
+class UtageConfig(EngineConfig):
+    """Utage 引擎配置"""
+    engine_type: str = "utage"
+    file_extension: str = ".xls"
+    output_format: str = "excel"
+
+    # 表格列配置
+    columns: List[str] = field(default_factory=lambda: [
+        "", "Command", "Arg1", "Arg2", "Arg3", "Arg4", "Arg5", "Arg6",
+        "WaitType", "Text", "PageCtrl", "Voice", "WindowType"
+    ])
+
+    # 列映射（从输入列到输出列）
+    column_mapping: Dict[str, str] = field(default_factory=dict)
+
 
 @dataclass
 class ResourceConfig:
@@ -101,7 +117,7 @@ class AppConfig:
     """应用总配置"""
     paths: PathConfig = field(default_factory=PathConfig)
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
-    engine: EngineConfig = field(default_factory=NaninovelConfig)
+    engine: EngineConfig = field(default_factory=RenpyConfig)
     resources: ResourceConfig = field(default_factory=ResourceConfig)
 
     @classmethod
@@ -153,7 +169,7 @@ class AppConfig:
         if isinstance(engine_data, str):
             engine_type = engine_data
         else:
-            engine_type = engine_data.get('engine_type', 'naninovel')
+            engine_type = engine_data.get('engine_type', 'renpy')
 
         # 根据引擎类型创建默认配置，然后用用户提供的值覆盖
         if engine_type == 'renpy':
@@ -165,6 +181,12 @@ class AppConfig:
                         setattr(engine, key, value)
         elif engine_type == 'naninovel':
             engine = NaninovelConfig()
+            if isinstance(engine_data, dict):
+                for key, value in engine_data.items():
+                    if hasattr(engine, key) and key != 'engine_type':
+                        setattr(engine, key, value)
+        elif engine_type == 'utage':
+            engine = UtageConfig()
             if isinstance(engine_data, dict):
                 for key, value in engine_data.items():
                     if hasattr(engine, key) and key != 'engine_type':
@@ -237,6 +259,8 @@ class AppConfig:
             engine = RenpyConfig()
         elif engine_type == "naninovel":
             engine = NaninovelConfig()
+        elif engine_type == "utage":
+            engine = UtageConfig()
         else:
             raise ValueError(f"不支持的引擎类型: {engine_type}")
 

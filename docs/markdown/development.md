@@ -38,6 +38,13 @@ pytest tests/ -v
 ```
 scenario_tool/
 ├── core/                          # 核心框架
+│   ├── excel_management/          # Excel表格处理
+│   │   ├── __init__.py
+│   │   ├── dataframe_processor.py # DataFrame处理
+│   │   ├── excel_decorators.py    # 装饰器
+│   │   ├── excel_exceptions.py    # Excel异常类
+│   │   ├── excel_file_manager.py  # Excel文件管理器
+│   │   └── excel_editor.py        # Excel编辑器
 │   ├── logger.py                  # 日志系统
 │   ├── exceptions.py              # 异常类
 │   ├── constants.py               # 常量定义
