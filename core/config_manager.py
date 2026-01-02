@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import json
 import yaml
+from core.logger import get_logger
+
+logger = get_logger()
 
 
 @dataclass
@@ -61,39 +64,55 @@ class EngineConfig:
         return f"{sheet_name}{self.file_extension}"
 
 
-@dataclass
-class RenpyConfig(EngineConfig):
-    """Ren'Py 引擎配置"""
-    engine_type: str = "renpy"
-    file_extension: str = ".rpy"
-    indent_size: int = 4
-    label_indent: bool = False
-    default_transition: str = "dissolve"
+def _create_engine_config(engine_type: str, engine_data: Optional[Dict[str, Any]] = None) -> EngineConfig:
+    """
+    通过引擎注册表创建引擎配置实例
 
+    Args:
+        engine_type: 引擎类型
+        engine_data: 引擎配置数据字典（可选）
 
-@dataclass
-class NaninovelConfig(EngineConfig):
-    """Naninovel 引擎配置"""
-    engine_type: str = "naninovel"
-    file_extension: str = ".nani"
-    command_prefix: str = "@"
+    Returns:
+        EngineConfig: 引擎配置实例
 
-@dataclass
-class UtageConfig(EngineConfig):
-    """Utage 引擎配置"""
-    engine_type: str = "utage"
-    file_extension: str = ".xls"
-    output_format: str = "excel"
+    Raises:
+        ValueError: 引擎未注册或无法创建配置
+    """
+    # 延迟导入以避免循环导入
+    from core.engine_registry import EngineRegistry
+    
+    # 如果引擎未注册，尝试动态导入
+    if not EngineRegistry.is_registered(engine_type):
+        # 尝试动态导入引擎模块
+        engine_module_map = {
+            "renpy": "engines.renpy",
+            "naninovel": "engines.naninovel",
+            "utage": "engines.utage"
+        }
+        if engine_type in engine_module_map:
+            try:
+                __import__(engine_module_map[engine_type])
+            except ImportError as e:
+                logger.warning(f"无法导入引擎模块 {engine_module_map[engine_type]}: {e}")
 
-    # 表格列配置
-    columns: List[str] = field(default_factory=lambda: [
-        "", "Command", "Arg1", "Arg2", "Arg3", "Arg4", "Arg5", "Arg6",
-        "WaitType", "Text", "PageCtrl", "Voice", "WindowType"
-    ])
+    # 从注册表获取引擎元数据
+    try:
+        engine_meta = EngineRegistry.get(engine_type)
+    except Exception as e:
+        raise ValueError(f"无法获取引擎 '{engine_type}' 的配置类: {e}")
 
-    # 列映射（从输入列到输出列）
-    column_mapping: Dict[str, str] = field(default_factory=dict)
+    # 创建配置实例
+    config_class = engine_meta.config_class
+    
+    # 如果提供了配置数据，使用数据创建；否则使用默认值
+    if engine_data and isinstance(engine_data, dict):
+        # 过滤掉engine_type，因为它是类属性
+        filtered_data = {k: v for k, v in engine_data.items() if k != 'engine_type'}
+        engine = config_class(**filtered_data)
+    else:
+        engine = config_class()
 
+    return engine
 
 @dataclass
 class ResourceConfig:
@@ -117,7 +136,7 @@ class AppConfig:
     """应用总配置"""
     paths: PathConfig = field(default_factory=PathConfig)
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
-    engine: EngineConfig = field(default_factory=RenpyConfig)
+    engine: EngineConfig = field(default_factory=lambda: _create_engine_config("renpy"))
     resources: ResourceConfig = field(default_factory=ResourceConfig)
 
     @classmethod
@@ -168,31 +187,12 @@ class AppConfig:
         # 如果只提供了 engine_type，使用默认配置
         if isinstance(engine_data, str):
             engine_type = engine_data
+            engine_data = {}
         else:
             engine_type = engine_data.get('engine_type', 'renpy')
 
-        # 根据引擎类型创建默认配置，然后用用户提供的值覆盖
-        if engine_type == 'renpy':
-            engine = RenpyConfig()
-            # 只覆盖用户明确提供的配置项
-            if isinstance(engine_data, dict):
-                for key, value in engine_data.items():
-                    if hasattr(engine, key) and key != 'engine_type':
-                        setattr(engine, key, value)
-        elif engine_type == 'naninovel':
-            engine = NaninovelConfig()
-            if isinstance(engine_data, dict):
-                for key, value in engine_data.items():
-                    if hasattr(engine, key) and key != 'engine_type':
-                        setattr(engine, key, value)
-        elif engine_type == 'utage':
-            engine = UtageConfig()
-            if isinstance(engine_data, dict):
-                for key, value in engine_data.items():
-                    if hasattr(engine, key) and key != 'engine_type':
-                        setattr(engine, key, value)
-        else:
-            raise ValueError(f"不支持的引擎类型: {engine_type}")
+        # 通过引擎注册表动态创建配置实例
+        engine = _create_engine_config(engine_type, engine_data)
 
         return cls(paths=paths, processing=processing, engine=engine, resources=resources)
 
@@ -220,8 +220,6 @@ class AppConfig:
             },
             'engine': {
                 'engine_type': self.engine.engine_type,
-                'file_extension': self.engine.file_extension,
-                'indent_size': self.engine.indent_size,
             },
             'resources': {
                 'project_root': str(self.resources.project_root),
@@ -230,12 +228,19 @@ class AppConfig:
             }
         }
 
-        # 添加引擎特定配置
-        if isinstance(self.engine, RenpyConfig):
-            data['engine']['label_indent'] = self.engine.label_indent
-            data['engine']['default_transition'] = self.engine.default_transition
-        elif isinstance(self.engine, NaninovelConfig):
-            data['engine']['command_prefix'] = self.engine.command_prefix
+        # 将引擎配置的所有字段添加到engine字典中
+        # 使用dataclasses.fields获取所有字段
+        from dataclasses import fields
+        for field_info in fields(self.engine):
+            if field_info.name != 'engine_type':  # engine_type已经在上面添加了
+                value = getattr(self.engine, field_info.name)
+                # 处理Path对象和复杂对象
+                if isinstance(value, Path):
+                    data['engine'][field_info.name] = str(value)
+                elif isinstance(value, (list, dict)):
+                    data['engine'][field_info.name] = value
+                else:
+                    data['engine'][field_info.name] = value
 
         if config_path.suffix == '.json':
             with open(config_path, 'w', encoding='utf-8') as f:
@@ -255,14 +260,7 @@ class AppConfig:
         Returns:
             AppConfig: 默认配置对象
         """
-        if engine_type == "renpy":
-            engine = RenpyConfig()
-        elif engine_type == "naninovel":
-            engine = NaninovelConfig()
-        elif engine_type == "utage":
-            engine = UtageConfig()
-        else:
-            raise ValueError(f"不支持的引擎类型: {engine_type}")
+        engine = _create_engine_config(engine_type)
 
         return cls(
             paths=PathConfig(),
@@ -270,3 +268,33 @@ class AppConfig:
             engine=engine,
             resources=ResourceConfig()
         )
+
+
+# 向后兼容：提供从引擎模块导入配置类的快捷方式
+# 这样现有代码仍然可以使用 from core.config_manager import RenpyConfig
+def __getattr__(name: str):
+    """
+    动态导入引擎配置类以提供向后兼容性
+    
+    支持的名称：
+    - RenpyConfig
+    - NaninovelConfig
+    - UtageConfig
+    """
+    engine_config_map = {
+        'RenpyConfig': 'engines.renpy.config',
+        'NaninovelConfig': 'engines.naninovel.config',
+        'UtageConfig': 'engines.utage.config',
+    }
+    
+    if name in engine_config_map:
+        module_path = engine_config_map[name]
+        try:
+            module = __import__(module_path, fromlist=[name])
+            return getattr(module, name)
+        except (ImportError, AttributeError) as e:
+            raise AttributeError(
+                f"无法导入 {name}。请使用 'from {module_path} import {name}' 或确保引擎模块已正确安装。"
+            ) from e
+    
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

@@ -20,7 +20,8 @@ from core.config_manager import (
     ProcessingConfig,
     EngineConfig,
     RenpyConfig,
-    NaninovelConfig
+    NaninovelConfig,
+    UtageConfig
 )
 from core.engine_registry import EngineRegistry, register_engine
 from core.param_translator import ParamTranslator
@@ -46,6 +47,7 @@ __all__ = [
     'EngineConfig',
     'RenpyConfig',
     'NaninovelConfig',
+    'UtageConfig',
     'EngineRegistry',
     'register_engine',
     'ParamTranslator',

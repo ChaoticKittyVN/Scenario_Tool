@@ -189,7 +189,7 @@ class DataFrameProcessor:
         Returns:
             Dict[str, Any]: 提取的参数字典
         """
-        if row_data is pd.Series:
+        if isinstance(row_data, pd.Series):
             row_data = row_data.to_dict()
         
         params = {}

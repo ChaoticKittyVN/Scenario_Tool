@@ -3,8 +3,8 @@ Naninovel Engine Module
 Naninovel 引擎实现
 """
 from core.engine_registry import register_engine
-from core.config_manager import NaninovelConfig
 from core.engine_processor import EngineProcessor
+from .config import NaninovelConfig
 
 
 @register_engine(

@@ -3,8 +3,8 @@ Ren'Py Engine Module
 Ren'Py 引擎实现
 """
 from core.engine_registry import register_engine
-from core.config_manager import RenpyConfig
 from core.engine_processor import EngineProcessor
+from .config import RenpyConfig
 
 
 @register_engine(

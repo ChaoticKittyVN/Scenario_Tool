@@ -17,7 +17,7 @@ class EngineMetadata:
     name: str
     display_name: str
     file_extension: str
-    config_class: Type[EngineConfig]
+    config_class: Type[EngineConfig]  # 引擎配置类，通常定义在各自的引擎模块中（如 engines.renpy.config.RenpyConfig）
     processor_factory: Callable
     validator_factory: Optional[Callable] = None
     description: str = ""
@@ -115,12 +115,28 @@ def register_engine(
         name: 引擎名称
         display_name: 显示名称
         file_extension: 文件扩展名
-        config_class: 配置类
-        validator_factory: 验证器工厂函数
-        description: 描述
+        config_class: 配置类，必须继承自 EngineConfig。
+                     通常定义在各自的引擎模块中（如 engines.renpy.config.RenpyConfig）
+        validator_factory: 验证器工厂函数（可选）
+        description: 引擎描述（可选）
 
     Returns:
         装饰器函数
+
+    Example:
+        ```python
+        from engines.renpy.config import RenpyConfig
+        
+        @register_engine(
+            name="renpy",
+            display_name="Ren'Py",
+            file_extension=".rpy",
+            config_class=RenpyConfig,
+            description="Ren'Py 视觉小说引擎"
+        )
+        def create_renpy_processor(config: RenpyConfig, translator):
+            # ...
+        ```
     """
     def decorator(processor_factory: Callable):
         metadata = EngineMetadata(
