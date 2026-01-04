@@ -52,6 +52,6 @@ class VoiceGenerator(BaseSentenceGenerator):
             return []
 
         if voice == "stop":
-            return ["voice stop"]
+            return ["stop voice"]
         else:
             return [f"voice {voice}"]
