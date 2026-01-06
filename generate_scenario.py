@@ -383,7 +383,7 @@ def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTran
 
         # Excel格式统一输出
         if is_excel and excel_outputs:
-            scenario_name = f"{file_basename}.xlsx"
+            scenario_name = f"{file_basename}_输出脚本.xlsx"
             output_file_path = config.paths.output_dir / scenario_name
             output_excel_file(excel_outputs, output_file_path, config)
         elif is_excel and not excel_outputs:
