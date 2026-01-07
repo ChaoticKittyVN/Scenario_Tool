@@ -12,6 +12,7 @@ class UtageConfig(EngineConfig):
     engine_type: str = "utage"
     file_extension: str = ".xls"
     output_format: str = "excel"
+    use_macro: bool = True
 
     # 表格列配置
     columns: List[str] = field(default_factory=lambda: [

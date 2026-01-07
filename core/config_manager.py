@@ -50,6 +50,7 @@ class EngineConfig:
     engine_type: str
     file_extension: str
     indent_size: int = 0
+    use_macro: bool = False
 
     def get_output_filename(self, sheet_name: str) -> str:
         """

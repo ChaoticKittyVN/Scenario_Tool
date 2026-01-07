@@ -10,6 +10,9 @@ from core.constants import WindowMode, SpecialName
 class CharacterTextGenerator(DictBasedSentenceGenerator):
     """角色与文本生成器"""
 
+    # 标记：允许与Macro一起处理（因为Macro可能需要Text）
+    ALLOWED_WITH_MACRO = True
+
     # 资源配置 - 用于资源验证
     resource_config = {
         "resource_type": "Character",
@@ -42,6 +45,9 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
         "Text": {
             "key": "Text"
         },
+        "Voice": {
+            "key": "Voice"
+        }        
     }
 
     SPECIAL_NAME_VALUES = {member.value for member in SpecialName}
@@ -97,6 +103,8 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
             # else:
                 # character_name = self.translator.translate("Name", character_name)
                 line = {}
+                if self.exists_param("Voice", data):
+                    self._set_param_fast(line, "Voice", data)
                 # 使用缓存的字段名
                 name_field = self.get_cached_field("Name", "Arg2")
                 line[name_field] = character_name
@@ -107,6 +115,8 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
         else:
             if text:
                 line = {}
+                if self.exists_param("Voice", data):
+                    self._set_param_fast(line, "Voice", data)
                 text_field = self.get_cached_field("Text", "Text")
                 line[text_field] = text
                 lines.append(line)

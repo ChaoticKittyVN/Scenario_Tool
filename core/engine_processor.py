@@ -68,6 +68,11 @@ class EngineProcessor:
         """构建generator到参数的映射"""
         generator_param_map = {}
         for generator in self.generators:
+            # 检查是否有特殊标记：接收所有参数（用于Macro生成器）
+            if getattr(generator, 'RECEIVE_ALL_PARAMS', False):
+                generator_param_map[generator] = None  # None表示接收所有参数
+                continue
+            
             params = []
             generator_params = getattr(generator, "param_config", {}) or {}
             generator_params_keys = (
@@ -90,7 +95,7 @@ class EngineProcessor:
             row_data: pandas Series，一行的所有数据
 
         Returns:
-            List[str]: 生成的命令列表
+            List[str] | List[Dict[str, Any]]: 生成的命令列表
         """
         results = []
 
@@ -98,6 +103,17 @@ class EngineProcessor:
         row_dict = row_data.to_dict()
 
         for generator, needed_params in self.generator_param_map.items():
+            # 处理接收所有参数的生成器（如Macro生成器）
+            if needed_params is None:
+                # 接收所有非空参数
+                generator_params = {k: v for k, v in row_dict.items() 
+                                  if v not in (None, "")}
+                if generator_params:
+                    commands = generator.process(generator_params)
+                    if commands:
+                        results.extend(commands)
+                continue
+            
             # 快速检查：这个generator需要的参数是否存在于行数据中
             if not any(param in row_dict for param in needed_params):
                 continue
@@ -115,6 +131,105 @@ class EngineProcessor:
                 if commands:
                     results.extend(commands)
 
+        return results
+
+    def has_macro(self, row_data: pd.Series) -> bool:
+        """
+        检查行数据中是否包含Macro指令（仅用于utage引擎）
+        
+        Args:
+            row_data: pandas Series，一行的所有数据
+            
+        Returns:
+            bool: 如果包含Macro指令且值不为空，返回True
+        """
+        if self.engine_type != "utage":
+            return False
+        
+        row_dict = row_data.to_dict()
+        return "Macro" in row_dict and row_dict.get("Macro") not in (None, "")
+
+    def _find_macro_generator(self):
+        """
+        查找Macro生成器实例（仅用于utage引擎）
+        
+        Returns:
+            Macro生成器实例，如果不存在则返回None
+        """
+        if self.engine_type != "utage":
+            return None
+        
+        for generator in self.generators:
+            if (getattr(generator, 'EXCLUSIVE_MODE', False) and 
+                getattr(generator, 'RECEIVE_ALL_PARAMS', False)):
+                return generator
+        return None
+
+    def process_macro_row(self, row_data: pd.Series) -> List[str] | List[Dict[str, Any]] | None:
+        """
+        Macro专用处理流程（仅用于utage引擎）
+        
+        处理逻辑：
+        1. 优先处理Macro生成器（接收所有非空参数）
+        2. 只处理标记为ALLOWED_WITH_MACRO的生成器（如Text相关）
+        3. 其他生成器全部跳过
+        
+        Args:
+            row_data: pandas Series，一行的所有数据
+            
+        Returns:
+            List[str] | List[Dict[str, Any]]: 生成的命令列表
+        """
+        if self.engine_type != "utage":
+            # 非utage引擎不应该调用此方法，降级为普通处理
+            return self.process_row(row_data)
+        
+        results = []
+        row_dict = row_data.to_dict()
+        
+        # 查找Macro生成器
+        macro_generator = self._find_macro_generator()
+        if not macro_generator:
+            logger.warning("未找到Macro生成器，但检测到Macro指令，降级为普通处理")
+            return self.process_row(row_data)
+        
+        # 1. 处理Macro生成器（接收所有参数）
+        macro_params = {k: v for k, v in row_dict.items() 
+                       if v not in (None, "")}
+        if macro_params:
+            commands = macro_generator.process(macro_params)
+            if commands:
+                results.extend(commands)
+        
+        # 2. 处理允许与Macro一起处理的生成器
+        for generator, needed_params in self.generator_param_map.items():
+            # 跳过Macro生成器本身
+            if generator == macro_generator:
+                continue
+            
+            # 只处理标记为ALLOWED_WITH_MACRO的生成器
+            if not getattr(generator, 'ALLOWED_WITH_MACRO', False):
+                continue
+            
+            # 提取该生成器需要的参数
+            if needed_params is None:
+                # 接收所有参数的生成器
+                generator_params = {k: v for k, v in row_dict.items() 
+                                  if v not in (None, "")}
+            else:
+                # 只提取需要的参数
+                generator_params = {}
+                for param_name in needed_params:
+                    if param_name in row_dict:
+                        value = row_dict[param_name]
+                        if value not in (None, ""):
+                            generator_params[param_name] = value
+            
+            if generator_params:
+                commands = generator.process(generator_params)
+                if commands:
+                    results.extend(commands)
+        
         return results
 
     def get_pipeline_info(self) -> Dict[str, Any]:

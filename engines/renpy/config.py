@@ -14,3 +14,5 @@ class RenpyConfig(EngineConfig):
     label_indent: bool = False
     default_transition: str = "dissolve"
 
+    use_macro: bool = False
+

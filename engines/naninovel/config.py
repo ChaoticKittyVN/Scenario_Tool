@@ -12,3 +12,4 @@ class NaninovelConfig(EngineConfig):
     file_extension: str = ".nani"
     command_prefix: str = "@"
 
+    use_macro: bool = False

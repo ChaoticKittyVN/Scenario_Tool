@@ -66,7 +66,7 @@ class AudioGenerator(DictBasedSentenceGenerator):
             "Volume": {
                 "key": "Arg3"
             },
-            "FadeTime": {
+            "AudioFadeTime": {
                 "key": "Arg6",
                 "default": "2.0"
             },
@@ -116,7 +116,7 @@ class AudioGenerator(DictBasedSentenceGenerator):
                 # 停止命令
                 line["Command"] = audio_cfg.get("stop_format", "")
                 # 自动使用缓存的字段名
-                self._set_param_fast(line, "FadeTime", data)
+                self._set_param_fast(line, "AudioFadeTime", data)
             else:
                 # 播放命令
                 format_str = audio_cfg.get("format", "")
@@ -131,7 +131,7 @@ class AudioGenerator(DictBasedSentenceGenerator):
                 
                 # 设置可选参数（自动使用缓存的字段名）
                 self._set_param_fast(line, "Volume", data)
-                self._set_param_fast(line, "FadeTime", data)
+                self._set_param_fast(line, "AudioFadeTime", data)
 
             lines.append(line)
 

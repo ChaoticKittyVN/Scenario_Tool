@@ -164,7 +164,13 @@ def process_sheet_rows(
             # 设置翻译器上下文信息
             translator.set_context(file_basename, sheet, idx, row_data.get("Index", ""))
 
-            commands = processor.process_row(row_data)
+            # 对于使用macro引擎，如果检测到Macro指令，使用Macro专用处理流程
+            # 其他引擎或没有Macro的情况，使用普通处理流程
+            if config.engine.use_macro and processor.has_macro(row_data):
+                commands = processor.process_macro_row(row_data)
+            else:
+                commands = processor.process_row(row_data)
+            
             if commands:
                 output_list.extend(commands)
         except Exception as e:
