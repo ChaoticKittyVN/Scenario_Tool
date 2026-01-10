@@ -62,7 +62,8 @@ class ResourceExtractor:
             configs = self.get_resource_configs(generator)
 
             for config in configs:
-                resource_name = self._build_resource_name(row_data, config)
+                # 传递生成器实例以便访问 param_config
+                resource_name = self._build_resource_name(row_data, config, generator)
                 if resource_name:
                     resource_type = config["resource_type"]
                     resources[resource_type].add(resource_name)
@@ -91,13 +92,43 @@ class ResourceExtractor:
 
         return configs
 
-    def _build_resource_name(self, row_data: Dict, config: Dict) -> str:
+    def _build_resource_name(self, row_data: Dict, config: Dict, generator=None) -> str:
         """
         根据配置构建完整的资源名（包含差分）
 
         Args:
             row_data: 行数据
             config: 资源配置
+            generator: 生成器实例（用于访问 param_config 和自定义构建方法）
+
+        Returns:
+            str: 完整的资源名，如果主参数不存在则返回空字符串
+        """
+        # 如果生成器提供了自定义的资源名称构建方法，优先使用
+        if generator and hasattr(generator, 'build_resource_name'):
+            try:
+                # 先翻译数据，因为生成器的 build_resource_name 期望接收已翻译的数据
+                translated_data = generator.do_translate(row_data.copy())
+                custom_name = generator.build_resource_name(translated_data, config)
+                if custom_name is not None and custom_name != "":
+                    return str(custom_name).strip()
+            except Exception as e:
+                logger.warning(
+                    f"生成器 {generator.__class__.__name__} 的 build_resource_name 方法执行失败，"
+                    f"回退到标准逻辑: {e}"
+                )
+        
+        # 使用标准逻辑构建资源名称
+        return self._build_resource_name_standard(row_data, config, generator)
+
+    def _build_resource_name_standard(self, row_data: Dict, config: Dict, generator=None) -> str:
+        """
+        使用标准逻辑构建资源名称（原有逻辑）
+
+        Args:
+            row_data: 行数据
+            config: 资源配置
+            generator: 生成器实例（用于访问 param_config）
 
         Returns:
             str: 完整的资源名，如果主参数不存在则返回空字符串
@@ -111,9 +142,20 @@ class ResourceExtractor:
         # 确保是字符串类型
         main_value = str(main_value).strip()
 
-        # 翻译主参数
-        if self.translator.has_mapping(config["resource_type"], main_value):
-            main_value = self.translator.translate(config["resource_type"], main_value)
+        # 翻译主参数 - 使用 param_config 中的 translate_type
+        translate_type = None
+        if generator and hasattr(generator, 'param_config'):
+            param_cfg = generator.param_config.get(main_param, {})
+            translate_type = param_cfg.get("translate_type")
+        
+        # 如果找到了 translate_type，使用它进行翻译
+        if translate_type:
+            if self.translator.has_mapping(translate_type, main_value):
+                main_value = self.translator.translate(translate_type, main_value)
+        else:
+            # 回退到使用 resource_type（向后兼容）
+            if self.translator.has_mapping(config["resource_type"], main_value):
+                main_value = self.translator.translate(config["resource_type"], main_value)
 
         result = str(main_value)
         separator = config.get("separator", " ")
@@ -123,9 +165,19 @@ class ResourceExtractor:
             if part_param in row_data and row_data[part_param]:
                 part_value = str(row_data[part_param]).strip()
 
-                # 尝试翻译差分参数
-                if self.translator.has_mapping(part_param, part_value):
-                    part_value = self.translator.translate(part_param, part_value)
+                # 尝试翻译差分参数 - 也使用 param_config 中的 translate_type
+                part_translate_type = None
+                if generator and hasattr(generator, 'param_config'):
+                    part_param_cfg = generator.param_config.get(part_param, {})
+                    part_translate_type = part_param_cfg.get("translate_type")
+                
+                if part_translate_type:
+                    if self.translator.has_mapping(part_translate_type, part_value):
+                        part_value = self.translator.translate(part_translate_type, part_value)
+                else:
+                    # 回退到使用参数名作为翻译类型
+                    if self.translator.has_mapping(part_param, part_value):
+                        part_value = self.translator.translate(part_param, part_value)
 
                 part_value = str(part_value)
 

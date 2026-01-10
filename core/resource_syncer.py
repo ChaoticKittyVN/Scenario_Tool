@@ -56,6 +56,9 @@ class ResourceSyncer:
             if not folder:
                 continue
 
+            # 规范化 folder 路径（去除首尾斜杠，避免路径构建问题）
+            folder_normalized = folder.strip().strip('/\\')
+
             # 检查两个库都缺失的文件
             missing_in_both = comp_data.get("missing_in_both", [])
             if missing_in_both:
@@ -74,16 +77,50 @@ class ResourceSyncer:
 
             for resource_name in missing_files:
                 source_filename = source_results[resource_type].get(resource_name)
-                if source_filename:
-                    source_path = self.source_root / folder / source_filename
-                    target_path = self.project_root / folder / source_filename
+                if not source_filename:
+                    logger.warning(f"资源 {resource_name} 在验证结果中未找到文件名，跳过")
+                    continue
 
-                    sync_plan.append({
-                        "resource_type": resource_type,
-                        "resource_name": resource_name,
-                        "source_path": source_path,
-                        "target_path": target_path
-                    })
+                # 规范化文件名路径（统一使用正斜杠）
+                source_filename_normalized = str(source_filename).replace('\\', '/')
+                
+                # 构建源路径和目标路径
+                source_path = self.source_root / folder_normalized / source_filename_normalized
+                target_path = self.project_root / folder_normalized / source_filename_normalized
+
+                # 验证路径安全性（确保路径在预期根目录下）
+                try:
+                    source_resolved = source_path.resolve()
+                    target_resolved = target_path.resolve()
+                    source_root_resolved = self.source_root.resolve()
+                    project_root_resolved = self.project_root.resolve()
+
+                    # 检查源路径是否在源根目录下
+                    if not str(source_resolved).startswith(str(source_root_resolved)):
+                        logger.warning(
+                            f"源路径不在预期根目录下，跳过: {source_path} "
+                            f"(预期根目录: {source_root_resolved})"
+                        )
+                        continue
+
+                    # 检查目标路径是否在项目根目录下
+                    if not str(target_resolved).startswith(str(project_root_resolved)):
+                        logger.warning(
+                            f"目标路径不在预期根目录下，跳过: {target_path} "
+                            f"(预期根目录: {project_root_resolved})"
+                        )
+                        continue
+
+                except Exception as e:
+                    logger.warning(f"验证路径安全性失败: {e}，跳过资源 {resource_name}")
+                    continue
+
+                sync_plan.append({
+                    "resource_type": resource_type,
+                    "resource_name": resource_name,
+                    "source_path": source_path,
+                    "target_path": target_path
+                })
 
         # 如果有文件在两个库都缺失，给出总体警告
         if total_missing_in_both > 0:
@@ -112,30 +149,76 @@ class ResourceSyncer:
         stats = {"success": 0, "failed": 0, "skipped": 0}
 
         for item in sync_plan:
-            source_path = item["source_path"]
-            target_path = item["target_path"]
+            source_path = Path(item["source_path"])
+            target_path = Path(item["target_path"])
+            resource_name = item.get("resource_name", "未知")
 
             try:
+                # 检查源文件是否存在
+                if not source_path.exists():
+                    logger.error(
+                        f"源文件不存在，跳过: {source_path} "
+                        f"(资源: {resource_name})"
+                    )
+                    stats["skipped"] += 1
+                    continue
+
+                # 检查源文件是否是文件（而不是目录）
+                if not source_path.is_file():
+                    logger.warning(
+                        f"源路径不是文件，跳过: {source_path} "
+                        f"(资源: {resource_name})"
+                    )
+                    stats["skipped"] += 1
+                    continue
+
                 # 检查目标文件是否已存在
                 if target_path.exists():
-                    logger.warning(f"目标文件已存在，跳过: {target_path.name}")
+                    logger.warning(
+                        f"目标文件已存在，跳过: {target_path} "
+                        f"(资源: {resource_name})"
+                    )
                     stats["skipped"] += 1
                     continue
 
                 # 确保目标目录存在
-                target_path.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    logger.error(
+                        f"创建目标目录失败: {target_path.parent} - {e} "
+                        f"(资源: {resource_name})"
+                    )
+                    stats["failed"] += 1
+                    continue
 
                 if dry_run:
-                    logger.info(f"[干跑] 将复制: {source_path.name}")
+                    logger.info(
+                        f"[干跑] 将复制: {source_path} -> {target_path} "
+                        f"(资源: {resource_name})"
+                    )
                     stats["success"] += 1
                 else:
                     # 执行复制
-                    shutil.copy2(source_path, target_path)
-                    logger.info(f"已复制: {source_path.name} -> {target_path}")
-                    stats["success"] += 1
+                    try:
+                        shutil.copy2(source_path, target_path)
+                        logger.info(
+                            f"已复制: {source_path} -> {target_path} "
+                            f"(资源: {resource_name})"
+                        )
+                        stats["success"] += 1
+                    except Exception as copy_error:
+                        logger.error(
+                            f"复制操作失败: {source_path} -> {target_path} - {copy_error} "
+                            f"(资源: {resource_name})"
+                        )
+                        stats["failed"] += 1
 
             except Exception as e:
-                logger.error(f"复制失败: {source_path.name} - {e}")
+                logger.error(
+                    f"处理资源失败: {resource_name} - {e}",
+                    exc_info=True
+                )
                 stats["failed"] += 1
 
         return stats
