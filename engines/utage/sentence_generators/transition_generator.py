@@ -27,6 +27,7 @@ class FadeGenerator(DictBasedSentenceGenerator):
         },
         "FadeTime": {
             "key": "Arg6",
+            "default": "1.0"
         },
     }
 

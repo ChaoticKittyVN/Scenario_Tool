@@ -46,7 +46,7 @@ class MacroGenerator(DictBasedSentenceGenerator):
     
     def can_process(self, data: Dict[str, Any]) -> bool:
         """检查是否有Macro参数"""
-        return "Macro" in data and data.get("Macro")
+        return self.exists_param("Macro", data)
     
     def process(self, data: Dict[str, Any]) -> Optional[list]:
         """

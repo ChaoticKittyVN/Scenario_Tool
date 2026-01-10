@@ -1,11 +1,12 @@
 """
-Ren'Py Camera Generator
+Utage Camera Generator
 生成镜头效果命令
 """
-from core.base_sentence_generator import BaseSentenceGenerator
+from typing import Any, Dict, Optional
+from core.dict_based_sentence_generator import DictBasedSentenceGenerator
 
 
-class CameraGenerator(BaseSentenceGenerator):
+class CameraGenerator(DictBasedSentenceGenerator):
     """镜头效果生成器"""
 
     param_config = {

@@ -181,7 +181,8 @@ class DictBasedSentenceGenerator(BaseSentenceGenerator):
         line: Dict[str, Any],
         param_name: str,
         data: Dict[str, Any],
-        field_name: Optional[str] = None
+        field_name: Optional[str] = None,
+        use_default: bool = False
     ):
         """
         快速设置参数字段（性能优化版本，自动使用缓存的字段名）
