@@ -73,6 +73,8 @@ class MacroGenerator(DictBasedSentenceGenerator):
         
         line = self.create_command_dict()
         self.set_command(line, self.get_value("Macro", data))
+        if self.exists_param("WaitType", data):
+                self._set_param_fast(line, "WaitType", data)
 
         # 根据映射填充字段
         for target_field, source in mapping.items():

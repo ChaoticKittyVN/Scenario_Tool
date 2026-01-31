@@ -29,6 +29,10 @@ class FadeGenerator(DictBasedSentenceGenerator):
             "key": "Arg6",
             "default": "1.0"
         },
+        "WaitType":{
+            "key": "WaitType",
+            "translate_type": "WaitType"
+        }
     }
 
     @property

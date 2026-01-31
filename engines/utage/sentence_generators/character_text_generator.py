@@ -62,6 +62,10 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
             "key": "Voice"
         },
         "MessageWindow":{},
+        "WaitType":{
+            "key": "WaitType",
+            "translate_type": "WaitType"
+        }
     }
 
     SPECIAL_NAME_VALUES = {member.value for member in SpecialName}
@@ -102,6 +106,8 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
 
         # 处理角色
         line = {}
+        if self.exists_param("WaitType", data):
+                self._set_param_fast(line, "WaitType", data)
         if character and not is_off:
             # 使用缓存的字段名
             character_field = self.get_cached_field("Character", "Arg1")
@@ -124,6 +130,8 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
         if not same_chara:
             lines.append(line)
             line = {}
+            if self.exists_param("WaitType", data):
+                self._set_param_fast(line, "WaitType", data)
 
         window = str(data.get("MessageWindow", "")) if "MessageWindow" in data else ""
         # 处理窗口显示
@@ -140,6 +148,8 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
             # else:
                 # character_name = self.translator.translate("Name", character_name)
             line = {}
+            if self.exists_param("WaitType", data):
+                self._set_param_fast(line, "WaitType", data)
             if self.exists_param("Voice", data):
                 self._set_param_fast(line, "Voice", data)
             # 使用缓存的字段名

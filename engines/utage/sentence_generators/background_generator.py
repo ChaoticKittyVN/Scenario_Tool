@@ -55,6 +55,10 @@ class BackgroundGenerator(DictBasedSentenceGenerator):
             "key": "Arg6",
             "default": "1.0"
         },
+        "WaitType":{
+            "key": "WaitType",
+            "translate_type": "WaitType"
+        }
     }
 
     @property
@@ -102,6 +106,8 @@ class BackgroundGenerator(DictBasedSentenceGenerator):
 
         # 创建命令字典
         line = {}
+        if self.exists_param("WaitType", data):
+                self._set_param_fast(line, "WaitType", data)
         
         # 检查是否为关闭命令（直接字符串比较，避免创建列表）
         is_off = (background == "off" or event == "off")

@@ -40,37 +40,41 @@ class AudioGenerator(DictBasedSentenceGenerator):
     }
 
     param_config = {
-            "Bgm": {
-                "translate_type": "Music",
-                "match_word": "stop",
-                "stop_format": "StopBgm",
-                "format": "Bgm",
-                "key": "Arg1"
-            },
+        "Bgm": {
+            "translate_type": "Music",
+            "match_word": "stop",
+            "stop_format": "StopBgm",
+            "format": "Bgm",
+            "key": "Arg1"
+        },
 
-            "Ambience": {
-                "translate_type": "Ambience",
-                "match_word": "stop",
-                "stop_format": "StopAmbience",
-                "format": "Ambience",
-                "key": "Arg1"
-            },
+        "Ambience": {
+            "translate_type": "Ambience",
+            "match_word": "stop",
+            "stop_format": "StopAmbience",
+            "format": "Ambience",
+            "key": "Arg1"
+        },
 
-            "Se": {
-                "translate_type": "Sound",
-                "match_word": "stop",
-                "stop_format": "StopSe",
-                "format": "Se",
-                "key": "Arg1"
-            },
-            "Volume": {
-                "key": "Arg3"
-            },
-            "AudioFadeTime": {
-                "key": "Arg6",
-                "default": "2.0"
-            },
+        "Se": {
+            "translate_type": "Sound",
+            "match_word": "stop",
+            "stop_format": "StopSe",
+            "format": "Se",
+            "key": "Arg1"
+        },
+        "Volume": {
+            "key": "Arg3"
+        },
+        "AudioFadeTime": {
+            "key": "Arg6",
+            "default": "2.0"
+        },
+        "WaitType":{
+            "key": "WaitType",
+            "translate_type": "WaitType"
         }
+    }
 
     # 音频类型列表（避免每次创建）
     AUDIO_TYPES = ["Bgm", "Se", "Ambience"]
@@ -109,6 +113,8 @@ class AudioGenerator(DictBasedSentenceGenerator):
                 audio_value = str(audio_value)
 
             line = {}
+            if self.exists_param("WaitType", data):
+                self._set_param_fast(line, "WaitType", data)
             # 使用基类的配置缓存
             audio_cfg = self.get_cached_config(audio_type)
 

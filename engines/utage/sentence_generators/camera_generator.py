@@ -10,28 +10,28 @@ class CameraGenerator(DictBasedSentenceGenerator):
     """镜头效果生成器"""
 
     param_config = {
-        "Camera": {
-            "translate_type": "Camera"
-        },
-        "CameraLayer": {
-            "translate_type": "Layer",
-            "format": " {value}"
-        },
-        "CameraAt": {
-            "translate_type": "Transform",
-            "format": " at {value}"
+        "ZoomCamera": {
+            "translate_type": "Camera",
+            "default": "MainCamera",
+            "key": "Arg1"
         },
         "Zoom": {
-            "format": " zoom {value}"
+            "key": "Arg2"
         },
-        "OffsetX": {
-            "format": " xoffset {value}"
+        "CameraX": {
+            "key": "Arg3"
         },
-        "OffsetY": {
-            "format": " yoffset {value}"
+        "CameraY": {
+            "key": "Arg4"
         },
-        "CameraATL": {
+        "CameraTime": {
+            "key": "Arg6",
+            "default": "0.5"
         },
+        "WaitType":{
+            "key": "WaitType",
+            "translate_type": "WaitType"
+        }
     }
 
     @property
@@ -42,7 +42,7 @@ class CameraGenerator(DictBasedSentenceGenerator):
     def priority(self) -> int:
         return 150
 
-    def process(self, data):
+    def process(self, data: Dict[str, Any]) -> Optional[list]:
         """
         处理镜头效果参数
 
@@ -57,30 +57,12 @@ class CameraGenerator(DictBasedSentenceGenerator):
 
         data = self.do_translate(data)
 
-        camera = self.get_value("Camera", data)
+        line = {}
+        self._set_param_fast(line, "ZoomCamera", data)
+        self._set_param_fast(line, "Zoom", data)
+        self._set_param_fast(line, "CameraX", data)
+        self._set_param_fast(line, "CameraY", data)
+        self._set_param_fast(line, "CameraTime", data)
 
-        command = "camera"
-        layer = self.get_sentence("CameraOnlayer", data)
-
-        if camera == "transform":
-            at = self.get_sentence("CameraAt", data)
-            return [f"{command}{layer}{at}"]
-        
-
-        lines = []
-
-        if camera == "move":
-            zoom = self.get_sentence("Zoom", data)
-            x = self.get_sentence("OffsetX", data)
-            y = self.get_sentence("OffsetY", data)
-            lines.append(f"{command}{layer}:")
-            lines.append(f"   {zoom}{x}{y}")
-            return lines
-
-        if camera == "custom":
-            custom = self.get_value("CameraATL", data)
-            lines.append(f"{command}{layer}:")
-            lines.append(f"    {custom}")
-            return lines
-
-        return ["camera"]
+        self._set_param_fast(line, "WaitType", data)
+        return [line]
