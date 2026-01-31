@@ -205,6 +205,29 @@ class BaseSentenceGenerator(ABC):
         """
         return name in data
 
+    def build_resource_name(self, row_data: Dict, config: Dict) -> Optional[str]:
+        """
+        构建资源名称（可选方法，由子类实现）
+        
+        如果生成器需要自定义资源名称构建逻辑（例如需要条件判断、多参数组合等），
+        可以重写此方法。默认实现返回 None，资源提取器会使用标准逻辑。
+        
+        注意：此方法接收的 row_data 应该是已经经过翻译的数据。
+        如果需要翻译，可以在方法内部调用 self.do_translate(row_data.copy())。
+        
+        Args:
+            row_data: 行数据字典（已翻译）
+            config: 资源配置字典，包含以下键：
+                - resource_type: 资源类型（如 "Character", "Back"）
+                - main_param: 主参数名
+                - part_params: 差分参数列表
+                - separator: 分隔符
+        
+        Returns:
+            Optional[str]: 资源名称，如果返回 None 则使用默认逻辑
+        """
+        return None
+
     def __repr__(self) -> str:
         """字符串表示"""
         return f"{self.__class__.__name__}(category={self.category}, priority={self.priority})"

@@ -5,6 +5,7 @@
 from typing import Dict, Set, List
 from pathlib import Path
 from collections import defaultdict
+import os
 from core.logger import get_logger
 
 logger = get_logger()
@@ -59,19 +60,40 @@ class ResourceValidator:
                     logger.warning(f"未找到资源类型 {resource_type} 的文件夹配置")
                     continue
 
-                # 在项目库中验证
-                project_results = self._validate_in_library(
-                    self.project_root / folder,
-                    resource_names,
-                    self.extensions.get(category, [])
-                )
+                # 规范化 folder 路径（去除首尾斜杠，避免路径构建问题）
+                folder_normalized = folder.strip().strip('/\\')
+                
+                try:
+                    # 构建项目库路径并验证
+                    project_folder = self.project_root / folder_normalized
+                    project_results = self._validate_in_library(
+                        project_folder,
+                        resource_names,
+                        self.extensions.get(category, [])
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"验证项目库资源失败: resource_type={resource_type}, "
+                        f"project_root={self.project_root}, folder={folder}, error={e}",
+                        exc_info=True
+                    )
+                    project_results = {name: "" for name in resource_names}
 
-                # 在资源库中验证
-                source_results = self._validate_in_library(
-                    self.source_root / folder,
-                    resource_names,
-                    self.extensions.get(category, [])
-                )
+                try:
+                    # 构建资源库路径并验证
+                    source_folder = self.source_root / folder_normalized
+                    source_results = self._validate_in_library(
+                        source_folder,
+                        resource_names,
+                        self.extensions.get(category, [])
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"验证资源库资源失败: resource_type={resource_type}, "
+                        f"source_root={self.source_root}, folder={folder}, error={e}",
+                        exc_info=True
+                    )
+                    source_results = {name: "" for name in resource_names}
 
                 # 保存结果
                 results["project"][resource_type] = project_results
@@ -106,17 +128,58 @@ class ResourceValidator:
         """
         results = {}
 
-        if not folder.exists():
-            logger.warning(f"文件夹不存在: {folder}")
+        try:
+            # 检查是否是根路径（可能导致问题）
+            if self._is_root_path(folder):
+                logger.warning(f"文件夹路径是根路径，可能导致问题: {folder}")
+                for name in resource_names:
+                    results[name] = ""
+                return results
+
+            if not folder.exists():
+                logger.warning(f"文件夹不存在: {folder}")
+                for name in resource_names:
+                    results[name] = ""
+                return results
+
+            for resource_name in resource_names:
+                try:
+                    found_file = self._find_file(folder, resource_name, extensions)
+                    results[resource_name] = found_file
+                except Exception as e:
+                    logger.debug(
+                        f"查找文件失败: folder={folder}, resource_name={resource_name}, error={e}"
+                    )
+                    results[resource_name] = ""
+
+        except Exception as e:
+            logger.error(
+                f"验证资源库失败: folder={folder}, error={e}",
+                exc_info=True
+            )
+            # 返回空结果
             for name in resource_names:
                 results[name] = ""
-            return results
-
-        for resource_name in resource_names:
-            found_file = self._find_file(folder, resource_name, extensions)
-            results[resource_name] = found_file
 
         return results
+
+    def _is_root_path(self, folder: Path) -> bool:
+        """
+        检查路径是否是根路径
+
+        Args:
+            folder: 要检查的路径
+
+        Returns:
+            bool: 是否是根路径
+        """
+        folder_str = str(folder).rstrip('/\\')
+        return (
+            folder_str == '' or
+            folder_str.endswith(':') or  # Windows 驱动器根: D:
+            (len(folder.parts) == 1 and folder.parts[0] in ('/', '\\')) or  # Unix 根
+            folder.parent == folder  # 根路径的 parent 等于自身
+        )
 
     def _find_file(
         self,
@@ -125,20 +188,64 @@ class ResourceValidator:
         extensions: List[str]
     ) -> str:
         """
-        在文件夹中查找文件
+        在文件夹中查找文件（支持子文件夹路径）
 
         Args:
             folder: 文件夹路径
-            resource_name: 资源名（可能包含空格，如 "alice happy smile"）
+            resource_name: 资源名（可能包含路径，如 "alice/happy" 或 "alice\\happy"）
             extensions: 文件扩展名列表
 
         Returns:
-            str: 找到的文件名（带扩展名），未找到返回空字符串
+            str: 找到的文件路径（相对路径，如 "alice/happy.png"），未找到返回空字符串
         """
+        # 规范化路径分隔符（统一使用正斜杠，Path 对象会自动处理）
+        resource_name_normalized = resource_name.replace('\\', '/')
+        
         for ext in extensions:
-            file_path = folder / f"{resource_name}{ext}"
+            try:
+                # 如果资源名称包含路径分隔符，构建完整路径
+                if '/' in resource_name_normalized:
+                    # 使用 Path 对象构建路径，然后添加扩展名
+                    # 例如：folder / "alice/happy" -> folder/alice/happy，然后添加 .png
+                    # 先构建路径，再添加扩展名，避免路径构建错误
+                    base_path = folder / resource_name_normalized
+                    file_path = base_path.with_suffix(ext)
+                else:
+                    # 否则在根文件夹下查找
+                    file_path = folder / f"{resource_name_normalized}{ext}"
+            except Exception as e:
+                logger.debug(
+                    f"构建文件路径失败: folder={folder}, resource_name={resource_name_normalized}, "
+                    f"ext={ext}, error={e}"
+                )
+                continue
+            
             if file_path.exists():
-                return file_path.name
+                # 返回相对路径（相对于 folder）
+                # 如果包含子文件夹，返回完整相对路径；否则只返回文件名
+                if '/' in resource_name_normalized:
+                    # 检查是否是根路径，如果是则直接返回资源名称
+                    if self._is_root_path(folder):
+                        return f"{resource_name_normalized}{ext}"
+                    
+                    try:
+                        # 尝试使用 relative_to 计算相对路径
+                        relative_path = file_path.relative_to(folder)
+                        return str(relative_path).replace('\\', '/')
+                    except (ValueError, AttributeError):
+                        # 如果 relative_to 失败，使用 os.path.relpath 作为备选
+                        try:
+                            relative_path = os.path.relpath(str(file_path), str(folder))
+                            return relative_path.replace('\\', '/')
+                        except (ValueError, AttributeError):
+                            # 如果还是失败，直接返回资源名称加上扩展名
+                            logger.debug(
+                                f"无法计算相对路径: file_path={file_path}, folder={folder}, "
+                                f"使用资源名称: {resource_name_normalized}{ext}"
+                            )
+                            return f"{resource_name_normalized}{ext}"
+                else:
+                    return file_path.name
 
         return ""
 
