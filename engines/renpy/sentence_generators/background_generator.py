@@ -41,7 +41,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
         },
         "EventVarient": {},
         "At": {
-            "translate_type": "Transform",
+            "translate_type": "BackTransform",
             "format": " at {value}"
         },
         "Onlayer": {

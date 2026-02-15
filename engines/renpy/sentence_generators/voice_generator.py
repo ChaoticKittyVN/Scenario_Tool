@@ -20,7 +20,7 @@ class VoiceGenerator(BaseSentenceGenerator):
 
     param_config = {
         "Voice": {
-            "translate_type": "Voice"
+            "format": "voice '{value}"
         }
     }
 
@@ -45,8 +45,6 @@ class VoiceGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return None
 
-        data = self.do_translate(data)
-
         voice = self.get_value("Voice", data)
         if not voice:
             return []
@@ -54,4 +52,4 @@ class VoiceGenerator(BaseSentenceGenerator):
         if voice == "stop":
             return ["stop voice"]
         else:
-            return [f"voice {voice}"]
+            return [self.get_sentence("Voice", data)]

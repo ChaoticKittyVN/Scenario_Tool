@@ -9,9 +9,16 @@ class TransitionGenerator(BaseSentenceGenerator):
     """转场生成器"""
 
     param_config = {
-        "Transition": {
-            "translate_type": "Transition"
-        }
+        "UseTrans": {},
+        "TransWith": {
+            "translate_type": "Transition",
+            "format": "with {value}",
+            "default": "Dissolve"
+            },
+        "TransWithAtr": {
+            "format": "({value})",
+            "default": "1.0"
+        },
     }
 
     @property
@@ -37,8 +44,10 @@ class TransitionGenerator(BaseSentenceGenerator):
 
         data = self.do_translate(data)
 
-        transition = self.get_value("Transition", data)
-        if not transition or transition == "empty":
-            return []
+        transition = self.get_sentence("TransWith", data, use_default=True)
 
-        return [f"with {transition}"]
+        atr = self.get_sentence("TransWithAtr", data, use_default=True)
+
+        line = f"{transition}{atr}"
+
+        return [line]
