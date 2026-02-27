@@ -36,6 +36,7 @@ class SheetName(str, Enum):
 
 class ColumnName(str, Enum):
     """Excel 列名"""
+    INDEX = "Index"
     NOTE = "Note"
     IGNORE = "Ignore"
     NAME = "Name"
