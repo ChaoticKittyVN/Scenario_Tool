@@ -12,6 +12,7 @@ from core.logger import get_logger
 from core.excel_management.excel_file_manager import ExcelFileManager, ExcelFileNotFoundError, ExcelFormatError
 from core.excel_management.dataframe_processor import DataFrameProcessor
 from core.constants import ColumnName, SheetName
+from core.param_translator import ParamTranslator
 
 logger = get_logger(__name__)
 
@@ -27,7 +28,8 @@ class DialogueExporter:
         default_speaker: str = "",
         sort_by: Optional[List[str]] = None,
         merge_files: bool = False,
-        output_format: str = "excel"
+        output_format: str = "excel",
+        use_cache_map: bool = False,
     ):
         """
         Args:
@@ -47,12 +49,14 @@ class DialogueExporter:
         self.ignore_word = ["无语音"]
         self.merge_files = merge_files
         self.output_format = output_format.lower()
+        self.use_cache_map = use_cache_map
 
         self.count_dict = {}  # 用于统计每个角色在每个工作表中的对话数量
         self.voice_filename_cache = {}  # 缓存完整的语音文件名，键为(speaker, sheet_name)元组
 
         self.excel_manager = ExcelFileManager(cache_enabled=True)
         self.df_processor = DataFrameProcessor(config)
+        self.translator = ParamTranslator()
 
     def _convert_chinese_to_english(self, chinese_name: str) -> str:
         """
@@ -78,6 +82,10 @@ class DialogueExporter:
         # 移除中文字符，保留英文字母和数字
         english_name = re.sub(r'[^\w]', '_', chinese_name)
         return english_name.lower() or "unknown"
+
+    def translate_name(self, param: str) -> str:
+        """使用翻译器进行翻译"""
+        return self.translator.translate("Name", param)
 
     def extract_from_file(self, file_path: Path) -> pd.DataFrame:
         """从单个Excel文件提取对话，返回DataFrame"""
@@ -119,7 +127,10 @@ class DialogueExporter:
         for speaker, sheets in temp_count.items():
             filename_generators[speaker] = {}
             # 转换角色名为英文（只转换一次）
-            converted_speaker = self._convert_chinese_to_english(speaker)
+            if not self.use_cache_map:
+                converted_speaker = self.translate_name(speaker)
+            else:
+                converted_speaker = self._convert_chinese_to_english(speaker)
             
             for sheet_name, count in sheets.items():
                 # 为每个角色-工作表组合创建编号迭代器
@@ -205,7 +216,7 @@ class DialogueExporter:
                 if df.empty:
                     continue
                 df = df.sort_values(by=self.sort_by)
-                base_name = f.stem
+                base_name = f.stem + "_配音台本"
                 self._save_dataframe(df, self.output_dir / base_name)
 
     def _save_dataframe(self, df: pd.DataFrame, base_path: Path):
