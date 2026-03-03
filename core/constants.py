@@ -16,7 +16,11 @@ class SpecialName(str, Enum):
     """特殊说话者（用于直接输入引擎命令）"""
     RENPY_COMMAND = "renpy"
     NANINOVEL_COMMAND = "naninovel"
-    LABEL_CAMMAND = "label"
+    LABEL_COMMAND = "label"
+    STEAM_COMMAND = "steam"
+    UNLOCK_COMMAND = "unlock"
+    CHOICE_COMMAND = "choice"
+    JUMP_COMMAND = "jump"
 
 
 class FileType(str, Enum):

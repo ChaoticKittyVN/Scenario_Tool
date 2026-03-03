@@ -61,7 +61,9 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
         "Voice": {
             "key": "Voice"
         },
-        "MessageWindow":{},
+        "MessageWindow":{
+            "validate_type": "Window"
+        },
         "WaitType":{
             "key": "WaitType",
             "translate_type": "WaitType"
@@ -155,17 +157,28 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
             # 使用缓存的字段名
             name_field = self.get_cached_field("Name", "Arg2")
             line[name_field] = character_name
-            if text:
-                text_field = self.get_cached_field("Text", "Text")
-                line[text_field] = text
-            lines.append(line)
-        else:
-            if self.exists_param("Voice", data):
-                self._set_param_fast(line, "Voice", data)            
-            if text:
+        if self.exists_param("Voice", data):
+            self._set_param_fast(line, "Voice", data)           
+ 
+        if text:
+            if character_name in self.SPECIAL_NAME_VALUES:
+                spceial_line = {}
+                if character_name == SpecialName.LABEL_COMMAND.value:
+                    spceial_line["Command"] = f"*{text}"
+                elif character_name == SpecialName.CHOICE_COMMAND.value:
+                    spceial_line["Command"] = "Selection"
+                    spceial_line["Arg1"] = f"*{text}"
+                    spceial_line["Text"] = text
+                elif character_name == SpecialName.JUMP_COMMAND.value:
+                    spceial_line["Command"] = "Jump"
+                    spceial_line["Arg1"] = f"*{text}"
+                lines.append(spceial_line)
+            else:
                 text_field = self.get_cached_field("Text", "Text")
                 line[text_field] = text
                 lines.append(line)
+        else:
+            lines.append(line)
 
         if window in [WindowMode.HIDE.value, WindowMode.SHOW_AND_HIDE.value]:
             lines.append({"Command": "HideMessageWindow"})

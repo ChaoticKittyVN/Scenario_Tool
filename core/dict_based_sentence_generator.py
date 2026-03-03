@@ -196,8 +196,11 @@ class DictBasedSentenceGenerator(BaseSentenceGenerator):
             field_name: 目标字段名（如果为None，则从缓存中自动获取）
         """
         if param_name not in data:
+            if "default" in self._config_cache[param_name] and use_default:
+                field_name = self._field_cache.get(param_name, param_name)
+                line[field_name] = self._config_cache[param_name]["default"]
             return
-        
+
         value = data[param_name]
         if not value:
             return
