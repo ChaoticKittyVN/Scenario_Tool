@@ -35,7 +35,24 @@ class MacroGenerator(DictBasedSentenceGenerator):
     
     # 标记：独占模式 - 当此生成器成功处理时，其他生成器（除Text相关）应被跳过
     EXCLUSIVE_MODE = True
-    
+
+    param_config = {
+        "Macro": {
+            "validate_type": "Macro",
+            }
+        }
+
+    combined_param_config = {
+        "Bg": {
+            "combined_params" : ["BgAtr"],
+            "format": "{Bg}{BgAtr}"
+        },
+        "BgEvent": {
+            "combined_params" : ["BgEventAtr"],
+            "format": "{BgEvent}{BgEventAtr}"
+        },
+    }
+
     @property
     def category(self):
         return "Macro"
@@ -47,7 +64,7 @@ class MacroGenerator(DictBasedSentenceGenerator):
     def can_process(self, data: Dict[str, Any]) -> bool:
         """检查是否有Macro参数"""
         return self.exists_param("Macro", data)
-    
+
     def process(self, data: Dict[str, Any]) -> Optional[list]:
         """
         处理宏命令
@@ -74,19 +91,63 @@ class MacroGenerator(DictBasedSentenceGenerator):
         line = self.create_command_dict()
         self.set_command(line, self.get_value("Macro", data))
         if self.exists_param("WaitType", data):
-                self._set_param_fast(line, "WaitType", data)
+            self._set_param_fast(line, "WaitType", data)
 
-        # 根据映射填充字段
+        # 首先处理组合参数，创建一个处理后的数据副本
+        processed_data = self._apply_combined_params(data)
+
+        # 根据映射填充字段，使用处理后的数据
         for target_field, source in mapping.items():
-            # source 可能是参数名（从data中获取）或固定值（直接使用）
-            if source in data:
-                # source 是参数名，从data中获取值
-                value = data[source]
+            if source in processed_data:
+                # source 是参数名，从处理后的数据中获取值
+                value = processed_data[source]
                 if value not in (None, ""):
                     line[target_field] = str(value)
             else:
                 # source 是固定值，直接使用
-                line[target_field] = str(source)
+                continue
         
         return [line] if line else None
 
+    def _apply_combined_params(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        应用组合参数规则，返回处理后的数据字典
+        
+        Args:
+            data: 原始参数字典
+            
+        Returns:
+            Dict[str, Any]: 包含组合参数结果的新字典
+        """
+        # 创建数据副本，避免修改原始数据
+        result_data = data.copy()
+        
+        # 遍历所有组合参数配置
+        for main_param, config in self.combined_param_config.items():
+            combined_params = config.get("combined_params", [])
+            format_template = config.get("format", "{%s}" % main_param)
+            
+            # 检查主参数是否存在于数据中
+            if main_param in result_data:
+                # 准备格式化参数
+                format_values = {main_param: result_data[main_param]}
+                
+                # 添加所有需要组合的参数
+                for combined_param in combined_params:
+                    if combined_param in result_data:
+                        format_values[combined_param] = result_data[combined_param]
+                    else:
+                        # 如果组合参数不存在，默认为空字符串
+                        format_values[combined_param] = ""
+                
+                # 执行格式化操作
+                try:
+                    combined_value = format_template.format(**format_values)
+                    # 将组合后的值替换原主参数的值
+                    result_data[main_param] = combined_value
+                except KeyError as e:
+                    logger.warning(f"格式化参数错误: 缺少键 {e}, 模板: {format_template}, 数据: {format_values}")
+                except Exception as e:
+                    logger.error(f"参数组合时发生错误: {e}")
+        
+        return result_data

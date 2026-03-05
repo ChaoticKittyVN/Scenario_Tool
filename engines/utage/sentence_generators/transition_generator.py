@@ -16,7 +16,8 @@ class FadeGenerator(DictBasedSentenceGenerator):
         },
         "FadeColor": {
             "key": "Arg1",
-            "translate_type": "FadeColor"
+            "translate_type": "FadeColor",
+            "default": "Black"
         },
         "FadeCamera": {
             "key": "Arg2",
@@ -27,7 +28,7 @@ class FadeGenerator(DictBasedSentenceGenerator):
         },
         "FadeTime": {
             "key": "Arg6",
-            "default": "1.0"
+            "default": "1"
         },
         "WaitType":{
             "key": "WaitType",
@@ -60,9 +61,9 @@ class FadeGenerator(DictBasedSentenceGenerator):
 
         line = {}
         self._set_param_fast(line, "FadeType", data)
-        self._set_param_fast(line, "FadeColor", data)
+        self._set_param_fast(line, "FadeColor", data, use_default=True)
         self._set_param_fast(line, "FadeCamera", data)
         self._set_param_fast(line, "FadeRule", data)
-        self._set_param_fast(line, "FadeTime", data)
+        self._set_param_fast(line, "FadeTime", data, use_default=True)
 
         return [line]

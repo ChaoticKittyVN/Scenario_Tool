@@ -41,7 +41,7 @@ class AudioGenerator(DictBasedSentenceGenerator):
 
     param_config = {
         "Bgm": {
-            "translate_type": "Music",
+            "validate_type": "Music",
             "match_word": "stop",
             "stop_format": "StopBgm",
             "format": "Bgm",
@@ -49,7 +49,7 @@ class AudioGenerator(DictBasedSentenceGenerator):
         },
 
         "Ambience": {
-            "translate_type": "Ambience",
+            "validate_type": "Ambience",
             "match_word": "stop",
             "stop_format": "StopAmbience",
             "format": "Ambience",
@@ -57,7 +57,7 @@ class AudioGenerator(DictBasedSentenceGenerator):
         },
 
         "Se": {
-            "translate_type": "Sound",
+            "validate_type": "Sound",
             "match_word": "stop",
             "stop_format": "StopSe",
             "format": "Se",
@@ -86,6 +86,21 @@ class AudioGenerator(DictBasedSentenceGenerator):
     @property
     def priority(self) -> int:
         return 100
+
+    def can_process(self, data: Dict[str, Any]) -> bool:
+        """
+        判断是否可以处理给定的数据
+        需要存在除去WaitType以外的任何参数
+        Args:
+            data: 参数字典
+
+        Returns:
+            bool: 是否可以处理
+        """
+        # 检查是否还有其他参数（除了WaitType）
+        data_copy = data.copy()
+        data_copy.pop("WaitType", None)
+        return bool(data_copy)
 
     def process(self, data: Dict[str, Any]) -> Optional[list]:
         """
@@ -118,7 +133,7 @@ class AudioGenerator(DictBasedSentenceGenerator):
             # 使用基类的配置缓存
             audio_cfg = self.get_cached_config(audio_type)
 
-            if audio_value == "stop":
+            if audio_value == "停止":
                 # 停止命令
                 line["Command"] = audio_cfg.get("stop_format", "")
                 # 自动使用缓存的字段名

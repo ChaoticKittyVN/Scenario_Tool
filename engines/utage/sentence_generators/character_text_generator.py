@@ -80,6 +80,20 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
     def priority(self) -> int:
         return 900
 
+    def can_process(self, data: Dict[str, Any]) -> bool:
+        """
+        判断是否可以处理给定的数据
+        需要存在除去WaitType以外的任何参数
+        Args:
+            data: 参数字典
+
+        Returns:
+            bool: 是否可以处理
+        """
+        # 检查是否还有其他参数（除了WaitType）
+        data_copy = data.copy()
+        data_copy.pop("WaitType", None)
+        return bool(data_copy)
     def process(self, data: Dict[str, Any]) -> Optional[list]:
         """
         处理文本参数（性能优化版本）

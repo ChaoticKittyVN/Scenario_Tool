@@ -31,18 +31,17 @@ class BackgroundGenerator(DictBasedSentenceGenerator):
 
     param_config = {
         "Bg": {
-            "translate_type": "Background",
+            "validate_type": "Background",
             "key": "Arg1"
         },
+        "BgAtr": {},
         "BgEvent": {
-            "translate_type": "Event",
+            "validate_type": "Event",
             "key": "Arg1"
         },
-        "EventVarient": {
-            "key": "Arg2"
-        },
+        "BgEventAtr": {},
         "BgLayer": {
-            "translate_type": "Layer",
+            "validate_type": "Layer",
             "key": "Arg3"
         },
         "BgX": {
@@ -53,7 +52,7 @@ class BackgroundGenerator(DictBasedSentenceGenerator):
         },
         "BgFade": {
             "key": "Arg6",
-            "default": "1.0"
+            "default": "1"
         },
         "WaitType":{
             "key": "WaitType",
@@ -98,9 +97,13 @@ class BackgroundGenerator(DictBasedSentenceGenerator):
         if background:
             command = "Bg"
             image = background
+            if self.exists_param("BgAtr", data):
+                image += str(data.get("BgAtr", ""))
         elif event:
             command = "BgEvent"
             image = event
+            if self.exists_param("BgEventAtr", data):
+                image += str(data.get("BgEventAtr", ""))
         else:
             return None
 
@@ -115,7 +118,7 @@ class BackgroundGenerator(DictBasedSentenceGenerator):
         if is_off:
             line["Command"] = command + "Off"
             # 只设置BgFade（如果存在），自动使用缓存的字段名
-            self._set_param_fast(line, "BgFade", data)
+            self._set_param_fast(line, "BgFade", data, use_default=True)
         else:
             line["Command"] = command
             line["Arg1"] = image
@@ -124,6 +127,6 @@ class BackgroundGenerator(DictBasedSentenceGenerator):
             self._set_param_fast(line, "BgLayer", data)
             self._set_param_fast(line, "BgX", data)
             self._set_param_fast(line, "BgY", data)
-            self._set_param_fast(line, "BgFade", data)
+            self._set_param_fast(line, "BgFade", data, use_default=True)
 
         return [line]
