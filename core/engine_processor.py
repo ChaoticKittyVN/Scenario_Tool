@@ -87,6 +87,115 @@ class EngineProcessor:
 
         return generator_param_map
 
+    def has_exclusive_generator(self, row_data: pd.Series) -> bool:
+        """
+        检查行数据是否包含独占模式生成器需要处理的参数
+        
+        Args:
+            row_data: pandas Series，一行的所有数据
+            
+        Returns:
+            bool: 如果包含独占模式生成器需要的参数且值不为空，返回True
+        """
+        if self.engine_type != "utage":
+            return False
+
+        row_dict = row_data.to_dict()
+
+        # 检查是否有任何独占模式生成器需要处理的参数
+        for generator in self.generators:
+            if getattr(generator, 'EXCLUSIVE_MODE', False):
+                # 检查生成器的参数配置
+                if hasattr(generator, 'param_config'):
+                    for param_name in generator.param_config.keys():
+                        if param_name in row_dict and row_dict[param_name] not in (None, ""):
+                            return True
+
+        return False
+
+    def _find_exclusive_generator(self):
+        """
+        查找独占模式生成器实例
+        
+        Returns:
+            独占模式生成器实例，如果不存在则返回None
+        """
+        if self.engine_type != "utage":
+            return None
+
+        for generator in self.generators:
+            if (getattr(generator, 'EXCLUSIVE_MODE', False) or
+                getattr(generator, 'RECEIVE_ALL_PARAMS', False)):
+                return generator
+        return None
+
+    def process_exclusive_row(self, row_data: pd.Series) -> List[str] | List[Dict[str, Any]] | None:
+        """
+        独占模式处理流程（仅用于utage引擎）
+        
+        处理逻辑：
+        1. 优先处理独占模式生成器（接收所有非空参数）
+        2. 只处理标记为ALLOWED_WITH_EXCLUSIVE的生成器
+        3. 其他生成器全部跳过
+        
+        Args:
+            row_data: pandas Series，一行的所有数据
+            
+        Returns:
+            List[str] | List[Dict[str, Any]]: 生成的命令列表
+        """
+        if self.engine_type != "utage":
+            # 非utage引擎不应该调用此方法，降级为普通处理
+            return self.process_row(row_data)
+        
+        results = []
+        row_dict = row_data.to_dict()
+        
+        # 查找独占模式生成器
+        exclusive_generator = self._find_exclusive_generator()
+        if not exclusive_generator:
+            logger.warning("未找到独占模式生成器，但检测到独占指令，降级为普通处理")
+            return self.process_row(row_data)
+        
+        # 1. 处理独占模式生成器（接收所有参数）
+        exclusive_params = {k: v for k, v in row_dict.items() 
+                        if v not in (None, "")}
+        if exclusive_params:
+            commands = exclusive_generator.process(exclusive_params)
+            if commands:
+                results.extend(commands)
+        
+        # 2. 处理允许与独占模式生成器一起处理的生成器
+        for generator, needed_params in self.generator_param_map.items():
+            # 跳过独占模式生成器本身
+            if generator == exclusive_generator:
+                continue
+            
+            # 只处理标记为ALLOWED_WITH_EXCLUSIVE的生成器
+            if not getattr(generator, 'ALLOWED_WITH_EXCLUSIVE', False):
+                continue
+            
+            # 提取该生成器需要的参数
+            if needed_params is None:
+                # 接收所有参数的生成器
+                generator_params = {k: v for k, v in row_dict.items() 
+                                if v not in (None, "")}
+            else:
+                # 只提取需要的参数
+                generator_params = {}
+                for param_name in needed_params:
+                    if param_name in row_dict:
+                        value = row_dict[param_name]
+                        if value not in (None, ""):
+                            generator_params[param_name] = value
+            
+            if generator_params:
+                commands = generator.process(generator_params)
+                if commands:
+                    results.extend(commands)
+        
+        return results
+
     def process_row(self, row_data: pd.Series) -> List[str] | List[Dict[str, Any]] | None:
         """
         处理单行数据 - 管道模式
@@ -97,9 +206,13 @@ class EngineProcessor:
         Returns:
             List[str] | List[Dict[str, Any]]: 生成的命令列表
         """
-        results = []
+        # 对于utage引擎，检查是否需要独占模式处理
+        if self.engine_type == "utage":
+            if self.has_exclusive_generator(row_data):
+                return self.process_exclusive_row(row_data)
 
-        # 使用DataFrameProcessor提取所有生成器需要的参数
+        # 原有的普通处理逻辑
+        results = []
         row_dict = row_data.to_dict()
 
         for generator, needed_params in self.generator_param_map.items():
@@ -107,7 +220,7 @@ class EngineProcessor:
             if needed_params is None:
                 # 接收所有非空参数
                 generator_params = {k: v for k, v in row_dict.items() 
-                                  if v not in (None, "")}
+                                if v not in (None, "")}
                 if generator_params:
                     commands = generator.process(generator_params)
                     if commands:

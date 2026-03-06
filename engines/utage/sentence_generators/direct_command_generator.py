@@ -71,8 +71,7 @@ class DirectCommandGenerator(DictBasedSentenceGenerator):
                 line["Arg3"] = self.get_value("MacroParam2", data)
 
                 # 选项文本
-                line["SC"] = value
-                # line["SC"] = self.get_value("Text", data) if self.exists_param("Text", data) else value
+                line["Text"] = self.get_value("Text", data) if self.exists_param("Text", data) else value
 
         else:
             self._set_param_fast(line, "CommandValue", data)
@@ -83,5 +82,3 @@ class DirectCommandGenerator(DictBasedSentenceGenerator):
     def _labelize(self, label: str) -> str:
         """将标签转换为命令格式（如 Jump 或 Label 的参数）"""
         return str(f"*{label}")
-
-
