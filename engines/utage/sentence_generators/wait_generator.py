@@ -37,9 +37,13 @@ class WaitGenerator(DictBasedSentenceGenerator):
             return None
 
         line = {}
-        self.set_command(line, "Wait")
-        self._set_param_fast(line, "Wait", data)
+        wait = self.get_value("Wait", data)
+        if wait.startswith("i"):
+            self.set_command(line, "WaitInput")
+            if wait[1:].isdigit():
+                line["Arg6"] = int(wait[1:])
+        else:
+            self.set_command(line, "Wait")
+            self._set_param_fast(line, "Wait", data)
 
         return [line]
-
-

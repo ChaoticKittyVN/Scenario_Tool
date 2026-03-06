@@ -192,7 +192,8 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
                 line[text_field] = text
                 lines.append(line)
         else:
-            lines.append(line)
+            if line:
+                lines.append(line)
 
         if window in [WindowMode.HIDE.value, WindowMode.SHOW_AND_HIDE.value]:
             lines.append({"Command": "HideMessageWindow"})
