@@ -66,7 +66,7 @@ class TextGenerator(BaseSentenceGenerator):
                 if character_name == SpecialName.NANINOVEL_COMMAND.value:
                     # 直接输入 Naninovel 命令
                     lines.append(text)
-                elif character_name == SpecialName.LABEL_CAMMAND.value:
+                elif character_name == SpecialName.LABEL_COMMAND.value:
                     lines.append(f"# {text}")
                 else:
                     raise ValueError(f"不支持的特殊说话者：{character_name}。")

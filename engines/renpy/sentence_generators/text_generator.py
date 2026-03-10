@@ -61,7 +61,7 @@ class TextGenerator(BaseSentenceGenerator):
                     text = text.replace("\u00a0"," ")
                     lines.append(text)
                     #
-                elif character_name == SpecialName.LABEL_CAMMAND.value:
+                elif character_name == SpecialName.LABEL_COMMAND.value:
                     lines.append(f"label {text}:")
                 else:
                     raise ValueError(f"不支持的特殊说话者：{character_name}。")
