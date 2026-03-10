@@ -24,7 +24,7 @@ from core.config_manager import (
     UtageConfig
 )
 from core.engine_registry import EngineRegistry, register_engine
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 from core.base_sentence_generator import BaseSentenceGenerator
 from core.sentence_generator_manager import SentenceGeneratorManager
 from core.engine_processor import EngineProcessor

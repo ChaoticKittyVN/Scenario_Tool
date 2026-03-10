@@ -4,7 +4,7 @@
 """
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 from core.config_manager import EngineConfig
 from core.logger import get_logger
 

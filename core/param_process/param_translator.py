@@ -7,13 +7,14 @@ import os
 from typing import Dict, Optional, List, Any
 from pathlib import Path
 from core.logger import get_logger
+from core.param_process.base_param_processor import ParamBaseProccesor
 from core.exceptions import TranslationError
 
 
 logger = get_logger()
 
 
-class ParamTranslator:
+class ParamTranslator(ParamBaseProccesor):
     """
     参数翻译器类，用于加载参数映射并提供翻译功能
     """
@@ -30,12 +31,12 @@ class ParamTranslator:
             module_file: 基础参数映射模块文件路径
             varient_module_file: 差分参数映射模块文件路径
         """
-        self.module_file = module_file
-        self.varient_module_file = varient_module_file
-        self.mappings = self._load_mappings()
-        self.varient_mappings = self._load_varient_mappings()
-        self._translation_cache = {}
-        self._varient_translation_cache = {}
+        # 调用父类构造函数
+        super().__init__(module_file, varient_module_file)
+
+        # 由于基类的缓存名称与原来不同，我们重新定义为原来的命名以保持兼容性
+        self._translation_cache = self.cache
+        self._varient_translation_cache = self.varient_cache
 
         # 上下文追踪
         self.current_file_name: Optional[str] = None
@@ -47,56 +48,6 @@ class ParamTranslator:
         self.untranslatable_params: List[Dict[str, Any]] = []
 
         logger.info(f"参数翻译器初始化完成，加载了 {len(self.mappings)} 个参数类型")
-
-    def _load_mappings(self) -> Dict[str, Dict[str, str]]:
-        """
-        从Python模块加载映射字典
-
-        Returns:
-            Dict[str, Dict[str, str]]: 映射字典，如果加载失败则返回空字典
-        """
-        if not os.path.exists(self.module_file):
-            logger.warning(f"映射文件不存在: {self.module_file}")
-            return {}
-
-        try:
-            spec = importlib.util.spec_from_file_location(
-                "param_mappings",
-                self.module_file
-            )
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            mappings = module.PARAM_MAPPINGS
-            logger.debug(f"成功加载基础参数映射: {len(mappings)} 个类型")
-            return mappings
-        except Exception as e:
-            logger.error(f"加载映射模块失败: {e}", exc_info=True)
-            return {}
-
-    def _load_varient_mappings(self) -> Dict[str, Dict[str, str]]:
-        """
-        从Python模块加载差分映射字典
-
-        Returns:
-            Dict[str, Dict[str, str]]: 差分映射字典，如果加载失败则返回空字典
-        """
-        if not os.path.exists(self.varient_module_file):
-            logger.debug(f"差分映射文件不存在: {self.varient_module_file}")
-            return {}
-
-        try:
-            spec = importlib.util.spec_from_file_location(
-                "varient_mappings",
-                self.varient_module_file
-            )
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            varient_mappings = getattr(module, "VARIENT_MAPPINGS", {})
-            logger.debug(f"成功加载差分参数映射: {len(varient_mappings)} 个角色")
-            return varient_mappings
-        except Exception as e:
-            logger.error(f"加载差分映射模块失败: {e}", exc_info=True)
-            return {}
 
     def set_context(self, file_name: str, sheet_name: str, row_index: int ,scenario_index: str):
         """
@@ -235,29 +186,6 @@ class ParamTranslator:
         """
         return [self.translate(param_type, param) for param in params]
 
-    def get_available_types(self) -> list:
-        """
-        获取可用的参数类型列表
-
-        Returns:
-            list: 参数类型列表
-        """
-        return list(self.mappings.keys())
-
-    def get_params_for_type(self, param_type: str) -> list:
-        """
-        获取指定参数类型的所有原始参数
-
-        Args:
-            param_type: 参数类型
-
-        Returns:
-            list: 原始参数列表，如果类型不存在则返回空列表
-        """
-        if param_type in self.mappings:
-            return list(self.mappings[param_type].keys())
-        return []
-
     def get_translations_for_type(self, param_type: str) -> list:
         """
         获取指定参数类型的所有翻译后参数
@@ -271,22 +199,6 @@ class ParamTranslator:
         if param_type in self.mappings:
             return list(self.mappings[param_type].values())
         return []
-
-    def has_mapping(self, param_type: str, param: str) -> bool:
-        """
-        检查是否存在指定参数的映射
-
-        Args:
-            param_type: 参数类型
-            param: 参数值
-
-        Returns:
-            bool: 是否存在映射
-        """
-        return (
-            param_type in self.mappings and
-            param in self.mappings[param_type]
-        )
 
     def get_untranslatable_count(self) -> int:
         """

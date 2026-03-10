@@ -5,7 +5,7 @@
 from typing import List, Dict, Any
 import pandas as pd
 from core.sentence_generator_manager import SentenceGeneratorManager
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 from core.config_manager import EngineConfig
 from core.logger import get_logger
 from core.excel_management.dataframe_processor import DataFrameProcessor

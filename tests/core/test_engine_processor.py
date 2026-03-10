@@ -6,7 +6,7 @@ import pandas as pd
 from unittest.mock import Mock, patch, MagicMock
 from core.engine_processor import EngineProcessor
 from core.base_sentence_generator import BaseSentenceGenerator
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 from core.config_manager import EngineConfig
 from core.sentence_generator_manager import SentenceGeneratorManager
 

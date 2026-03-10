@@ -7,7 +7,7 @@ import pkgutil
 import inspect
 from typing import List, Dict, Type
 from core.base_sentence_generator import BaseSentenceGenerator
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 from core.config_manager import EngineConfig
 from core.logger import get_logger
 from core.exceptions import GeneratorError

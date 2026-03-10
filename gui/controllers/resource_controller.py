@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Signal, QThread
 from core.config_manager import AppConfig
 from core.logger import get_logger
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 from core.resource_extractor import ResourceExtractor
 from core.resource_validator import ResourceValidator
 from core.resource_syncer import ResourceSyncer

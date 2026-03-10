@@ -12,7 +12,7 @@ from core.logger import get_logger
 from core.excel_management.excel_file_manager import ExcelFileManager, ExcelFileNotFoundError, ExcelFormatError
 from core.excel_management.dataframe_processor import DataFrameProcessor
 from core.constants import ColumnName, SheetName
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 
 logger = get_logger(__name__)
 

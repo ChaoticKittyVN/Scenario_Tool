@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Dict
 from core.config_manager import AppConfig
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 from core.resource_extractor import ResourceExtractor
 from core.resource_validator import ResourceValidator
 from core.sentence_generator_manager import SentenceGeneratorManager

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 from tqdm import tqdm
 from core.config_manager import AppConfig
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 from core.engine_registry import EngineRegistry
 from core.logger import get_logger
 from core.exceptions import ExcelParseError, GeneratorError

@@ -4,7 +4,7 @@
 import pytest
 import tempfile
 from pathlib import Path
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 
 
 class TestParamTranslator:

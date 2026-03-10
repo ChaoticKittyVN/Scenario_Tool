@@ -22,7 +22,7 @@ def test_imports():
         from core.constants import WindowMode
         from core.config_manager import AppConfig
         from core.engine_registry import EngineRegistry
-        from core.param_translator import ParamTranslator
+        from core.param_process.param_translator import ParamTranslator
         from core.base_sentence_generator import BaseSentenceGenerator
         from core.sentence_generator_manager import SentenceGeneratorManager
         from core.engine_processor import EngineProcessor
@@ -124,7 +124,7 @@ def test_param_translator():
     print_section("测试 5: 参数翻译器")
 
     try:
-        from core.param_translator import ParamTranslator
+        from core.param_process.param_translator import ParamTranslator
         from pathlib import Path
 
         param_config_dir = Path("param_config")

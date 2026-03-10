@@ -4,7 +4,7 @@
 import pytest
 from unittest.mock import Mock
 from core.base_sentence_generator import BaseSentenceGenerator
-from core.param_translator import ParamTranslator
+from core.param_process.param_translator import ParamTranslator
 from core.config_manager import EngineConfig
 
 
