@@ -4,6 +4,7 @@
 """
 import argparse
 from pathlib import Path
+import re
 from typing import List, Optional
 import pandas as pd
 
@@ -11,11 +12,12 @@ from core.config_manager import AppConfig
 from core.logger import get_logger
 from core.excel_management.excel_file_manager import ExcelFileManager, ExcelFileNotFoundError, ExcelFormatError
 from core.excel_management.dataframe_processor import DataFrameProcessor
-from core.constants import ColumnName, SheetName
+from core.constants import ColumnName, SheetName, SpecialName
 from core.param_process.param_translator import ParamTranslator
 
 logger = get_logger(__name__)
 
+SPECIAL_NAME_VALUES = {member.value for member in SpecialName}
 
 class DialogueExporter:
     """配音台本导出器"""
@@ -30,6 +32,8 @@ class DialogueExporter:
         merge_files: bool = False,
         output_format: str = "excel",
         use_cache_map: bool = False,
+        selected_characters: Optional[List[str]] = None,
+        per_character: bool = False
     ):
         """
         Args:
@@ -47,9 +51,12 @@ class DialogueExporter:
         self.default_speaker = default_speaker
         self.sort_by = sort_by or ["角色", "行号"]
         self.ignore_word = ["无语音"]
+        self.ignore_text = [""]
         self.merge_files = merge_files
         self.output_format = output_format.lower()
         self.use_cache_map = use_cache_map
+        self.selected_characters = selected_characters
+        self.per_character = per_character
 
         self.count_dict = {}  # 用于统计每个角色在每个工作表中的对话数量
         self.voice_filename_cache = {}  # 缓存完整的语音文件名，键为(speaker, sheet_name)元组
@@ -163,7 +170,7 @@ class DialogueExporter:
                 count_num = f"{next_num:03d}"
                 
                 # 获取已转换的角色名（通过缓存避免重复转换）
-                cache_key = (speaker, sheet_name)
+                cache_key = (speaker, sheet_name, idx)
                 if cache_key not in self.voice_filename_cache:
                     converted_speaker = self._convert_chinese_to_english(speaker)
                     self.voice_filename_cache[cache_key] = f"{converted_speaker}_{sheet_name}_{count_num}"
@@ -195,6 +202,34 @@ class DialogueExporter:
             return
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # 按角色分别导出
+        if self.per_character:
+            # 合并所有文件的数据
+            all_dfs = []
+            for f in excel_files:
+                df = self.extract_from_file(f)
+                if not df.empty:
+                    all_dfs.append(df)
+            if not all_dfs:
+                logger.warning("没有提取到任何对话")
+                return
+            combined_df = pd.concat(all_dfs, ignore_index=True)
+            combined_df = combined_df.sort_values(by=self.sort_by)
+
+            # 按角色分组
+            for role, group_df in combined_df.groupby("角色"):
+                # 如果指定了角色列表且当前角色不在其中，则跳过
+                if self.selected_characters and role not in self.selected_characters:
+                    continue
+
+                # 生成安全的文件名（避免非法字符）
+                safe_role = self._sanitize_filename(role)
+                base_path = self.output_dir / f"dialogue_{safe_role}"
+                self._save_dataframe(group_df, base_path)
+
+            logger.info("所有角色导出完成")
+            return
 
         if self.merge_files:
             # 合并所有文件到一个DataFrame
@@ -233,6 +268,14 @@ class DialogueExporter:
         logger.info(f"已导出 {len(df)} 行到 {output_path}")
 
 
+    def _sanitize_filename(self, name: str) -> str:
+        """将角色名转换为安全的文件名（只保留字母、数字、下划线、连字符）"""
+        # 可以先用翻译器转换成英文（如果有映射）
+        translated = self.translate_name(name)
+        # 移除非法的文件名字符
+        safe = re.sub(r'[^\w\-_]', '_', translated)
+        return safe or "unknown"
+
 def main():
     parser = argparse.ArgumentParser(description="导出配音台本工具")
     parser.add_argument("--input", type=Path, help="输入目录（覆盖配置中的input_dir）")
@@ -243,6 +286,8 @@ def main():
     parser.add_argument("--merge", action="store_true", help="合并所有文件为一个表格")
     parser.add_argument("--format", choices=["excel", "csv"], default="excel",
                         help="输出格式 (默认: excel)")
+    parser.add_argument("--per-character", action="store_true",
+                    help="按角色分别导出为单独的文件（自动合并所有输入文件）")
     args = parser.parse_args()
 
     # 加载配置
@@ -260,7 +305,9 @@ def main():
         default_speaker=args.default_speaker,
         sort_by=args.sort,
         merge_files=args.merge,
-        output_format=args.format
+        output_format=args.format,
+        selected_characters=args.characters,
+        per_character=args.per_character,
     )
     exporter.export()
 

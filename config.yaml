@@ -5,6 +5,7 @@ paths:
   log_dir: logs
   output_dir: output
   param_config_dir: param_config
+  input_voice_dir: input/voice
 processing:
   batch_size: 100
   enable_progress_bar: true

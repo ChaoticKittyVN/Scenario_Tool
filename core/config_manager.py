@@ -19,6 +19,7 @@ class PathConfig:
     output_dir: Path = Path("./output")
     param_config_dir: Path = Path("./param_config")
     log_dir: Path = Path("./logs")
+    input_voice_dir: Path = Path("./input/voice")
 
     def __post_init__(self):
         """确保路径是 Path 对象"""

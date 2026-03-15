@@ -27,7 +27,8 @@ class EngineProcessor:
         self,
         engine_type: str,
         translator: ParamTranslator,
-        engine_config: EngineConfig
+        engine_config: EngineConfig,
+        generator_categories: List[str] = []
     ):
         """
         初始化管道处理器
@@ -40,6 +41,8 @@ class EngineProcessor:
         self.engine_type = engine_type
         self.translator = translator
         self.engine_config = engine_config
+
+        self.generator_categories = generator_categories
         self.generators = []
         self.generator_param_map = {}
 
@@ -56,14 +59,23 @@ class EngineProcessor:
         """设置处理器，初始化生成器和参数提取器"""
 
         # 通过生成器管理器创建生成器实例
-        self.generators = self.generator_manager.create_generator_instances(
+        all_generators = self.generator_manager.create_generator_instances(
             self.translator,
             self.engine_config
         )
+        # 根据类别过滤
+        if self.generator_categories:
+            self.generators = [
+                g for g in all_generators 
+                if getattr(g, 'category', '') in self.generator_categories
+            ]
+        else:
+            self.generators = all_generators
 
         self.generator_param_map = self._build_generator_param_map()
         logger.info(f"引擎处理器设置完成，共 {len(self.generators)} 个生成器")
-
+        if self.generator_categories:
+            logger.info(f"已过滤，仅保留类别: {self.generator_categories}")
     def _build_generator_param_map(self) -> Dict:
         """构建generator到参数的映射"""
         generator_param_map = {}
