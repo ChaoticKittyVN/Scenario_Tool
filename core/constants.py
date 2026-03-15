@@ -47,6 +47,7 @@ class ColumnName(str, Enum):
     TEXT = "Text"
     CHARACTER = "Character"
     BACKGROUND = "Background"
+    VOICE = "Voice"
 
 
 class Marker(str, Enum):

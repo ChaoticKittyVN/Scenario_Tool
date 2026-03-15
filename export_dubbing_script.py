@@ -276,19 +276,162 @@ class DialogueExporter:
         safe = re.sub(r'[^\w\-_]', '_', translated)
         return safe or "unknown"
 
+    def convert_to_performance_format(
+        self,
+        dialogue_df: pd.DataFrame,
+        include_voice_prefix: bool = True,
+        include_index: bool = True
+    ) -> pd.DataFrame:
+        """
+        将配音台本 DataFrame 转换为演出脚本生成器可识别的格式
+        
+        Args:
+            dialogue_df: 配音台本的 DataFrame（包含列：角色、文本、语音文件名、文本行号）
+            include_voice_prefix: 是否在文本前添加语音文件名前缀
+            include_index: 是否包含 Index 列
+            
+        Returns:
+            转换后的 DataFrame，包含列：Name、Text、Voice、Index（可选）
+        """
+        if dialogue_df.empty:
+            return dialogue_df
+        
+        result_rows = []
+        
+        for idx, row in dialogue_df.iterrows():
+            speaker = row.get("角色", "")
+            text = row.get("文本", "")
+            voice_file = row.get("语音文件名", "")
+            line_index = row.get("文本行号", "")
+            
+            # 构建新的文本（如果需要添加语音文件名和行号前缀）
+            new_text = text
+            if include_voice_prefix and voice_file:
+                # 格式：[语音文件名][行号] 文本
+                if include_index and line_index:
+                    new_text = f"[{voice_file}][{line_index}] {text}"
+                else:
+                    new_text = f"[{voice_file}] {text}"
+            elif include_index and line_index:
+                new_text = f"[{line_index}] {text}"
+            
+            # 构建新行
+            new_row = {
+                ColumnName.NAME.value: speaker,
+                ColumnName.TEXT.value: new_text,
+                ColumnName.VOICE.value: voice_file,
+            }
+            
+            # 添加 Index 列（用于追踪定位）
+            if include_index:
+                new_row[ColumnName.INDEX.value] = line_index
+            
+            result_rows.append(new_row)
+        
+        return pd.DataFrame(result_rows)
+
+
+def convert_dialogue_to_performance(
+    input_path: Path,
+    output_path: Optional[Path] = None,
+    include_voice_prefix: bool = True,
+    include_index: bool = True,
+    output_format: str = "excel"
+):
+    """
+    快速转换函数：读取配音台本文件并转换为演出脚本格式
+    
+    Args:
+        input_path: 输入的配音台本文件路径
+        output_path: 输出路径（如果为 None，则在输入文件同目录下生成）
+        include_voice_prefix: 是否在文本前添加语音文件名
+        include_index: 是否包含 Index 列
+        output_format: 输出格式 "excel" 或 "csv"
+    """
+    logger.info(f"开始转换配音台本：{input_path.name}")
+    
+    # 读取配音台本
+    if input_path.suffix == ".xlsx":
+        df = pd.read_excel(input_path)
+    else:
+        df = pd.read_csv(input_path, encoding="utf-8-sig")
+    
+    # 检查必需的列
+    required_cols = ["角色", "文本", "语音文件名"]
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        logger.error(f"缺少必需的列：{missing_cols}")
+        logger.error(f"当前列：{list(df.columns)}")
+        raise ValueError(f"配音台本格式不正确，缺少必需的列：{missing_cols}")
+    
+    # 创建导出器实例（使用默认配置）
+    config_path = Path("config.yaml")
+    if config_path.exists():
+        config = AppConfig.from_file(config_path)
+    else:
+        config = AppConfig.create_default("naninovel")
+    
+    exporter = DialogueExporter(config=config)
+    
+    # 转换为演出脚本格式
+    performance_df = exporter.convert_to_performance_format(
+        df,
+        include_voice_prefix=include_voice_prefix,
+        include_index=include_index
+    )
+    
+    # 确定输出路径
+    if output_path is None:
+        output_dir = input_path.parent
+        base_name = input_path.stem.replace("配音台本", "演出脚本")
+        if output_format.lower() == "excel":
+            output_path = output_dir / f"{base_name}.xlsx"
+        else:
+            output_path = output_dir / f"{base_name}.csv"
+    
+    # 保存结果
+    logger.info(f"转换完成，共 {len(performance_df)} 条记录")
+    
+    if output_format.lower() == "excel":
+        performance_df.to_excel(output_path, index=False)
+    else:
+        performance_df.to_csv(output_path, index=False, encoding="utf-8-sig")
+    
+    logger.info(f"已保存到：{output_path}")
+    return output_path
+
+
 def main():
     parser = argparse.ArgumentParser(description="导出配音台本工具")
-    parser.add_argument("--input", type=Path, help="输入目录（覆盖配置中的input_dir）")
-    parser.add_argument("--output", type=Path, help="输出目录（覆盖配置中的output_dir）")
+    parser.add_argument("--input", type=Path, help="输入目录（覆盖配置中的 input_dir）")
+    parser.add_argument("--output", type=Path, help="输出目录（覆盖配置中的 output_dir）")
     parser.add_argument("--sort", nargs="+", default=["角色", "文本行号"],
                         help="排序字段，例如 --sort 角色 行号")
     parser.add_argument("--default-speaker", default="旁白", help="角色为空时的默认名称")
     parser.add_argument("--merge", action="store_true", help="合并所有文件为一个表格")
     parser.add_argument("--format", choices=["excel", "csv"], default="excel",
-                        help="输出格式 (默认: excel)")
+                        help="输出格式 (默认：excel)")
     parser.add_argument("--per-character", action="store_true",
                     help="按角色分别导出为单独的文件（自动合并所有输入文件）")
+    
+    # 新增：转换模式参数
+    parser.add_argument("--convert", type=Path,
+                        help="将配音台本转换为演出脚本格式（指定配音台本文件路径）")
+    parser.add_argument("--no-voice-prefix", action="store_true",
+                        help="不在文本前添加语音文件名前缀")
+    parser.add_argument("--no-index", action="store_true",
+                        help="不添加 Index 列和行号前缀")
+    
     args = parser.parse_args()
+
+    # 如果是转换模式
+    if args.convert:
+        convert_dialogue_to_performance(
+            input_path=args.convert,
+            include_voice_prefix=not args.no_voice_prefix,
+            include_index=not args.no_index
+        )
+        return
 
     # 加载配置
     config_path = Path("config.yaml")
@@ -306,7 +449,7 @@ def main():
         sort_by=args.sort,
         merge_files=args.merge,
         output_format=args.format,
-        selected_characters=args.characters,
+        selected_characters=getattr(args, 'characters', None),
         per_character=args.per_character,
     )
     exporter.export()
