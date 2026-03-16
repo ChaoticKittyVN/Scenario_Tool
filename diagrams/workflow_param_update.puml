@@ -57,7 +57,7 @@ partition "阶段1: 基础参数映射" {
 }
 
 partition "阶段2: 差分参数映射" {
-  :检查 varient_data.xlsx;
+  :检查 variant_data.xlsx;
 
   if (文件存在?) then (是)
     :读取所有工作表;
@@ -82,9 +82,9 @@ partition "阶段2: 差分参数映射" {
     repeat while (还有工作表?) is (是)
     ->否;
 
-    :生成 varient_mappings.py;
+    :生成 variant_mappings.py;
     note right
-      变量名: VARIENT_MAPPINGS
+      变量名: VARIANT_MAPPINGS
     end note
 
     :统计有效映射;

@@ -29,7 +29,7 @@ PARAM_MAPPINGS = {
         "背景1": "bg_1",
         "背景2": "bg_2"
     },
-    "Varient": {
+    "Variant": {
         "差分1": "variant_1",
         "差分2": "variant_2"
     }
@@ -39,11 +39,11 @@ PARAM_MAPPINGS = {
         return mappings_file
 
     @pytest.fixture
-    def mock_varient_mappings_file(self, tmp_path):
+    def mock_variant_mappings_file(self, tmp_path):
         """创建模拟的差分参数映射文件"""
-        varient_file = tmp_path / "varient_mappings.py"
-        varient_content = """
-VARIENT_MAPPINGS = {
+        variant_file = tmp_path / "variant_mappings.py"
+        variant_content = """
+VARIANT_MAPPINGS = {
     "角色A": {
         "开心": "happy",
         "难过": "sad"
@@ -54,31 +54,31 @@ VARIENT_MAPPINGS = {
     }
 }
 """
-        varient_file.write_text(varient_content, encoding="utf-8")
-        return varient_file
+        variant_file.write_text(variant_content, encoding="utf-8")
+        return variant_file
 
     @pytest.fixture
-    def translator(self, mock_param_mappings_file, mock_varient_mappings_file):
+    def translator(self, mock_param_mappings_file, mock_variant_mappings_file):
         """创建 ParamTranslator 实例"""
         return ParamTranslator(
             module_file=str(mock_param_mappings_file),
-            varient_module_file=str(mock_varient_mappings_file)
+            variant_module_file=str(mock_variant_mappings_file)
         )
 
     def test_init_success(self, translator):
         """测试成功初始化"""
         assert translator is not None
         assert len(translator.mappings) == 4
-        assert len(translator.varient_mappings) == 2
+        assert len(translator.variant_mappings) == 2
 
     def test_init_with_missing_files(self, tmp_path):
         """测试文件不存在时的初始化"""
         translator = ParamTranslator(
             module_file=str(tmp_path / "nonexistent.py"),
-            varient_module_file=str(tmp_path / "nonexistent2.py")
+            variant_module_file=str(tmp_path / "nonexistent2.py")
         )
         assert translator.mappings == {}
-        assert translator.varient_mappings == {}
+        assert translator.variant_mappings == {}
 
     @pytest.mark.parametrize("param_type,param_value,expected", [
         # 正常翻译
@@ -113,9 +113,9 @@ VARIENT_MAPPINGS = {
         # 角色存在但参数不存在，返回原值
         ("不存在的表情", "角色A", "不存在的表情"),
     ])
-    def test_translate_varient(self, translator, param_value, role, expected):
+    def test_translate_variant(self, translator, param_value, role, expected):
         """测试差分参数翻译"""
-        assert translator.translate_varient(param_value, role=role) == expected
+        assert translator.translate_variant(param_value, role=role) == expected
 
     def test_translate_batch(self, translator):
         """测试批量翻译"""
@@ -135,7 +135,7 @@ VARIENT_MAPPINGS = {
         assert "Music" in types
         assert "Speaker" in types
         assert "Background" in types
-        assert "Varient" in types
+        assert "Variant" in types
         assert len(types) == 4
 
     @pytest.mark.parametrize("param_type,expected_result", [
@@ -195,7 +195,7 @@ PARAM_MAPPINGS = {
 
         translator = ParamTranslator(
             module_file=str(mappings_file),
-            varient_module_file=str(tmp_path / "nonexistent.py")
+            variant_module_file=str(tmp_path / "nonexistent.py")
         )
 
         assert translator.translate("Test", "参数-1") == "param_1"

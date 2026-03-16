@@ -1,12 +1,12 @@
 import re
 from typing import Dict, Optional, List, Tuple, Any
 from core.logger import get_logger
-from core.param_process.base_param_processor import ParamBaseProccesor
+from core.param_process.base_param_processor import ParamBaseProccessor
 
 logger = get_logger()
 
 
-class ParamValidator(ParamBaseProccesor):
+class ParamValidator(ParamBaseProccessor):
     """
     参数验证器类，用于加载参数映射并提供验证功能
     """
@@ -14,21 +14,21 @@ class ParamValidator(ParamBaseProccesor):
     def __init__(
         self,
         module_file: str = "param_config/param_mappings.py",
-        varient_module_file: str = "param_config/varient_mappings.py"
+        variant_module_file: str = "param_config/variant_mappings.py"
     ):
         """
         初始化参数验证器
 
         Args:
             module_file: 基础参数映射模块文件路径
-            varient_module_file: 差分参数映射模块文件路径
+            variant_module_file: 差分参数映射模块文件路径
         """
         # 调用父类构造函数
-        super().__init__(module_file, varient_module_file)
+        super().__init__(module_file, variant_module_file)
         
         # 重新指向缓存，保持原有命名约定
         self._validation_cache = self.cache
-        self._varient_validation_cache = self.varient_cache
+        self._variant_validation_cache = self.variant_cache
 
         # 自定义验证规则（特殊情况）
         self.custom_validators = {
@@ -92,8 +92,8 @@ class ParamValidator(ParamBaseProccesor):
         cache_key = f"Variant:{role}:{param}"
 
         # 检查缓存
-        if cache_key in self._varient_validation_cache:
-            return self._varient_validation_cache[cache_key]
+        if cache_key in self._variant_validation_cache:
+            return self._variant_validation_cache[cache_key]
 
         # 如果没有提供角色名，尝试从基础映射中查找
         if role is None:
@@ -103,16 +103,16 @@ class ParamValidator(ParamBaseProccesor):
                 result = (False, f"Variant parameter '{param}' not found in base mappings")
         else:
             # 使用角色特定的映射
-            if role in self.varient_mappings:
-                if param in self.varient_mappings[role]:
-                    result = (True, f"Valid variant parameter for {role}: {param} -> {self.varient_mappings[role][param]}")
+            if role in self.variant_mappings:
+                if param in self.variant_mappings[role]:
+                    result = (True, f"Valid variant parameter for {role}: {param} -> {self.variant_mappings[role][param]}")
                 else:
                     result = (False, f"Variant parameter '{param}' not found for role {role}")
             else:
                 result = (False, f"Role '{role}' not found in variant mappings")
 
         # 存入缓存
-        self._varient_validation_cache[cache_key] = result
+        self._variant_validation_cache[cache_key] = result
         return result
 
     def validate_batch(self, param_type: str, params: list) -> List[Tuple[bool, str]]:
@@ -131,7 +131,7 @@ class ParamValidator(ParamBaseProccesor):
     def clear_validation_cache(self):
         """清空验证缓存"""
         self._validation_cache.clear()
-        self._varient_validation_cache.clear()
+        self._variant_validation_cache.clear()
         logger.debug("已清空验证缓存")
 
 

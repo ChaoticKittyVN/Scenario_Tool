@@ -17,7 +17,7 @@ Excel 中文参数 → 参数映射文件 → 引擎脚本参数
 
 - **Ren'Py**: `param_config/param_data_renpy.xlsx`
 - **Naninovel**: `param_config/param_data_naninovel.xlsx`
-- **差分参数**: `param_config/varient_data.xlsx`（可选）
+- **差分参数**: `param_config/variant_data.xlsx`（可选）
 
 ---
 
@@ -83,7 +83,7 @@ param_config/param_data_renpy.xlsx
 param_config/param_data_naninovel.xlsx
 
 # 编辑差分参数（可选）
-param_config/varient_data.xlsx
+param_config/variant_data.xlsx
 ```
 
 ### 2. 运行更新脚本
@@ -97,7 +97,7 @@ py update_param.py
 脚本会自动生成以下文件：
 
 - `param_config/param_mappings.py` - 基础参数映射
-- `param_config/varient_mappings.py` - 差分参数映射（如果存在）
+- `param_config/variant_mappings.py` - 差分参数映射（如果存在）
 
 ### 4. 重新生成脚本
 
@@ -210,7 +210,7 @@ graph LR
 
 ### 差分参数示例
 
-**varient_data.xlsx**:
+**variant_data.xlsx**:
 
 **爱丽丝 工作表**:
 | ExcelParam | ScenarioParam |
@@ -289,7 +289,7 @@ ScenarioParam: "m1"
 
 - `param_config/param_data_renpy.xlsx` - Ren'Py 参数文件
 - `param_config/param_data_naninovel.xlsx` - Naninovel 参数文件
-- `param_config/varient_data.xlsx` - 差分参数文件
+- `param_config/variant_data.xlsx` - 差分参数文件
 - `param_config/param_mappings.py` - 生成的参数映射（自动生成）
-- `param_config/varient_mappings.py` - 生成的差分映射（自动生成）
+- `param_config/variant_mappings.py` - 生成的差分映射（自动生成）
 - `update_param.py` - 参数更新脚本

@@ -159,12 +159,12 @@ class MainWindowUI:
         config_layout.addLayout(param_layout)
 
         # 差分参数文件（只读提示）
-        varient_layout = QHBoxLayout()
-        varient_layout.addWidget(QLabel("差分文件:"))
-        self.param_varient_label = QLabel("param_config/varient_data.xlsx")
-        varient_layout.addWidget(self.param_varient_label)
-        varient_layout.addStretch()
-        config_layout.addLayout(varient_layout)
+        variant_layout = QHBoxLayout()
+        variant_layout.addWidget(QLabel("差分文件:"))
+        self.param_variant_label = QLabel("param_config/variant_data.xlsx")
+        variant_layout.addWidget(self.param_variant_label)
+        variant_layout.addStretch()
+        config_layout.addLayout(variant_layout)
 
         config_group.setLayout(config_layout)
         layout.addWidget(config_group)

@@ -90,7 +90,7 @@ engine:
 ### Q: 如何使用差分参数？
 
 **A**:
-1. 编辑 `param_config/varient_data.xlsx`
+1. 编辑 `param_config/variant_data.xlsx`
 2. 每个工作表代表一个角色
 3. 运行 `py update_param.py` 生成映射
 

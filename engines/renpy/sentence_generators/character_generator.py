@@ -13,7 +13,7 @@ class CharacterGenerator(BaseSentenceGenerator):
         "resource_type": "Character",
         "resource_category": "图片",
         "main_param": "Character",
-        "part_params": ["Varient", "Atr1", "Atr2", "Atr3"],
+        "part_params": ["Variant", "Atr1", "Atr2", "Atr3"],
         "separator": " ",
         "folder": "images/Character/"
     }
@@ -23,7 +23,7 @@ class CharacterGenerator(BaseSentenceGenerator):
         "resource_type": "Sprite",
         "resource_category": "图片",
         "main_param": "Sprite",
-        "part_params": ["Varient", "Atr1", "Atr2", "Atr3"],
+        "part_params": ["Variant", "Atr1", "Atr2", "Atr3"],
         "separator": " ",
         "folder": "images/Sprite/"
     }
@@ -39,8 +39,8 @@ class CharacterGenerator(BaseSentenceGenerator):
         "Sprite": {
             "translate_type": "Sprite",
         },
-        "Varient": {
-            "translate_type": "Varient",
+        "Variant": {
+            "translate_type": "Variant",
         },
         "Atr1": {},
         "Atr2": {},
@@ -97,9 +97,9 @@ class CharacterGenerator(BaseSentenceGenerator):
             command = self.get_value("SpriteCommand", data, use_default=True) + " "
 
             # 添加非层叠式图像属性
-            varient = self.get_value("Varient", data)
-            if varient:
-                image = f"{image} {varient}"
+            variant = self.get_value("Variant", data)
+            if variant:
+                image = f"{image} {variant}"
 
             # 添加所有属性（差分）
             for i in range(1, 4):  # 支持最多3个属性

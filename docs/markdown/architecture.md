@@ -125,7 +125,7 @@ Excel 参数 → 参数映射表 → 引擎参数
 ```python
 class ParamTranslator:
     def translate(self, param_type: str, param_value: str) -> str
-    def translate_varient(self, param_value: str, role: str = None) -> str
+    def translate_variant(self, param_value: str, role: str = None) -> str
     def translate_batch(self, param_type: str, params: List[str]) -> List[str]
 ```
 

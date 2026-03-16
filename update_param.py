@@ -111,7 +111,7 @@ class ParamUpdater:
         """
         try:
             # 根据文件名确定变量名
-            variable_name = "VARIENT_MAPPINGS" if "varient" in output_file.name else "PARAM_MAPPINGS"
+            variable_name = "VARIANT_MAPPINGS" if "variant" in output_file.name else "PARAM_MAPPINGS"
 
             with open(output_file, "w", encoding="utf-8") as f:
                 f.write("# 自动生成的参数映射文件\n")
@@ -132,14 +132,14 @@ class ParamUpdater:
     def collect_validation_data(
         self, 
         param_file: Path, 
-        varient_file: Optional[Path] = None  # 修改类型注解
+        variant_file: Optional[Path] = None  # 修改类型注解
     ) -> Dict[str, List[str]]:
         """
         收集所有验证数据（基础参数 + 差分参数）
 
         Args:
             param_file: 基础参数文件路径
-            varient_file: 差分参数文件路径（可选）
+            variant_file: 差分参数文件路径（可选）
 
         Returns:
             Dict[str, List[str]]: 参数名 -> 参数值列表
@@ -178,13 +178,13 @@ class ParamUpdater:
             return {}
 
         # 2. 收集差分参数
-        if varient_file is not None and varient_file.exists():
+        if variant_file is not None and variant_file.exists():
             try:
-                varient_sheets = self.excel_manager.load_excel(varient_file)
+                variant_sheets = self.excel_manager.load_excel(variant_file)
 
                 # 收集所有差分参数名
-                all_varient_params = set()
-                for sheet_name, df in varient_sheets.items():
+                all_variant_params = set()
+                for sheet_name, df in variant_sheets.items():
                     if "ExcelParam" not in df.columns:
                         continue
 
@@ -193,22 +193,22 @@ class ParamUpdater:
                         if pd.notna(excel_param):
                             param_str = str(excel_param).strip()
                             if param_str:
-                                all_varient_params.add(param_str)
+                                all_variant_params.add(param_str)
 
-                # 将差分参数合并到 Varient 列
-                if all_varient_params:
-                    if "Varient" in validation_data:
+                # 将差分参数合并到 Variant 列
+                if all_variant_params:
+                    if "Variant" in validation_data:
                         # 合并去重
-                        existing_varients = set(validation_data["Varient"])
-                        combined_varients = existing_varients.union(all_varient_params)
-                        validation_data["Varient"] = sorted(list(combined_varients))
+                        existing_variants = set(validation_data["Variant"])
+                        combined_variants = existing_variants.union(all_variant_params)
+                        validation_data["Variant"] = sorted(list(combined_variants))
                     else:
-                        validation_data["Varient"] = sorted(list(all_varient_params))
+                        validation_data["Variant"] = sorted(list(all_variant_params))
 
-                    logger.debug(f"收集差分参数: {len(all_varient_params)} 个值")
+                    logger.debug(f"收集差分参数: {len(all_variant_params)} 个值")
 
             except (ExcelFileNotFoundError, ExcelFormatError) as e:
-                logger.warning(f"读取差分参数文件失败: {varient_file} - {e}")
+                logger.warning(f"读取差分参数文件失败: {variant_file} - {e}")
             except Exception as e:
                 logger.warning(f"读取差分参数文件时发生未知错误: {e}")
 
@@ -346,30 +346,30 @@ class ParamUpdater:
             return False
 
         # 阶段2: 生成差分参数映射
-        varient_file = Path(self.config.paths.param_config_dir) / "varient_data.xlsx"
-        varient_file_path = None  # 明确设置为 None
+        variant_file = Path(self.config.paths.param_config_dir) / "variant_data.xlsx"
+        variant_file_path = None  # 明确设置为 None
 
-        if varient_file.exists():
-            logger.info(f"读取差分参数文件: {varient_file}")
+        if variant_file.exists():
+            logger.info(f"读取差分参数文件: {variant_file}")
             try:
                 # 差分参数文件不跳过模板工作表，保持与原项目一致
-                varient_mappings = self.read_param_file(varient_file, skip_template=False)
+                variant_mappings = self.read_param_file(variant_file, skip_template=False)
 
                 # 生成差分映射文件（保持与原项目一致，包含空映射）
-                varient_output = self.config.paths.param_config_dir / "varient_mappings.py"
-                logger.info(f"生成差分参数映射文件: {varient_output}")
-                self.generate_mappings_file(varient_mappings, varient_output)
+                variant_output = self.config.paths.param_config_dir / "variant_mappings.py"
+                logger.info(f"生成差分参数映射文件: {variant_output}")
+                self.generate_mappings_file(variant_mappings, variant_output)
 
                 # 统计有效映射（排除模板）
-                valid_mappings = {k: v for k, v in varient_mappings.items() if v and "模板" not in k}
+                valid_mappings = {k: v for k, v in variant_mappings.items() if v and "模板" not in k}
                 if valid_mappings:
-                    total_varient = sum(len(m) for m in valid_mappings.values())
-                    logger.info(f"差分参数映射: {len(valid_mappings)} 个角色, {total_varient} 个映射")
+                    total_variant = sum(len(m) for m in valid_mappings.values())
+                    logger.info(f"差分参数映射: {len(valid_mappings)} 个角色, {total_variant} 个映射")
                 else:
                     logger.info("差分参数文件中没有有效的角色映射")
                     
                 # 将文件路径赋值给变量
-                varient_file_path = varient_file
+                variant_file_path = variant_file
                     
             except Exception as e:
                 logger.error(f"处理差分参数映射时失败: {e}")
@@ -383,7 +383,7 @@ class ParamUpdater:
         logger.info("=" * 60)
 
         try:
-            validation_data = self.collect_validation_data(param_file, varient_file_path)
+            validation_data = self.collect_validation_data(param_file, variant_file_path)
             if validation_data:
                 logger.info(f"收集到 {len(validation_data)} 个参数类型的验证数据")
                 success = self.update_scenario_param_sheets(validation_data)

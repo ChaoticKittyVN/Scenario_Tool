@@ -13,7 +13,7 @@ class CharacterGenerator(BaseSentenceGenerator):
         "resource_type": "Character",
         "resource_category": "图片",
         "main_param": "Character",
-        "part_params": ["Varient"],
+        "part_params": ["Variant"],
         "separator": ".",
         "folder": "Characters/"
     }
@@ -27,8 +27,8 @@ class CharacterGenerator(BaseSentenceGenerator):
             "translate_type": "Character",
         },
 
-        "Varient": {
-            "translate_type": "Varient"
+        "Variant": {
+            "translate_type": "Variant"
         },
 
         "Pose": {
@@ -126,13 +126,13 @@ class CharacterGenerator(BaseSentenceGenerator):
                 command += "@hide "
             else:
                 command += "@char "
-                varient = self.get_value("Varient", data)
+                variant = self.get_value("Variant", data)
 
-                # 使用varient_data时使用以下指令进行翻译
-                # self.translator._translate_varient(varient,image)
+                # 使用variant_data时使用以下指令进行翻译
+                # self.translator._translate_variant(variant,image)
 
                 # 差分名，如有需要使用多参数组合
-                image += f".{varient}"
+                image += f".{variant}"
 
             # 添加姿势
             pose = self.get_sentence("Pose", data)

@@ -43,7 +43,7 @@ class ScenarioGeneratorWorker(QThread):
             # 创建翻译器（用于追踪无法翻译的参数）
             translator = ParamTranslator(
                 module_file=str(self.config.paths.param_config_dir / "param_mappings.py"),
-                varient_module_file=str(self.config.paths.param_config_dir / "varient_mappings.py")
+                variant_module_file=str(self.config.paths.param_config_dir / "variant_mappings.py")
             )
 
             # 处理每个文件

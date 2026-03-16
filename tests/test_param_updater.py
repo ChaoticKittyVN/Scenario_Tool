@@ -57,21 +57,21 @@ class TestParamUpdater:
             })
             df_bg.to_excel(writer, sheet_name='Background', index=False)
 
-            # Varient 工作表
-            df_varient = pd.DataFrame({
+            # Variant 工作表
+            df_variant = pd.DataFrame({
                 'ExcelParam': ['差分1', '差分2'],
                 'ScenarioParam': ['variant_1', 'variant_2']
             })
-            df_varient.to_excel(writer, sheet_name='Varient', index=False)
+            df_variant.to_excel(writer, sheet_name='Variant', index=False)
 
         return param_file
 
     @pytest.fixture
-    def mock_varient_excel(self, tmp_path):
+    def mock_variant_excel(self, tmp_path):
         """创建模拟的差分参数 Excel 文件"""
-        varient_file = tmp_path / "param_config" / "varient_data.xlsx"
+        variant_file = tmp_path / "param_config" / "variant_data.xlsx"
 
-        with pd.ExcelWriter(varient_file, engine='openpyxl') as writer:
+        with pd.ExcelWriter(variant_file, engine='openpyxl') as writer:
             # 角色A 工作表
             df_role_a = pd.DataFrame({
                 'ExcelParam': ['开心', '难过'],
@@ -93,7 +93,7 @@ class TestParamUpdater:
             })
             df_template.to_excel(writer, sheet_name='参数表模板', index=False)
 
-        return varient_file
+        return variant_file
 
     @pytest.fixture
     def updater(self, mock_config):
@@ -113,7 +113,7 @@ class TestParamUpdater:
         assert 'Music' in mappings
         assert 'Speaker' in mappings
         assert 'Background' in mappings
-        assert 'Varient' in mappings
+        assert 'Variant' in mappings
 
         # 验证映射内容
         assert mappings['Music']['音乐1'] == 'music1'
@@ -181,7 +181,7 @@ class TestParamUpdater:
         assert 'Music' in validation_data
         assert 'Speaker' in validation_data
         assert 'Background' in validation_data
-        assert 'Varient' in validation_data
+        assert 'Variant' in validation_data
 
         # 验证数据内容
         assert '音乐1' in validation_data['Music']
@@ -189,27 +189,27 @@ class TestParamUpdater:
         assert '角色A' in validation_data['Speaker']
         assert '背景1' in validation_data['Background']
 
-    def test_collect_validation_data_with_varient(self, updater, mock_param_excel, mock_varient_excel):
+    def test_collect_validation_data_with_variant(self, updater, mock_param_excel, mock_variant_excel):
         """测试收集验证数据（包含差分参数）"""
-        validation_data = updater.collect_validation_data(mock_param_excel, mock_varient_excel)
+        validation_data = updater.collect_validation_data(mock_param_excel, mock_variant_excel)
 
-        # 验证差分参数被合并到 Varient 列
-        assert 'Varient' in validation_data
+        # 验证差分参数被合并到 Variant 列
+        assert 'Variant' in validation_data
 
         # 应该包含基础差分参数
-        assert '差分1' in validation_data['Varient']
-        assert '差分2' in validation_data['Varient']
+        assert '差分1' in validation_data['Variant']
+        assert '差分2' in validation_data['Variant']
 
         # 应该包含角色特定的差分参数
-        assert '开心' in validation_data['Varient']
-        assert '难过' in validation_data['Varient']
-        assert '生气' in validation_data['Varient']
-        assert '惊讶' in validation_data['Varient']
+        assert '开心' in validation_data['Variant']
+        assert '难过' in validation_data['Variant']
+        assert '生气' in validation_data['Variant']
+        assert '惊讶' in validation_data['Variant']
 
         # 验证去重和排序
-        varient_list = validation_data['Varient']
-        assert len(varient_list) == len(set(varient_list))  # 无重复
-        assert varient_list == sorted(varient_list)  # 已排序
+        variant_list = validation_data['Variant']
+        assert len(variant_list) == len(set(variant_list))  # 无重复
+        assert variant_list == sorted(variant_list)  # 已排序
 
     def test_collect_validation_data_file_not_exist(self, updater, tmp_path):
         """测试文件不存在时的行为"""
@@ -259,22 +259,22 @@ class TestParamUpdater:
         assert 'music1' in content
         assert 'character_a' in content
 
-    def test_generate_mappings_file_varient(self, updater, tmp_path):
+    def test_generate_mappings_file_variant(self, updater, tmp_path):
         """测试生成差分映射文件"""
-        varient_mappings = {
+        variant_mappings = {
             '角色A': {'开心': 'happy'},
             '角色B': {'生气': 'angry'}
         }
 
-        output_file = tmp_path / "varient_mappings.py"
-        updater.generate_mappings_file(varient_mappings, output_file)
+        output_file = tmp_path / "variant_mappings.py"
+        updater.generate_mappings_file(variant_mappings, output_file)
 
         # 验证文件被创建
         assert output_file.exists()
 
         # 验证文件内容
         content = output_file.read_text(encoding='utf-8')
-        assert 'VARIENT_MAPPINGS' in content
+        assert 'VARIANT_MAPPINGS' in content
         assert '角色A' in content
         assert 'happy' in content
 
@@ -608,7 +608,7 @@ class TestExceptionHandling:
         # 应该返回空字典
         assert result == {}
 
-    def test_collect_validation_data_with_varient_read_error(self, updater, tmp_path):
+    def test_collect_validation_data_with_variant_read_error(self, updater, tmp_path):
         """测试收集验证数据时差分文件读取失败"""
         # 创建正常的参数文件
         param_file = tmp_path / "param.xlsx"
@@ -620,11 +620,11 @@ class TestExceptionHandling:
             df.to_excel(writer, sheet_name='Music', index=False)
 
         # 创建损坏的差分文件
-        varient_file = tmp_path / "varient.xlsx"
-        varient_file.write_text("Not an Excel file")
+        variant_file = tmp_path / "variant.xlsx"
+        variant_file.write_text("Not an Excel file")
 
         # 应该只返回基础参数，忽略差分文件错误
-        result = updater.collect_validation_data(param_file, varient_file)
+        result = updater.collect_validation_data(param_file, variant_file)
 
         assert 'Music' in result
         assert '音乐1' in result['Music']
@@ -658,7 +658,7 @@ class TestUpdateMappingsMethod:
         # 应该返回 False
         assert result is False
 
-    def test_update_mappings_success_without_varient(self, updater, tmp_path):
+    def test_update_mappings_success_without_variant(self, updater, tmp_path):
         """测试成功更新映射（没有差分文件）"""
         # 创建参数文件
         param_file = updater.config.paths.param_config_dir / "param_data_renpy.xlsx"
@@ -678,7 +678,7 @@ class TestUpdateMappingsMethod:
         mapping_file = updater.config.paths.param_config_dir / "param_mappings.py"
         assert mapping_file.exists()
 
-    def test_update_mappings_success_with_varient(self, updater, tmp_path):
+    def test_update_mappings_success_with_variant(self, updater, tmp_path):
         """测试成功更新映射（有差分文件）"""
         # 创建参数文件
         param_file = updater.config.paths.param_config_dir / "param_data_renpy.xlsx"
@@ -690,8 +690,8 @@ class TestUpdateMappingsMethod:
             df.to_excel(writer, sheet_name='Music', index=False)
 
         # 创建差分文件
-        varient_file = updater.config.paths.param_config_dir / "varient_data.xlsx"
-        with pd.ExcelWriter(varient_file, engine='openpyxl') as writer:
+        variant_file = updater.config.paths.param_config_dir / "variant_data.xlsx"
+        with pd.ExcelWriter(variant_file, engine='openpyxl') as writer:
             df = pd.DataFrame({
                 'ExcelParam': ['开心', '难过'],
                 'ScenarioParam': ['happy', 'sad']
@@ -705,9 +705,9 @@ class TestUpdateMappingsMethod:
 
         # 验证两个映射文件都已创建
         mapping_file = updater.config.paths.param_config_dir / "param_mappings.py"
-        varient_mapping_file = updater.config.paths.param_config_dir / "varient_mappings.py"
+        variant_mapping_file = updater.config.paths.param_config_dir / "variant_mappings.py"
         assert mapping_file.exists()
-        assert varient_mapping_file.exists()
+        assert variant_mapping_file.exists()
 
     def test_update_mappings_empty_mappings(self, updater, tmp_path):
         """测试参数文件为空时的行为"""
@@ -802,9 +802,9 @@ class TestEdgeCases:
         # 应该返回 False（没有更新）
         assert result is False
 
-    def test_collect_validation_data_merge_varient(self, updater, tmp_path):
-        """测试合并差分参数到 Varient 列"""
-        # 创建基础参数文件（包含 Varient）
+    def test_collect_validation_data_merge_variant(self, updater, tmp_path):
+        """测试合并差分参数到 Variant 列"""
+        # 创建基础参数文件（包含 Variant）
         param_file = tmp_path / "param.xlsx"
         with pd.ExcelWriter(param_file, engine='openpyxl') as writer:
             df_music = pd.DataFrame({
@@ -813,44 +813,44 @@ class TestEdgeCases:
             })
             df_music.to_excel(writer, sheet_name='Music', index=False)
 
-            df_varient = pd.DataFrame({
+            df_variant = pd.DataFrame({
                 'ExcelParam': ['差分A', '差分B'],
                 'ScenarioParam': ['var_a', 'var_b']
             })
-            df_varient.to_excel(writer, sheet_name='Varient', index=False)
+            df_variant.to_excel(writer, sheet_name='Variant', index=False)
 
         # 创建差分文件
-        varient_file = tmp_path / "varient.xlsx"
-        with pd.ExcelWriter(varient_file, engine='openpyxl') as writer:
+        variant_file = tmp_path / "variant.xlsx"
+        with pd.ExcelWriter(variant_file, engine='openpyxl') as writer:
             df = pd.DataFrame({
                 'ExcelParam': ['差分C', '差分A'],  # 差分A 重复
                 'ScenarioParam': ['var_c', 'var_a']
             })
             df.to_excel(writer, sheet_name='角色A', index=False)
 
-        result = updater.collect_validation_data(param_file, varient_file)
+        result = updater.collect_validation_data(param_file, variant_file)
 
-        # 验证 Varient 列合并且去重
-        assert 'Varient' in result
-        varient_list = result['Varient']
-        assert '差分A' in varient_list
-        assert '差分B' in varient_list
-        assert '差分C' in varient_list
+        # 验证 Variant 列合并且去重
+        assert 'Variant' in result
+        variant_list = result['Variant']
+        assert '差分A' in variant_list
+        assert '差分B' in variant_list
+        assert '差分C' in variant_list
         # 应该去重，所以只有 3 个
-        assert len(varient_list) == 3
+        assert len(variant_list) == 3
 
-    def test_generate_mappings_file_varient_variable_name(self, updater, tmp_path):
+    def test_generate_mappings_file_variant_variable_name(self, updater, tmp_path):
         """测试生成差分映射文件时使用正确的变量名"""
         mappings = {'角色A': {'开心': 'happy'}}
-        output_file = tmp_path / "varient_mappings.py"
+        output_file = tmp_path / "variant_mappings.py"
 
         updater.generate_mappings_file(mappings, output_file)
 
         # 读取文件内容
         content = output_file.read_text(encoding='utf-8')
 
-        # 应该使用 VARIENT_MAPPINGS 变量名
-        assert 'VARIENT_MAPPINGS' in content
+        # 应该使用 VARIANT_MAPPINGS 变量名
+        assert 'VARIANT_MAPPINGS' in content
         assert 'PARAM_MAPPINGS' not in content
 
     def test_generate_mappings_file_param_variable_name(self, updater, tmp_path):
@@ -865,4 +865,4 @@ class TestEdgeCases:
 
         # 应该使用 PARAM_MAPPINGS 变量名
         assert 'PARAM_MAPPINGS' in content
-        assert 'VARIENT_MAPPINGS' not in content
+        assert 'VARIANT_MAPPINGS' not in content

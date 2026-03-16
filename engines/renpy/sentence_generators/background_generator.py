@@ -23,7 +23,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
         "resource_type": "Event",
         "resource_category": "图片",
         "main_param": "Event",
-        "part_params": ["EventVarient"],
+        "part_params": ["EventVariant"],
         "separator": " ",
         "folder": "images/Event/"
     }
@@ -39,7 +39,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
         "Event": {
             "translate_type": "Event",
         },
-        "EventVarient": {},
+        "EventVariant": {},
         "At": {
             "translate_type": "BackTransform",
             "format": " at {value}"
@@ -92,9 +92,9 @@ class BackgroundGenerator(BaseSentenceGenerator):
             image = background or event
 
             # 添加事件属性（差分）
-            varient = self.get_value("EventVarient", data)
-            if varient:
-                image += f" {varient}"
+            variant = self.get_value("EventVariant", data)
+            if variant:
+                image += f" {variant}"
 
             # 添加位置
             at = self.get_sentence("At", data)

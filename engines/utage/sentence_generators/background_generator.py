@@ -24,7 +24,7 @@ class BackgroundGenerator(DictBasedSentenceGenerator):
         "resource_type": "Event",
         "resource_category": "图片",
         "main_param": "Event",
-        "part_params": ["EventVarient"],
+        "part_params": ["EventVariant"],
         "separator": " ",
         "folder": "images/Event/"
     }

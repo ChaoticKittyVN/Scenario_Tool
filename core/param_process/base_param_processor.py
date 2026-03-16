@@ -7,16 +7,16 @@ from core.logger import get_logger
 
 logger = get_logger(__name__)
 
-class ParamBaseProccesor:
+class ParamBaseProccessor:
     """参数处理基类，提供映射加载、缓存、变体处理等公共功能"""
 
-    def __init__(self, module_file: str, varient_module_file: str):
+    def __init__(self, module_file: str, variant_module_file: str):
         self.module_file = module_file
-        self.varient_module_file = varient_module_file
+        self.variant_module_file = variant_module_file
         self.mappings = self._load_mappings(module_file, "PARAM_MAPPINGS")
-        self.varient_mappings = self._load_mappings(varient_module_file, "VARIENT_MAPPINGS")
+        self.variant_mappings = self._load_mappings(variant_module_file, "VARIANT_MAPPINGS")
         self.cache = {}
-        self.varient_cache = {}
+        self.variant_cache = {}
 
     def _load_mappings(self, file_path: str, var_name: str) -> Dict[str, Dict[str, str]]:
         """从Python文件加载映射字典"""
@@ -40,7 +40,7 @@ class ParamBaseProccesor:
 
     def has_variant_mapping(self, role: str, param: str) -> bool:
         """检查是否存在角色特定映射"""
-        return role in self.varient_mappings and param in self.varient_mappings[role]
+        return role in self.variant_mappings and param in self.variant_mappings[role]
 
     def get_mapping(self, param_type: str, param: str) -> Optional[str]:
         """获取映射值（若存在）"""
@@ -51,7 +51,7 @@ class ParamBaseProccesor:
     def get_variant_mapping(self, role: str, param: str) -> Optional[str]:
         """获取角色特定映射值"""
         if self.has_variant_mapping(role, param):
-            return self.varient_mappings[role][param]
+            return self.variant_mappings[role][param]
         return None
 
 
@@ -81,4 +81,4 @@ class ParamBaseProccesor:
     def clear_cache(self):
         """清空所有缓存"""
         self.cache.clear()
-        self.varient_cache.clear()
+        self.variant_cache.clear()

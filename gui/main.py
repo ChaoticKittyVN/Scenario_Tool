@@ -327,7 +327,7 @@ class MainWindow(QMainWindow):
 
         # 更新label显示
         self.ui.param_file_label.setText(f"{param_dir}/{param_file}")
-        self.ui.param_varient_label.setText(f"{param_dir}/varient_data.xlsx")
+        self.ui.param_variant_label.setText(f"{param_dir}/variant_data.xlsx")
 
     def _on_update_param(self):
         """更新参数映射"""

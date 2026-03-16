@@ -18,7 +18,7 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
         "resource_type": "Character",
         "resource_category": "图片",
         "main_param": "Character",
-        "part_params": ["Varient", "Atr1", "Atr2", "Atr3"],
+        "part_params": ["Variant", "Atr1", "Atr2", "Atr3"],
         "separator": " ",
         "folder": "images/Character/"
     }
@@ -31,8 +31,8 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
             "translate_type": "Character",
             "key": "Arg1"
         },
-        "Varient": {
-            "translate_type": "Varient",
+        "Variant": {
+            "translate_type": "Variant",
             "key": "Arg2"
         },
         "CharacterLayer": {
@@ -130,9 +130,9 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
             line[character_field] = character
             # 自动使用缓存的字段名
 
-            varient = self.get_value("Varient", data)
+            variant = self.get_value("Variant", data)
 
-            line["Arg2"] = varient
+            line["Arg2"] = variant
             self._set_param_fast(line, "CharacterLayer", data)
             self._set_param_fast(line, "CharacterFade", data, use_default=True)
 
