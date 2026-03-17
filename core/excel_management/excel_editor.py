@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass
 
 from core.logger import get_logger
 from core.constants import SheetName, ColumnName, Marker
@@ -14,7 +15,17 @@ from .excel_exceptions import ExcelWriteError
 logger = get_logger(__name__)
 
 
-# ==================== Excel编辑器（高级功能） ====================
+@dataclass
+class CellUpdate:
+    """单元格更新信息"""
+    sheet_name: str
+    row: int
+    column: int | str  # 可以是列索引或列名
+    value: Any
+    preserve_style: bool = True
+
+
+# ==================== Excel 编辑器（高级功能） ====================
 class ExcelEditor:
     """
     Excel写入器（高级功能）
@@ -156,7 +167,6 @@ class ExcelEditor:
         except Exception as e:
             logger.error(f"更新参数表失败: {file_path}", exc_info=True)
             raise ExcelWriteError(f"更新参数表失败: {file_path}", e)
-    
     def _create_named_range(
         self,
         wb: Workbook,
@@ -197,3 +207,274 @@ class ExcelEditor:
         except Exception as e:
             logger.warning(f"创建命名区域失败 {param_type}: {e}")
 
+    def get_header_row(self, file_path: Path, sheet_name: str) -> List[str]:
+        """
+        获取工作表的表头（第一行）
+        
+        Args:
+            file_path: Excel 文件路径
+            sheet_name: 工作表名称
+            
+        Returns:
+            List[str]: 表头列名列表
+        """
+        try:
+            wb = load_workbook(file_path, read_only=True, data_only=True)
+            
+            if sheet_name not in wb.sheetnames:
+                wb.close()
+                logger.error(f"工作表不存在：{sheet_name}")
+                return []
+            
+            ws = wb[sheet_name]
+            
+            # 读取第一行作为表头
+            headers = []
+            for cell in ws[1]:
+                value = cell.value
+                headers.append(str(value).strip() if value else "")
+            
+            wb.close()
+            logger.debug(f"获取表头：{sheet_name}, 列数：{len(headers)}")
+            
+            return headers
+            
+        except Exception as e:
+            logger.error(f"获取表头失败：{file_path} -> {sheet_name}", exc_info=True)
+            return []
+
+    def find_column_index(self, file_path: Path, sheet_name: str, column_name: str) -> Optional[int]:
+        """
+        通过表头查找列索引（从 1 开始，openpyxl 格式）
+        
+        Args:
+            file_path: Excel 文件路径
+            sheet_name: 工作表名称
+            column_name: 列名（表头中的名称）
+            
+        Returns:
+            Optional[int]: 列索引（从 1 开始），未找到返回 None
+        """
+        try:
+            headers = self.get_header_row(file_path, sheet_name)
+            
+            # 查找匹配的列
+            for idx, header in enumerate(headers, 1):
+                if header == column_name:
+                    logger.debug(f"找到列 '{column_name}' 在位置 {idx}")
+                    return idx
+            
+            logger.debug(f"未找到列 '{column_name}'，可用列：{headers}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"查找列索引失败：{column_name}", exc_info=True)
+            return None
+
+    def get_cell_value(self, file_path: Path, sheet_name: str, row: int, column: int | str) -> Any:
+        """
+        获取单元格值
+        
+        Args:
+            file_path: Excel 文件路径
+            sheet_name: 工作表名称
+            row: 行号（从 1 开始）
+            column: 列索引（从 1 开始）或列名
+            
+        Returns:
+            Any: 单元格值，如果单元格为空则返回 None
+        """
+        try:
+            # 如果是列名，先转换为索引
+            if isinstance(column, str):
+                col_idx = self.find_column_index(file_path, sheet_name, column)
+                if col_idx is None:
+                    return None
+            else:
+                col_idx = column
+            
+            wb = load_workbook(file_path, read_only=True, data_only=True)
+            
+            if sheet_name not in wb.sheetnames:
+                wb.close()
+                return None
+            
+            ws = wb[sheet_name]
+            cell_value = ws.cell(row=row, column=col_idx).value
+            
+            wb.close()
+            return cell_value
+            
+        except Exception as e:
+            logger.error(f"获取单元格值失败：{file_path} -> ({row}, {column})", exc_info=True)
+            return None
+
+    def get_row_data(self, file_path: Path, sheet_name: str, row: int) -> Dict[str, Any]:
+        """
+        获取整行数据（字典格式）
+        
+        Args:
+            file_path: Excel 文件路径
+            sheet_name: 工作表名称
+            row: 行号（从 1 开始）
+            
+        Returns:
+            Dict[str, Any]: {列名：单元格值} 的字典
+        """
+        try:
+            headers = self.get_header_row(file_path, sheet_name)
+            row_data = {}
+            
+            wb = load_workbook(file_path, read_only=True, data_only=True)
+            
+            if sheet_name not in wb.sheetnames:
+                wb.close()
+                return {}
+            
+            ws = wb[sheet_name]
+            
+            # 读取该行的所有单元格
+            for col_idx, header in enumerate(headers, 1):
+                if header:  # 只读取有表头的列
+                    cell_value = ws.cell(row=row, column=col_idx).value
+                    row_data[header] = cell_value
+            
+            wb.close()
+            return row_data
+            
+        except Exception as e:
+            logger.error(f"获取行数据失败：{file_path} -> row {row}", exc_info=True)
+            return {}
+
+    @handle_excel_operation
+    def update_cell(self, 
+                   file_path: Path, 
+                   sheet_name: str,
+                   row: int, 
+                   column: int | str, 
+                   value: Any,
+                   preserve_style: bool = True) -> bool:
+        """
+        精确修改单个单元格
+        
+        Args:
+            file_path: Excel 文件路径
+            sheet_name: 工作表名称
+            row: 行号（从 1 开始）
+            column: 列索引（从 1 开始）或列名
+            value: 新的值
+            preserve_style: 是否保留原有样式（默认 True）
+            
+        Returns:
+            bool: 是否更新成功
+        """
+        try:
+            logger.debug(f"更新单元格：{file_path} -> {sheet_name} ({row}, {column}) = {value}")
+            
+            # 如果是列名，先转换为索引
+            if isinstance(column, str):
+                col_idx = self.find_column_index(file_path, sheet_name, column)
+                if col_idx is None:
+                    raise ExcelWriteError(f"列不存在：{column}")
+            else:
+                col_idx = column
+            
+            # 加载工作簿
+            wb = load_workbook(file_path)
+            
+            if sheet_name not in wb.sheetnames:
+                wb.close()
+                raise ExcelWriteError(f"工作表不存在：{sheet_name}")
+            
+            ws = wb[sheet_name]
+            
+            # 获取目标单元格
+            target_cell = ws.cell(row=row, column=col_idx)
+            
+            # 设置新值（openpyxl 中修改值不会影响样式）
+            target_cell.value = value
+            
+            # 保存
+            wb.save(file_path)
+            wb.close()
+            
+            logger.info(f"单元格更新成功：{sheet_name} ({row}, {col_idx})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"更新单元格失败：{file_path} -> ({row}, {column})", exc_info=True)
+            raise ExcelWriteError(f"更新单元格失败：{file_path} -> ({row}, {column})", e)
+
+    @handle_excel_operation
+    def update_cells_batch(self, 
+                          file_path: Path, 
+                          updates: List[CellUpdate]) -> bool:
+        """
+        批量修改多个单元格
+        
+        Args:
+            file_path: Excel 文件路径
+            updates: 单元格更新列表
+            
+        Returns:
+            bool: 是否更新成功
+        """
+        try:
+            logger.info(f"批量更新单元格：{file_path}, 共 {len(updates)} 个更新")
+            
+            # 按工作表分组
+            from collections import defaultdict
+            updates_by_sheet = defaultdict(list)
+            for update in updates:
+                updates_by_sheet[update.sheet_name].append(update)
+            
+            # 加载工作簿
+            wb = load_workbook(file_path)
+            
+            success_count = 0
+            error_count = 0
+            
+            # 逐个工作表处理
+            for sheet_name, sheet_updates in updates_by_sheet.items():
+                if sheet_name not in wb.sheetnames:
+                    logger.error(f"工作表不存在：{sheet_name}")
+                    error_count += len(sheet_updates)
+                    continue
+                
+                ws = wb[sheet_name]
+                
+                # 处理该工作表的所有更新
+                for update in sheet_updates:
+                    try:
+                        # 转换列名为索引
+                        if isinstance(update.column, str):
+                            col_idx = self.find_column_index(file_path, sheet_name, update.column)
+                            if col_idx is None:
+                                logger.error(f"列不存在：{update.column}")
+                                error_count += 1
+                                continue
+                        else:
+                            col_idx = update.column
+                        
+                        # 获取单元格
+                        target_cell = ws.cell(row=update.row, column=col_idx)
+                        
+                        # 设置新值（openpyxl 中修改值不会影响样式）
+                        target_cell.value = update.value
+                        
+                        success_count += 1
+                        
+                    except Exception as e:
+                        logger.error(f"更新单元格失败：{sheet_name} ({update.row}, {update.column}) - {e}")
+                        error_count += 1
+            
+            # 保存
+            wb.save(file_path)
+            wb.close()
+            
+            logger.info(f"批量更新完成：成功 {success_count} 个，失败 {error_count} 个")
+            return error_count == 0
+            
+        except Exception as e:
+            logger.error(f"批量更新失败：{file_path}", exc_info=True)
+            raise ExcelWriteError(f"批量更新失败：{file_path}", e)
