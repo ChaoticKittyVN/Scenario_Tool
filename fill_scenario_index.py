@@ -141,7 +141,13 @@ class FillIndexTool(BaseParamTool):
     
     def process_dataframe(self, df: pd.DataFrame, sheet_name: str, file_path: Path):
         """
-        处理单个 DataFrame
+        处理单个 DataFrame（优化版）
+        
+        性能优化：
+        1. 移除 to_dict() 调用，直接使用 Series 访问
+        2. 预计算实际使用的列名
+        3. 向量化判断逻辑，减少函数调用开销
+        4. 减少重复的属性访问
         
         Args:
             df: DataFrame
@@ -171,47 +177,77 @@ class FillIndexTool(BaseParamTool):
         
         logger.debug(f"处理工作表：{sheet_name}，共 {len(df)} 行")
         
-        # 遍历所有行，计算有效的 Index
-        current_index = 0
-        updates_needed = []  # [(行索引，新 Index 值，旧 Index 值，是否需要清空)]
+        # 【性能优化】提前获取实际列名和 Series 数据
+        actual_text_col = next((col for col in text_columns if col in df.columns), None)
+        name_columns = ['Name', '说话人', '角色', 'name', 'speaker', 'character']
+        actual_name_col = next((col for col in name_columns if col in df.columns), None)
+        
+        text_series = df[actual_text_col] if actual_text_col else None
+        name_series = df[actual_name_col] if actual_name_col else None
+        index_series = df[index_column]
+        
+        # 【性能优化】向量化判断有效性，避免 to_dict() 和函数调用
+        valid_flags = []
+        excluded_names = self.excluded_names
         
         for idx in range(len(df)):
-            row_data: Dict[str, Any] = df.iloc[idx].to_dict()  # type: ignore
+            # 直接从 Series 获取值，避免 to_dict()
+            text_value = text_series.iloc[idx] if text_series is not None else None
             
-            # 判断是否是有效的文本行
-            if self.is_valid_text_row(row_data):
+            # Text 为空则无效
+            if pd.isna(text_value) or str(text_value).strip() == "":
+                valid_flags.append(False)
+                continue
+            
+            # 检查 Name 列
+            name_value = name_series.iloc[idx] if name_series is not None else None
+            if pd.isna(name_value) or str(name_value).strip() == "":
+                valid_flags.append(True)
+                continue
+            
+            # 检查是否在排除列表中
+            name_str = str(name_value).strip()
+            if (name_str in excluded_names or 
+                name_str.lower() in excluded_names or 
+                name_str.upper() in excluded_names):
+                valid_flags.append(False)
+            else:
+                valid_flags.append(True)
+        
+        # 计算有效的 Index 并收集更新
+        current_index = 0
+        updates_needed = []
+        
+        for idx in range(len(df)):
+            if valid_flags[idx]:
+                # 有效文本行
                 current_index += 1
-                
-                # 获取当前的 Index 值
-                old_index_value = df.at[idx, index_column]
-                
-                # 如果当前 Index 与预期值不同，记录更新
                 expected_index = current_index
+                old_index_value = index_series.iloc[idx]
                 
-                # 检查是否需要更新（考虑空值和不同的值）
+                # 检查是否需要更新
                 needs_update = False
+                old_index_str = str(old_index_value).strip() if not pd.isna(old_index_value) else ""
                 
-                if pd.isna(old_index_value):
-                    needs_update = True
-                elif str(old_index_value).strip() == "":
+                if pd.isna(old_index_value) or old_index_str == "":
                     needs_update = True
                 else:
                     try:
-                        old_index_int = int(float(old_index_value))  # type: ignore
+                        old_index_int = int(float(old_index_value))
                         if old_index_int != expected_index:
                             needs_update = True
                     except (ValueError, TypeError):
-                        # 无法转换为整数，需要更新
                         needs_update = True
                 
                 if needs_update:
                     updates_needed.append((idx, expected_index, old_index_value, False))
                     logger.debug(f"行 {idx + 2}: Index {old_index_value} -> {expected_index}")
             else:
-                # 无效行，如果 Index 有值则需要清空
-                old_index_value = df.at[idx, index_column]
-                if pd.notna(old_index_value) and str(old_index_value).strip() != "":
-                    updates_needed.append((idx, '', old_index_value, True))  # 清空操作
+                # 无效行，检查是否需要清空
+                old_index_value = index_series.iloc[idx]
+                old_index_str = str(old_index_value).strip() if not pd.isna(old_index_value) else ""
+                if not pd.isna(old_index_value) and old_index_str != "":
+                    updates_needed.append((idx, '', old_index_value, True))
                     logger.debug(f"行 {idx + 2}: Index {old_index_value} -> '' (清空)")
         
         # 记录所有改动
