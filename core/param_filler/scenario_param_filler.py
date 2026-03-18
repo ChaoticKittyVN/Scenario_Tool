@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 from core.logger import get_logger
 from core.excel_management.excel_file_manager import ExcelFileManager
-from core.excel_management.excel_editor import ExcelEditor
+from core.excel_management.excel_editor import ExcelEditor, CellUpdate
 from .rule_engine import RuleEngine, FillingRule
 from .filling_strategy import (
     StrategyManager,
@@ -17,7 +17,7 @@ from .filling_strategy import (
     ContextInheritStrategy,
     PatternGenerateStrategy,
     CharacterNameMappingStrategy,
-    VoiceIdGeneratorStrategy
+    VoiceIdGeneratorStrategy,
 )
 
 logger = get_logger()
@@ -56,13 +56,15 @@ class ChangeReporter:
         self.stats['total_changes'] += 1
     
     def print_preview(self, title: str = "改动预览报告", 
-                     detail_formatter: Optional[Callable[[ChangeRecord], str]] = None):
+                     detail_formatter: Optional[Callable[[ChangeRecord], str]] = None,
+                     show_run_hint: bool = True):
         """
         打印预览报告
         
         Args:
             title: 报告标题
             detail_formatter: 自定义详情格式化函数（可选），接收 ChangeRecord 返回字符串
+            show_run_hint: 是否显示运行提示（默认 True）
         """
         print("\n" + "=" * 80)
         print(f"📊 {title}")
@@ -113,7 +115,7 @@ class ChangeReporter:
         print(f"总改动数：{self.stats['total_changes']}")
         print("=" * 80)
         
-        if self.changes:
+        if self.changes and show_run_hint:
             print("\n💡 提示：使用 --run 参数执行实际修改")
         print()
     
@@ -148,29 +150,29 @@ class BaseParamTool:
     子类只需实现特定步骤即可快速创建新工具
     """
     
-    def __init__(self, strategy_class: type[FillingStrategy], strategy_name: str):
+    def __init__(self, strategy_class: type[FillingStrategy], strategy_name: str, 
+                 dry_run: bool = True):
         """
         初始化基类
         
         Args:
             strategy_class: 策略类
             strategy_name: 策略名称
+            dry_run: 是否干跑模式（默认 True）。干跑模式下不会实际修改文件。
         """
         # 创建智能填充器（不自动注册策略）
-        self.filler = SmartParameterFiller(auto_register=False)
+        self.filler = SmartParameterFiller(auto_register=False, dry_run=dry_run)
         
         # 注册策略
         self.filler.register_custom_strategy(strategy_class, name=strategy_name, verbose=False)
         
-        # 获取策略实例
-        self.strategy = self.filler.strategy_manager.get(strategy_name)
-        if not self.strategy:
-            raise RuntimeError(f"策略注册失败：{strategy_name}")
-        
         # 创建报告器
         self.reporter = ChangeReporter()
         
-        logger.debug(f"{self.__class__.__name__} 初始化完成")
+        # 保存 dry_run 状态
+        self.dry_run = dry_run
+        
+        logger.debug(f"{self.__class__.__name__} 初始化完成，策略 '{strategy_name}' 已注册，dry_run={dry_run}")
     
     def process_directory(self, input_dir: Path, dry_run: bool = True) -> Dict[Path, bool]:
         """
@@ -219,6 +221,9 @@ class BaseParamTool:
             mode_str = '[干跑] ' if dry_run else ''
             logger.info(f"{mode_str}处理文件：{file_path.name}")
             
+            # 清空改动记录（避免多个文件之间的改动混淆）
+            self.reporter.clear()
+
             # 加载 Excel
             excel_data = self.filler.excel_manager.load_excel(file_path)
             
@@ -310,7 +315,6 @@ class BaseParamTool:
         Returns:
             List[CellUpdate]: 单元格更新列表
         """
-        from core.excel_management.excel_editor import CellUpdate
         updates = []
         
         for change in changes:
@@ -341,15 +345,17 @@ class BaseParamTool:
         return updates
     
     def print_preview(self, title: str = "改动预览报告",
-                     detail_formatter: Optional[Callable[[ChangeRecord], str]] = None):
+                     detail_formatter: Optional[Callable[[ChangeRecord], str]] = None,
+                     show_run_hint: bool = True):
         """
         打印预览报告
         
         Args:
             title: 报告标题
             detail_formatter: 自定义详情格式化函数（可选）
+            show_run_hint: 是否显示运行提示（默认 True）
         """
-        self.reporter.print_preview(title=title, detail_formatter=detail_formatter)
+        self.reporter.print_preview(title=title, detail_formatter=detail_formatter, show_run_hint=show_run_hint)
 
 
 class SmartParameterFiller:
@@ -602,7 +608,6 @@ class SmartParameterFiller:
                 # column_values 是 {列名：填充值} 的字典
                 for column_name, value in column_values.items():
                     # 使用 CellUpdate 对象进行批量更新
-                    from core.excel_management.excel_editor import CellUpdate
                     update = CellUpdate(
                         sheet_name=sheet_name,
                         row=row_idx + 2,  # Excel 行号从 2 开始（第 1 行是表头）

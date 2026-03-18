@@ -3,7 +3,7 @@
 定义各种参数填充策略的实现
 """
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Callable, Type
+from typing import Any, Dict, List, Optional, Callable, Type, Tuple
 from pathlib import Path
 import pandas as pd
 import re
@@ -286,25 +286,15 @@ class StrategyManager:
     
     统一管理内置策略和外部自定义策略的注册与获取
     支持延迟实例化优化性能
+    
+    注意：每个 SmartParameterFiller 实例应持有独立的 StrategyManager 实例，
+    避免不同项目/工具间策略注册表共享导致的行为耦合。
     """
-    
-    _instance: Optional['StrategyManager'] = None
-    
-    def __new__(cls):
-        """单例模式"""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
     
     def __init__(self):
         """初始化策略管理器"""
-        if self._initialized:
-            return
-        
         self._strategies: Dict[str, FillingStrategy] = {}
         self._strategy_classes: Dict[str, Type[FillingStrategy]] = {}
-        self._initialized = True
         
         logger.debug("策略管理器初始化完成")
     
@@ -400,22 +390,260 @@ class StrategyManager:
 class StrategyRegistry:
     """
     策略注册表（向后兼容，推荐使用 StrategyManager）
+    
+    注意：这是全局单例，仅用于向后兼容。新代码应使用 SmartParameterFiller 内部的 strategy_manager。
     """
+    
+    _instance: Optional[StrategyManager] = None
+    
+    @classmethod
+    def _get_manager(cls) -> StrategyManager:
+        """获取内部管理器实例"""
+        if cls._instance is None:
+            cls._instance = StrategyManager()
+        return cls._instance
     
     @classmethod
     def register(cls, strategy: FillingStrategy):
         """注册策略"""
-        manager = StrategyManager()
-        manager.register(strategy)
+        cls._get_manager().register(strategy)
     
     @classmethod
     def get(cls, name: str) -> Optional[FillingStrategy]:
         """获取策略"""
-        manager = StrategyManager()
-        return manager.get(name)
+        return cls._get_manager().get(name)
     
     @classmethod
     def list_all(cls) -> List[str]:
         """列出所有策略"""
-        manager = StrategyManager()
-        return manager.list_all()
+        return cls._get_manager().list_all()
+
+
+# ============================================================================
+# 改动同步策略
+# ============================================================================
+
+class ChangeSyncStrategy(FillingStrategy):
+    """
+    改动同步策略
+    
+    从改动表格中读取修改信息并同步到演出表格
+    
+    改动表格格式:
+    - 定位列：ExcelFilename, SheetName, Idx, Index, OldText (5 列用于定位行)
+    - 数据列：其他所有列，与演出表格表头一致 (需要修改的数据)
+    """
+    
+    DEFAULT_LOCATOR_COLUMNS = ['ExcelFilename', 'SheetName', 'Idx', 'Index', 'OldText']
+    
+    def __init__(self):
+        super().__init__("change_sync")
+        self.changes_df: Optional[pd.DataFrame] = None
+        self.locator_columns: List[str] = self.DEFAULT_LOCATOR_COLUMNS.copy()
+        self.data_columns: List[str] = []
+        self._changes_cache: Dict[Tuple[str, str], pd.DataFrame] = {}  # {(filename, sheetname): changes}
+    
+    def set_changes_df(self, changes_df: pd.DataFrame, 
+                      locator_columns: Optional[List[str]] = None,
+                      data_columns: Optional[List[str]] = None):
+        """
+        设置改动表格数据
+        
+        Args:
+            changes_df: 改动表格 DataFrame
+            locator_columns: 定位列列表 (可选)
+            data_columns: 数据列列表 (可选，默认自动识别)
+        """
+        self.changes_df = changes_df
+        
+        if locator_columns:
+            self.locator_columns = locator_columns
+        
+        # 自动识别数据列：除定位列外的所有列
+        if data_columns:
+            self.data_columns = data_columns
+        else:
+            all_columns = changes_df.columns.tolist()
+            self.data_columns = [col for col in all_columns if col not in self.locator_columns]
+        
+        logger.debug(f"设置改动表格：{len(changes_df)} 条记录，数据列：{self.data_columns}")
+        
+        # 清空缓存
+        self._changes_cache.clear()
+    
+    def _get_changes_for_sheet(self, filename: str, sheet_name: str) -> pd.DataFrame:
+        """
+        获取指定工作表的改动记录
+        
+        Args:
+            filename: Excel 文件名
+            sheet_name: 工作表名称
+            
+        Returns:
+            pd.DataFrame: 该工作表的改动记录
+        """
+        cache_key = (filename, sheet_name)
+        
+        if cache_key not in self._changes_cache and self.changes_df is not None:
+            # 筛选该工作表的改动
+            mask = (
+                (self.changes_df['ExcelFilename'] == filename) &
+                (self.changes_df['SheetName'] == sheet_name)
+            )
+            self._changes_cache[cache_key] = self.changes_df[mask].copy()
+        
+        return self._changes_cache.get(cache_key, pd.DataFrame())
+    
+    def _find_row_by_locator(self, df: pd.DataFrame, change_record: Dict[str, Any]) -> Optional[int]:
+        """
+        根据定位信息查找对应的行索引
+        
+        Args:
+            df: 演出表格 DataFrame
+            change_record: 改动记录（一行数据）
+            
+        Returns:
+            Optional[int]: 匹配的行索引，找不到返回 None
+        """
+        # 优先级 1: Index 列（Excel 行号）
+        index_val = change_record.get('Index')
+        if pd.notna(index_val):
+            try:
+                excel_row = int(index_val)
+                df_row = excel_row - 2  # Excel 行号转 DataFrame 索引（减 2 因为标题占 2 行）
+                if 0 <= df_row < len(df):
+                    logger.debug(f"通过 Index={excel_row} 定位到第{df_row}行")
+                    return df_row
+            except (ValueError, TypeError):
+                pass
+        
+        # 优先级 2: Idx 列
+        idx_val = change_record.get('Idx')
+        if pd.notna(idx_val):
+            try:
+                excel_row = int(idx_val)
+                df_row = excel_row - 2
+                if 0 <= df_row < len(df):
+                    logger.debug(f"通过 Idx={excel_row} 定位到第{df_row}行")
+                    return df_row
+            except (ValueError, TypeError):
+                pass
+        
+        # 优先级 3: OldText 列（原文匹配）
+        old_text = change_record.get('OldText')
+        if pd.notna(old_text) and str(old_text).strip():
+            text_columns = ['台词', 'text', '对话', 'dialogue']
+            for col in text_columns:
+                if col in df.columns:
+                    # 查找匹配的行
+                    for idx, row in df.iterrows():
+                        cell_value = str(row.get(col, '')).strip()
+                        if cell_value == str(old_text).strip():
+                            logger.debug(f"通过 OldText='{old_text}' 定位到第{idx}行")
+                            return int(idx) if isinstance(idx, int) else idx  # type: ignore
+        
+        logger.warning(f"无法定位改动行：{change_record}")
+        return None
+    
+    def can_fill(self, cell_value: Any, context: Dict[str, Any]) -> bool:
+        """
+        判断是否可以填充该单元格
+        
+        条件:
+        1. 已加载改动表格
+        2. 当前工作表有改动记录
+        3. 当前行在改动记录中
+        4. 当前列是数据列
+        """
+        if self.changes_df is None:
+            return False
+        
+        filename = context.get('filename', '')
+        sheet_name = context.get('sheet_name', '')
+        row_idx = context.get('row_index')
+        column_name = context.get('column_name')
+        
+        # 检查是否是数据列
+        if column_name not in self.data_columns:
+            return False
+        
+        # 获取该工作表的改动记录
+        changes = self._get_changes_for_sheet(filename, sheet_name)
+        if changes.empty:
+            return False
+        
+        # 检查当前行是否有改动
+        if row_idx is not None:
+            excel_row = row_idx + 2
+            # 检查是否有任意定位方式匹配
+            for _, record in changes.iterrows():
+                matched = False
+                
+                # Index 匹配
+                if pd.notna(record.get('Index')) and int(record.get('Index', 0)) == excel_row:
+                    matched = True
+                
+                # Idx 匹配
+                if not matched and pd.notna(record.get('Idx')) and int(record.get('Idx', 0)) == excel_row:
+                    matched = True
+                
+                # OldText 匹配
+                if not matched and pd.notna(record.get('OldText')):
+                    row_data = context.get('row_data', {})
+                    text_columns = ['台词', 'text', '对话', 'dialogue']
+                    for col in text_columns:
+                        if col in row_data:
+                            current_text = str(row_data.get(col, '')).strip()
+                            old_text = str(record.get('OldText')).strip()
+                            if current_text == old_text:
+                                matched = True
+                                break
+                
+                if matched:
+                    # 检查该列是否有新值
+                    new_value = record.get(column_name)
+                    return pd.notna(new_value) and new_value != ""
+        
+        return False
+    
+    def fill(self, cell_value: Any, context: Dict[str, Any], params: Dict[str, Any]) -> Any:
+        """
+        执行填充
+        
+        从改动表格中获取新值并填充
+        
+        Args:
+            cell_value: 当前单元格值
+            context: 上下文信息
+            params: 策略参数（本策略不使用）
+            
+        Returns:
+            Any: 填充后的值（从改动表格获取）
+        """
+        filename = context.get('filename', '')
+        sheet_name = context.get('sheet_name', '')
+        row_idx = context.get('row_index')
+        column_name = context.get('column_name')
+        
+        # 获取该工作表的改动记录
+        changes = self._get_changes_for_sheet(filename, sheet_name)
+        if changes.empty:
+            logger.debug("无改动记录")
+            return cell_value
+        
+        # 查找匹配的改动记录
+        for _, record in changes.iterrows():
+            # 定位行
+            located_row = self._find_row_by_locator(context.get('dataframe', pd.DataFrame()), record.to_dict())  # type: ignore
+            
+            if located_row == row_idx:
+                # 找到匹配的改动，返回新值
+                new_value = record.get(column_name)
+                if pd.notna(new_value):
+                    row_display = row_idx + 2 if row_idx is not None else '?'
+                    logger.info(f"同步改动：{sheet_name} 行{row_display} "
+                              f"{column_name}: '{cell_value}' -> '{new_value}'")
+                    return new_value
+        
+        logger.debug("未找到匹配的改动记录")
+        return cell_value
