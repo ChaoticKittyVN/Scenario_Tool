@@ -442,7 +442,7 @@ def main():
             return 0
     
     # 创建工具实例
-    tool = CleanIndexTool(excluded_names=args.exclude, dry_run=dry_run)
+    tool = FillIndexTool(excluded_names=args.exclude, dry_run=dry_run)
     
     # 处理目录
     results = tool.process_directory(input_dir=args.input, dry_run=dry_run)
