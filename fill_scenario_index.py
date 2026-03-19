@@ -141,13 +141,7 @@ class FillIndexTool(BaseParamTool):
     
     def process_dataframe(self, df: pd.DataFrame, sheet_name: str, file_path: Path):
         """
-        处理单个 DataFrame（优化版）
-        
-        性能优化：
-        1. 移除 to_dict() 调用，直接使用 Series 访问
-        2. 预计算实际使用的列名
-        3. 向量化判断逻辑，减少函数调用开销
-        4. 减少重复的属性访问
+        处理单个 DataFrame
         
         Args:
             df: DataFrame
