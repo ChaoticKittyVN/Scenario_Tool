@@ -83,7 +83,7 @@ class FillIndexTool(BaseParamTool):
         # Excel 编辑器实例
         self.excel_editor = ExcelEditor()
         
-        logger.debug(f"CleanIndexTool 初始化完成，excluded_names={self.excluded_names}, dry_run={dry_run}")
+        logger.debug(f"FillIndexTool 初始化完成，excluded_names={self.excluded_names}, dry_run={dry_run}")
     
     def is_valid_text_row(self, row_data: Dict[str, Any]) -> bool:
         """
@@ -177,7 +177,7 @@ class FillIndexTool(BaseParamTool):
         
         logger.debug(f"处理工作表：{sheet_name}，共 {len(df)} 行")
         
-        # 【性能优化】提前获取实际列名和 Series 数据
+        # 提前获取实际列名和 Series 数据
         actual_text_col = next((col for col in text_columns if col in df.columns), None)
         name_columns = ['Name', '说话人', '角色', 'name', 'speaker', 'character']
         actual_name_col = next((col for col in name_columns if col in df.columns), None)
@@ -186,7 +186,7 @@ class FillIndexTool(BaseParamTool):
         name_series = df[actual_name_col] if actual_name_col else None
         index_series = df[index_column]
         
-        # 【性能优化】向量化判断有效性，避免 to_dict() 和函数调用
+        # 向量化判断有效性，避免 to_dict() 和函数调用
         valid_flags = []
         excluded_names = self.excluded_names
         
@@ -271,7 +271,7 @@ class FillIndexTool(BaseParamTool):
     
     def _find_column_index_cached(self, file_path: Path, sheet_name: str, column_name: str) -> int:
         """
-        查找列索引（带缓存优化）
+        查找列索引，使用缓存
         
         Args:
             file_path: Excel 文件路径
@@ -325,7 +325,7 @@ class FillIndexTool(BaseParamTool):
                 )
                 updates.append(update)
             
-            # 使用 ExcelEditor 的批量更新方法（已优化）
+            # 使用 ExcelEditor 的批量更新方法
             success = self.excel_editor.update_cells_batch(file_path, updates)
             
             if success:
@@ -432,16 +432,16 @@ def main():
         epilog="""
 示例用法:
   # 基本用法（干跑模式，只预览）
-  python clean_index.py --input ./scenario
+  python fill_scenario_index.py --input ./scenario
   
   # 正式执行
-  python clean_index.py --input ./scenario --run
+  python fill_scenario_index.py --input ./scenario --run
   
   # 自定义排除的名称
-  python clean_index.py --input ./scenario --exclude name1 name2 name3
+  python fill_scenario_index.py --input ./scenario --exclude name1 name2 name3
   
   # 指定特定目录
-  python clean_index.py --input ./my_scenarios --run
+  python fill_scenario_index.py --input ./my_scenarios --run
         """
     )
     
