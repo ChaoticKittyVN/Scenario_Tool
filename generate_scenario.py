@@ -27,11 +27,6 @@ from core.excel_management import (
 # 导入输出管理器
 from core.scenario_output import OutputManager, OutputFormat
 
-# 导入引擎模块以触发注册
-import engines.renpy
-import engines.naninovel
-import engines.utage
-
 logger = get_logger()
 
 
@@ -348,7 +343,7 @@ def process_sheet(
         output_sheet_file(output_list, output_file_path, config)
 
 
-def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTranslator):
+def process_excel_file(file_path: Path, config: AppConfig, processor, translator: ParamTranslator):
     """
     处理单个Excel文件
 
@@ -364,7 +359,6 @@ def process_excel_file(file_path: Path, config: AppConfig, translator: ParamTran
     """
     try:
         logger.info(f"开始处理文件: {file_path.name}")
-        processor = create_processor(config, translator)
 
         # 加载Excel数据
         excel_data = load_excel_data(file_path)
@@ -446,11 +440,13 @@ def main():
             module_file=str(config.paths.param_config_dir / "param_mappings.py"),
             variant_module_file=str(config.paths.param_config_dir / "variant_mappings.py")
         )
+    
+        processor = create_processor(config, translator)
 
         # 处理每个Excel文件
         for excel_file in excel_files:
             try:
-                process_excel_file(excel_file, config, translator)
+                process_excel_file(excel_file, config, processor, translator)
             except ExcelFileNotFoundError as e:
                 logger.error(f"文件不存在，跳过: {excel_file} - {e}")
                 continue
