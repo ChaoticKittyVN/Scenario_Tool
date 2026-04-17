@@ -35,16 +35,22 @@ class BackgroundGenerator(BaseSentenceGenerator):
         "Back": {
             "translate_type": "Background",
         },
+        "BackAtr": {},
         "Event": {
             "translate_type": "Event",
         },
+        "EventAtr": {},
         "BackID": {
             "translate_type": "Id",
             "format": " id:{value}",
             "default": "MainBackground"
         },
+        "BackPose": {
+            "format":" pose:{value}",
+            "translate_type": "BackPose",
+        },
         "BackScale": {
-            "format":" sacle:{value}"
+            "format":" scale:{value}"
         },
         "BackPos": {
             "format":" pos:{value}"
@@ -165,6 +171,8 @@ class BackgroundGenerator(BaseSentenceGenerator):
                 image = f"{image}.Custom"
             
             # 添加位置和缩放变换
+            pose = self.get_sentence("BackPose", data)
+
             pos = self.get_sentence("BackPos", data)
             
             scale = self.get_sentence("BackScale", data)
@@ -174,7 +182,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
 
             tint = self.get_sentence("BackTint", data)
 
-            line = f"{command}{image}{id}{pos}{scale}{visible}{tint}{dissolve}{wait}"
+            line = f"{command}{image}{id}{pose}{pos}{scale}{visible}{tint}{dissolve}{wait}"
 
         # 构建最终命令
         if trans == "trans":

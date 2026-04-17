@@ -95,26 +95,32 @@ class DialogueExporter:
         return self.translator.translate("Name", param)
 
     def extract_from_file(self, file_path: Path) -> pd.DataFrame:
-        """从单个Excel文件提取对话，返回DataFrame"""
-        logger.info(f"正在处理: {file_path.name}")
+        """从单个 Excel 文件提取对话，返回 DataFrame"""
+        logger.info(f"正在处理：{file_path.name}")
         try:
             excel_data = self.excel_manager.load_excel(file_path)
         except (ExcelFileNotFoundError, ExcelFormatError) as e:
             logger.error(f"跳过文件 {file_path.name}: {e}")
             return pd.DataFrame()
 
-        # 预处理阶段：统计每个角色在各工作表中的出现次数
+        # 第一阶段：提取所有有效行并统计每个角色在各工作表中的出现次数
         temp_count = {}
+        valid_data_cache = {}  # 缓存每个工作表的有效行数据
+        
         for sheet_name, df in excel_data.items():
             if sheet_name == SheetName.PARAM_SHEET.value:
                 continue
 
+            # 提取有效行（只调用一次）
             valid_df = self.df_processor.extract_valid_rows(df, sheet_name)
             if valid_df.empty:
                 continue
+            
+            # 缓存有效行数据供后续使用
+            valid_data_cache[sheet_name] = valid_df
 
+            # 统计每个角色的出现次数
             for idx, row in valid_df.iterrows():
-                # 提取角色信息
                 ignore = row.get(ColumnName.IGNORE.value, "")
                 if pd.isna(ignore) or ignore in self.ignore_word:
                     continue
@@ -122,7 +128,6 @@ class DialogueExporter:
                 if pd.isna(speaker) or speaker == "":
                     continue
                 
-                # 统计出现次数
                 if speaker not in temp_count:
                     temp_count[speaker] = {}
                 if sheet_name not in temp_count[speaker]:
@@ -140,15 +145,12 @@ class DialogueExporter:
                 converted_speaker = self._convert_chinese_to_english(speaker)
             
             for sheet_name, count in sheets.items():
-                # 为每个角色-工作表组合创建编号迭代器
+                # 为每个角色 - 工作表组合创建编号迭代器
                 filename_generators[speaker][sheet_name] = iter(range(1, count + 1))
 
+        # 第二阶段：使用缓存的数据生成最终结果
         all_rows = []
-        for sheet_name, df in excel_data.items():
-            if sheet_name == SheetName.PARAM_SHEET.value:
-                continue
-
-            valid_df = self.df_processor.extract_valid_rows(df, sheet_name)
+        for sheet_name, valid_df in valid_data_cache.items():
             if valid_df.empty:
                 continue
 
@@ -158,8 +160,8 @@ class DialogueExporter:
                 if pd.isna(ignore) or ignore in self.ignore_word:
                     continue
                 speaker = row.get(ColumnName.NAME.value, "")
-                if pd.isna(speaker) or speaker == "":
-                    speaker = self.default_speaker
+                if pd.isna(speaker) or speaker == "" or speaker in SPECIAL_NAME_VALUES:
+                    continue
                 text = row.get(ColumnName.TEXT.value, "")
                 if pd.isna(text) or text == "":
                     continue
@@ -407,7 +409,7 @@ def main():
     parser.add_argument("--output", type=Path, help="输出目录（覆盖配置中的 output_dir）")
     parser.add_argument("--sort", nargs="+", default=["角色", "文本行号"],
                         help="排序字段，例如 --sort 角色 行号")
-    parser.add_argument("--default-speaker", default="旁白", help="角色为空时的默认名称")
+    parser.add_argument("--default-speaker", default="", help="角色为空时的默认名称")
     parser.add_argument("--merge", action="store_true", help="合并所有文件为一个表格")
     parser.add_argument("--format", choices=["excel", "csv"], default="excel",
                         help="输出格式 (默认：excel)")

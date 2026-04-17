@@ -68,6 +68,8 @@ class TextGenerator(BaseSentenceGenerator):
                     lines.append(text)
                 elif character_name == SpecialName.LABEL_COMMAND.value:
                     lines.append(f"# {text}")
+                elif character_name == SpecialName.JUMP_COMMAND.value:
+                    lines.append(f"@goto {text}")
                 else:
                     raise ValueError(f"不支持的特殊说话者：{character_name}。")
             else:

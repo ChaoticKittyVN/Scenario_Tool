@@ -5,7 +5,7 @@ class PauseWaitGenerator(BaseSentenceGenerator):
 
 
     param_config = {
-        "PauseWait": {
+        "WaitPause": {
             "format": "@wait {value}"
         }
     }
@@ -31,6 +31,6 @@ class PauseWaitGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return None
 
-        wait = self.get_sentence("PauseWait", data)
+        wait = self.get_sentence("WaitPause", data)
 
         return [wait]

@@ -36,7 +36,7 @@ class TransitionGenerator(BaseSentenceGenerator):
 
     @property
     def priority(self) -> int:
-        return 400
+        return 120
 
 
     def process(self, data):
