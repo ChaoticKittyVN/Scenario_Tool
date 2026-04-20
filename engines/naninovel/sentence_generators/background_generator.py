@@ -83,6 +83,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
         "BackAnimParam": {
             "translate_type": "Animation",
         },
+        "Transition":{},
     }
 
     def __init__(self, translator, engine_config):
@@ -137,7 +138,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
         # 等待时间
         time = self.get_sentence("BackTime", data, use_default=True)
 
-        if trans in ["block", "trans"]:
+        if trans in ["block", "trans"] or self.exists_param("Transition", data):
             command = "    "
         else:
             command = ""

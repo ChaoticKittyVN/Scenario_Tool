@@ -7,7 +7,12 @@ class PauseWaitGenerator(BaseSentenceGenerator):
     param_config = {
         "WaitPause": {
             "format": "@wait {value}"
-        }
+        },
+        "TransitionWaitPause": {
+            "format": "@wait {value}"
+        },
+        "Transition": {},
+        "TransitionSub": {}
     }
 
     @property
@@ -31,6 +36,26 @@ class PauseWaitGenerator(BaseSentenceGenerator):
         if not self.can_process(data):
             return None
 
+        lines = []
+
+        transition = self.get_value("Transition", data)
+        transition_sub = self.get_value("TransitionSub", data)
+
+        if transition in ["新场景", "局部转场", "立绘转场"] and transition_sub not in ["开始"]:
+            if self.exists_param("TransitionWaitPause", data):
+                pause = self.get_value("TransitionWaitPause", data)
+                if pause.startswith("i") or float(pause) > 0:
+                    lines.append(self.get_sentence("TransitionWaitPause", data))
+                else:
+                    pass
+            elif transition in ["局部转场", "立绘转场"]:
+                lines.append("@wait i0.5")
+            elif transition in ["新场景"]:
+                lines.append("@wait i1")
+
         wait = self.get_sentence("WaitPause", data)
 
-        return [wait]
+        if wait: 
+            lines.append(wait)
+
+        return lines

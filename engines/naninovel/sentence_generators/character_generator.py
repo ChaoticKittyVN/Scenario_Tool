@@ -71,6 +71,8 @@ class CharacterGenerator(BaseSentenceGenerator):
         },
 
         "CharAnimWait": {},
+
+        "Transition": {},
     }
 
     def __init__(self, translator, engine_config):
@@ -110,13 +112,13 @@ class CharacterGenerator(BaseSentenceGenerator):
         lines = []
         trans = self.get_value("TransChar", data)
 
-        if trans in ["block", "trans"]:
+        if trans in ["block", "trans"] or self.exists_param("Transition", data):
             command = "    "
         else:
             command = ""
 
         if char == "hideAll":
-            lines.append("@hideChars")
+            lines.append(f"{command}@hideChars")
             # 构建角色命令
 
         else:

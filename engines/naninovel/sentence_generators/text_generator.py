@@ -17,7 +17,9 @@ class TextGenerator(BaseSentenceGenerator):
         "Printer": {
             "validate_type": "Printer"
         },
-        "PrinterPos": {}
+        "PrinterPos": {},
+        "Transition": {},
+        "TransitionSub": {}
     }
 
     SPECIAL_NAME_VALUES = {member.value for member in SpecialName}
@@ -46,19 +48,28 @@ class TextGenerator(BaseSentenceGenerator):
         character_name = self.get_value("Name", data)
         text = self.get_value("Text", data)
         printer = self.get_value("Printer", data)
+        printer_status = self.get_value("PrinterStatus", data)
 
+        transition = self.get_value("Transition", data)
+        transition_sub = self.get_value("TransitionSub", data)
+    
         lines = []
         # 处理打印机设置
-        if printer != WindowMode.HIDE.value and printer:
-            if printer in [WindowMode.SHOW.value, WindowMode.SHOW_AND_HIDE.value]:
-                line = f"@printer"
-            else:
+
+        printer_show = "@printer"
+
+        if printer_status != WindowMode.HIDE.value:
+            if printer in [WindowMode.SHOW.value, WindowMode.SHOW_AND_HIDE.value] or printer or (transition in ["局部转场", "新场景", "立绘转场"] and transition_sub not in ["过渡", "开始"]):
                 printer = self.translator.translate('Printer', printer)
+                if self.exists_param("Printer", data):
+                    printer_show += f" {self.translator.translate('Printer', printer)}"
+
                 printer_pos = self.get_sentence("PrinterPos", data)
-                line = f"@printer {printer}"
                 if printer_pos:
-                    line += printer_pos
-            lines.append(line)
+                    printer_show += printer_pos
+                lines.append(printer_show)             
+            else:
+                pass
 
         # 处理对话文本
         if character_name:

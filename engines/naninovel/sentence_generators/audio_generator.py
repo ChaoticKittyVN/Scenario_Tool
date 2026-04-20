@@ -60,6 +60,7 @@ class AudioGenerator(BaseSentenceGenerator):
 
             "AudioFade": {
                 "format": " fade:{value}",
+                "default": "2"
             },
         }
 
@@ -100,6 +101,8 @@ class AudioGenerator(BaseSentenceGenerator):
 
             if self.exists_param("AudioFade", data) and line:
                 line += self.get_sentence("AudioFade", data)
+            elif param_name == "Music" and param_value:
+                line += self.get_sentence("AudioFade", data, use_default=True)
             
             if line:
                 lines.append(line)

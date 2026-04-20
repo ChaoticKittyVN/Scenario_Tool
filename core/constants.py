@@ -22,6 +22,12 @@ class SpecialName(str, Enum):
     CHOICE_COMMAND = "choice"
     JUMP_COMMAND = "jump"
 
+class AutoBlockTransition(str, Enum):
+    """自动缩进转场类型"""
+    NEW_SCENE = "新场景"
+    PART_TRANS = "局部转场"
+    CHAR_TRANS = "立绘转场"
+    TRANS_BLOCK = "转场组件"
 
 class FileType(str, Enum):
     """文件类型"""

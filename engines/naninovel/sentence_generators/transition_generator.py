@@ -13,6 +13,11 @@ class TransitionGenerator(BaseSentenceGenerator):
             "translate_type": "Transition",
             "format": "    @back {value} id:转场"
         },
+
+        "TransitionSub": {
+            "validate_type": "TransitionSub",
+        },
+
     
         "TransitionDissolve": {
             "translate_type": "Dissolve",
@@ -28,6 +33,7 @@ class TransitionGenerator(BaseSentenceGenerator):
             "format": "@wait {value}",
             "default": "i1",
         },
+        "Printer": {}
     }
 
     @property
@@ -57,20 +63,33 @@ class TransitionGenerator(BaseSentenceGenerator):
         lines = []
 
         transition = self.get_value('Transition', data)
-        time = self.get_sentence('TransitionTime', data, use_default=True)
+        transition_sub = self.get_value('TransitionSub', data)
+
+        if self.exists_param("TransitionTime", data):
+            time = self.get_sentence('TransitionTime', data)
+        elif transition in ["PartTrans", "CharTrans"]:
+            time = " time:0.5"
+        else:
+            time = self.get_sentence('TransitionTime', data, use_default=True)
+
         if self.exists_param("TransitionDissolve", data):
             dissolve = self.get_sentence("TransitionDissolve", data)
         else:
             dissolve = ""
 
+        if not self.exists_param("Printer", data) and transition in ["PartTrans", "NewScene", "CharTrans"] and transition_sub not in ["过渡", "开场"]:
+            lines.append("@hidePrinter wait:true")
+
         lines.append(f"@trans{dissolve}{time}")
 
-        if transition == "PartTransOnly":
+        if transition in ["PartTrans", "CharTrans"]:
+            if transition in ["CharTrans"]:
+                lines.append("    @hideChars")
             return lines
 
         lines.append("    @hideAll")
 
-        if transition == "PartTransNew":
+        if transition in ["NewScene"]:
             return lines
 
         lines.append(self.get_sentence("Transition", data))
@@ -86,3 +105,6 @@ class TransitionGenerator(BaseSentenceGenerator):
 
         return lines
 
+    def can_process(self, data: dict) -> bool:
+        """判断是否可以处理转场参数"""
+        return self.exists_param("Transition", data) and self.get_value("Transition", data) not in ["转场组件"] and self.get_value("TransitionSub", data) not in ["结束"]

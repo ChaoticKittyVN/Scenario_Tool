@@ -29,6 +29,8 @@ class CameraGenerator(BaseSentenceGenerator):
             "format": " time:{value}",
             "default": "0"
             },
+
+        "Transition": {},
     }
 
     @property
@@ -60,18 +62,14 @@ class CameraGenerator(BaseSentenceGenerator):
 
         time = self.get_sentence("CameraTime", data)
 
+        command = ""
+
+        if self.exists_param("Transition", data):
+            command += "    "
+
         if command_type == "重置":
-            lines.append("@trans")
-            lines.append(f"    @camera offset:0,0 zoom:0 rotation:0,0,0{time}")
+            lines.append(f"{command}@camera offset:0,0 zoom:0 rotation:0,0,0{time}")
             return lines
-
-        if command_type == "镜头":
-            command = "@camera"
-        else:
-            command = "    @camera"
-
-        if command_type == "切镜头":
-            lines.append("@trans")
 
         zoom = self.get_sentence("Zoom", data)
 
