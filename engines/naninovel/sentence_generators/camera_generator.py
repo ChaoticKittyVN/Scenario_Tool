@@ -87,3 +87,5 @@ class CameraGenerator(BaseSentenceGenerator):
         lines.append(line)
 
         return lines
+    def can_process(self, data):
+        return self.exists_param("Camera", data)
