@@ -77,8 +77,7 @@ class CharacterGenerator(BaseSentenceGenerator):
         "Xoffset": {},
         "Yoffset": {},
 
-        "AnimationRepeat": {},
-
+        "AnimRepeat": {},
 
         "CharAnimWait": {},
 
@@ -234,25 +233,45 @@ class CharacterGenerator(BaseSentenceGenerator):
                 anim = self.get_value("CharAnimParam", data)
                 if self.exists_param("CharAnim", data):
                     char_anim = self.get_value("CharAnim", data)
-
                     if char_anim == "hideAll":
                         lines.append(f"@stop {anim}")
                 else:
                     char_anim = char
 
-                lines.append(f"@async {anim}")
+                char_anim_pose = self.get_value("CharPose", data) if self.exists_param("CharPose", data) else self.char_pose_cache.get(char_anim, "Middle")
 
-                if self.exists_param("CharPose", data):
-                    char_anim_pose = self.get_value("CharPose", data)
+                x_offset = int(self.get_value("Xoffset", data)) if self.exists_param("Xoffset", data) else self.animation_config[anim]["xoffset"]
+                y_offset = int(self.get_value("Yoffset", data)) if self.exists_param("Yoffset", data) else self.animation_config[anim]["yoffset"]
+
+                positions = self.calculate_animation_positions(char_anim_pose, xoffset=x_offset, yoffset=y_offset)
+
+                repeat_times = int(self.get_value("AnimRepeat", data)) if self.exists_param("AnimRepeat", data) else self.animation_config[anim]["repeat"]
+
+                # 提前构建单次动画的命令列表（避免重复代码）
+                anim_time = self.animation_config[anim].get("default_time", "0.1")
+                single_commands = []
+                for line_template in self.animation_config[anim]["lines"]:
+                    single_commands.append(line_template.format(
+                        char=char_anim,
+                        x=positions['x'], y=positions['y'],
+                        x_plus_offset=positions['x_plus_offset'], x_minus_offset=positions['x_minus_offset'],
+                        y_plus_offset=positions['y_plus_offset'], y_minus_offset=positions['y_minus_offset'],
+                        time=anim_time
+                    ))
+
+                # 添加动画启动命令
+                if repeat_times == -1:
+                    lines.append(f"@async {anim} loop:true")
                 else:
-                    char_anim_pose = self.char_pose_cache.get(char_anim, "Middle")
+                    lines.append(f"@async {anim}")
 
-                positions = self.calculate_animation_positions(char_anim_pose, xoffset=self.animation_config[anim]["xoffset"], yoffset=self.animation_config[anim]["yoffset"])
-
-                for i, line in enumerate(self.animation_config[anim]["lines"]):
-                    anim_time = self.animation_config[anim].get("default_time", "0.1")
-                    line = line.format(char=char_anim, x=positions['x'], y=positions['y'], x_plus_offset=positions['x_plus_offset'], x_minus_offset=positions['x_minus_offset'], y_plus_offset=positions['y_plus_offset'], y_minus_offset=positions['y_minus_offset'], time=anim_time)
-                    lines.append(line)
+                # 添加动画命令组
+                if repeat_times == -1 or repeat_times == 0:
+                    # 播放一次（用于启动无限循环，或者原逻辑处理 0 次的情况）
+                    lines.extend(single_commands)
+                elif repeat_times > 0:
+                    # 重复多次：直接将命令组列表重复 repeat_times 次
+                    lines.extend(single_commands * repeat_times)
 
                 # if "end_line" in self.animation_config[anim]:
                 #     end_line = self.animation_config[anim]["end_line"].format(anim=anim)
@@ -276,19 +295,19 @@ class CharacterGenerator(BaseSentenceGenerator):
     
     def calculate_animation_positions(self, pose, xoffset=0, yoffset=0):
         """
-        计算动画中使用的各种位置（包括正负偏移）
+        计算动画中使用的各种位置（包括正负偏移），使用 round 函数控制小数位数
         """
         # 获取基础位置坐标
         base_pos = self.pose_pos_mapping.get(pose, {"x": 0, "y": 0})
         base_x = base_pos["x"]
         base_y = base_pos["y"]
-        
-        # 计算带正负偏移的位置
-        x_plus_offset = base_x + xoffset
-        x_minus_offset = base_x - xoffset
-        y_plus_offset = base_y + yoffset
-        y_minus_offset = base_y - yoffset
-        
+
+        # 计算带正负偏移的位置，使用 round 限制小数位数到3位
+        x_plus_offset = round(base_x + xoffset, 3)
+        x_minus_offset = round(base_x - xoffset, 3)
+        y_plus_offset = round(base_y + yoffset, 3)
+        y_minus_offset = round(base_y - yoffset, 3)
+
         # 返回包含所有位置的字典
         positions = {
             'x': base_x,
