@@ -14,6 +14,10 @@ class TextGenerator(BaseSentenceGenerator):
             "validate_type": "Name"
         },
         "Text": {},
+        "AsName" : {
+            "format": "[< as:{value}]"
+        },
+
         "Printer": {
             "validate_type": "Printer"
         },
@@ -86,6 +90,14 @@ class TextGenerator(BaseSentenceGenerator):
                     lines.append(f"@goto {text}")
                 else:
                     raise ValueError(f"不支持的特殊说话者：{character_name}。")
+            elif self.exists_param("AsName", data): 
+                if self.get_value("AsName", data) in ["无头像"]:
+                    as_name = self.get_value("AsName", data)
+                    lines.append(f"{as_name}: {text}[< as:{character_name}]")
+                else:
+                    as_name = self.get_sentence("AsName", data)
+                    lines.append(f"{character_name}: {text}{as_name}")
+
             else:
                 # character_name = self.translator.translate("Name", character_name)
                 lines.append(f'{character_name}: {text}')
@@ -93,7 +105,7 @@ class TextGenerator(BaseSentenceGenerator):
             if text:
                 lines.append(text)
 
-        if printer in [WindowMode.HIDE.value, WindowMode.SHOW_AND_HIDE.value]:
+        if printer_state in [WindowMode.HIDE.value, WindowMode.SHOW_AND_HIDE.value]:
             lines.append("@hidePrinter wait:true")
 
         return lines

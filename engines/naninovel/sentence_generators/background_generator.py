@@ -149,7 +149,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
 
             if background:
                 # 添加图层
-                id = self.get_sentence("BackID", data, use_default=True)
+                id = self.get_value("BackID", data, use_default=True)
             else:
                 id = "CG"
 

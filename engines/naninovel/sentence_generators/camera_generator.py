@@ -21,6 +21,11 @@ class CameraGenerator(BaseSentenceGenerator):
             "format": ",{value}"
             },
 
+        "Toggle": {
+            "format": " toggle:{value}",
+            "translate_type": "CameraEffect"
+        },
+
         "CameraWait": {
             "format": " wait:{value}"
             },
@@ -67,8 +72,10 @@ class CameraGenerator(BaseSentenceGenerator):
         if self.exists_param("Transition", data):
             command += "    "
 
+        command += "@camera"
+
         if command_type == "重置":
-            lines.append(f"{command}@camera offset:0,0 zoom:0 rotation:0,0,0{time}")
+            lines.append(f"{command} offset:0,0 zoom:0 rotation:0,0,0{time}")
             return lines
 
         zoom = self.get_sentence("Zoom", data)
@@ -82,7 +89,16 @@ class CameraGenerator(BaseSentenceGenerator):
         
         wait = self.get_sentence("CameraWait", data).lower()
 
-        line = f"{command}{zoom}{offset}{wait}{time}"
+        if self.exists_param("Toggle", data):
+            if self.get_value("Toggle", data) in ["关闭", "off"]:
+                camera_effect = " set:*.false"
+            else:
+                camera_effect = self.get_sentence("Toggle", data)
+        else:
+            camera_effect = ""
+
+
+        line = f"{command}{zoom}{offset}{camera_effect}{wait}{time}"
         
         lines.append(line)
 

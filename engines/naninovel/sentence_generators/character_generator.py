@@ -125,6 +125,16 @@ class CharacterGenerator(BaseSentenceGenerator):
             ],
             "end_line": "@await {anim}"
         },
+        "Move": {
+            "xoffset": 0,
+            "yoffset": 0,
+            "repeat": 1,
+            "default_time": "1.5",
+            "lines": [
+                "    @char {char} position:{x_plus_offset},{y_plus_offset} time:{time}",
+            ],
+            "end_line": "@await {anim}"
+        },
     }
 
     def __init__(self, translator, engine_config):
@@ -217,6 +227,11 @@ class CharacterGenerator(BaseSentenceGenerator):
                 lines.append(f"@trans{time}")
                 lines.append("    @hideChars")
                 lines.append(line)
+            elif "anim" in trans:
+                time = self.get_sentence("Time", data, use_default=True)
+                lines.append(f"@async {trans.split('_')[1]}")
+                lines.append(f"    {line}{time}")
+
             else:
                 time = self.get_sentence("Time", data)
                 lines.append(f"{line}{time}")
@@ -235,47 +250,51 @@ class CharacterGenerator(BaseSentenceGenerator):
                     char_anim = self.get_value("CharAnim", data)
                     if char_anim == "hideAll":
                         lines.append(f"@stop {anim}")
+                    elif char_anim == "await":
+                        lines.append(f"@await {anim}")
+
                 else:
                     char_anim = char
 
-                char_anim_pose = self.get_value("CharPose", data) if self.exists_param("CharPose", data) else self.char_pose_cache.get(char_anim, "Middle")
+                if anim in self.animation_config:
+                    char_anim_pose = self.get_value("CharPose", data) if self.exists_param("CharPose", data) else self.char_pose_cache.get(char_anim, "Middle")
 
-                x_offset = int(self.get_value("Xoffset", data)) if self.exists_param("Xoffset", data) else self.animation_config[anim]["xoffset"]
-                y_offset = int(self.get_value("Yoffset", data)) if self.exists_param("Yoffset", data) else self.animation_config[anim]["yoffset"]
+                    x_offset = int(self.get_value("Xoffset", data)) if self.exists_param("Xoffset", data) else self.animation_config[anim]["xoffset"]
+                    y_offset = int(self.get_value("Yoffset", data)) if self.exists_param("Yoffset", data) else self.animation_config[anim]["yoffset"]
 
-                positions = self.calculate_animation_positions(char_anim_pose, xoffset=x_offset, yoffset=y_offset)
+                    positions = self.calculate_animation_positions(char_anim_pose, xoffset=x_offset, yoffset=y_offset)
 
-                repeat_times = int(self.get_value("AnimRepeat", data)) if self.exists_param("AnimRepeat", data) else self.animation_config[anim]["repeat"]
+                    repeat_times = int(self.get_value("AnimRepeat", data)) if self.exists_param("AnimRepeat", data) else self.animation_config[anim]["repeat"]
 
-                # 提前构建单次动画的命令列表（避免重复代码）
-                anim_time = self.animation_config[anim].get("default_time", "0.1")
-                single_commands = []
-                for line_template in self.animation_config[anim]["lines"]:
-                    single_commands.append(line_template.format(
-                        char=char_anim,
-                        x=positions['x'], y=positions['y'],
-                        x_plus_offset=positions['x_plus_offset'], x_minus_offset=positions['x_minus_offset'],
-                        y_plus_offset=positions['y_plus_offset'], y_minus_offset=positions['y_minus_offset'],
-                        time=anim_time
-                    ))
+                    # 提前构建单次动画的命令列表（避免重复代码）
+                    anim_time = self.animation_config[anim].get("default_time", "0.1")
+                    single_commands = []
+                    for line_template in self.animation_config[anim]["lines"]:
+                        single_commands.append(line_template.format(
+                            char=char_anim,
+                            x=positions['x'], y=positions['y'],
+                            x_plus_offset=positions['x_plus_offset'], x_minus_offset=positions['x_minus_offset'],
+                            y_plus_offset=positions['y_plus_offset'], y_minus_offset=positions['y_minus_offset'],
+                            time=anim_time
+                        ))
 
-                # 添加动画启动命令
-                if repeat_times == -1:
-                    lines.append(f"@async {anim} loop:true")
-                else:
-                    lines.append(f"@async {anim}")
+                    # 添加动画启动命令
+                    if repeat_times == -1:
+                        lines.append(f"@async {anim} loop:true")
+                    else:
+                        lines.append(f"@async {anim}")
 
-                # 添加动画命令组
-                if repeat_times == -1 or repeat_times == 0:
-                    # 播放一次（用于启动无限循环，或者原逻辑处理 0 次的情况）
-                    lines.extend(single_commands)
-                elif repeat_times > 0:
-                    # 重复多次：直接将命令组列表重复 repeat_times 次
-                    lines.extend(single_commands * repeat_times)
+                    # 添加动画命令组
+                    if repeat_times == -1 or repeat_times == 0:
+                        # 播放一次（用于启动无限循环，或者原逻辑处理 0 次的情况）
+                        lines.extend(single_commands)
+                    elif repeat_times > 0:
+                        # 重复多次：直接将命令组列表重复 repeat_times 次
+                        lines.extend(single_commands * repeat_times)
 
-                # if "end_line" in self.animation_config[anim]:
-                #     end_line = self.animation_config[anim]["end_line"].format(anim=anim)
-                #     lines.append(end_line)
+                    # if "end_line" in self.animation_config[anim]:
+                    #     end_line = self.animation_config[anim]["end_line"].format(anim=anim)
+                    #     lines.append(end_line)
     
             else: 
                 char_anim = self.get_value("CharAnim", data)

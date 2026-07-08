@@ -32,6 +32,8 @@ class EffectGenerator(BaseSentenceGenerator):
         "EffectWait": {
             "format": " wait:{value}",
         },
+        "Transition": {},
+        "TransBack": {},
     }
     @property
     def category(self):
