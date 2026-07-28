@@ -56,7 +56,10 @@ class BackgroundGenerator(BaseSentenceGenerator):
         "WithAtr": {
             "format": "({value})"
         },
-        "ATLType": {}
+        "ATLType": {},
+        "TransScene": {},
+        "TransSub": {},
+
     }
 
     @property
@@ -89,6 +92,9 @@ class BackgroundGenerator(BaseSentenceGenerator):
 
             # 构建场景命令
             command = self.get_value("Command", data, use_default=True) + " "
+            if self.get_value("TransScene", data) in ["新场景"]:
+                command = "scene "
+
             image = background or event
 
             # 添加事件属性（差分）
@@ -104,7 +110,7 @@ class BackgroundGenerator(BaseSentenceGenerator):
 
             # 添加过渡效果
             transition = self.get_value("With", data)
-            if transition != "empty":
+            if transition != "empty" and not self.exists_param("TransScene", data):
                 transition = self.get_sentence("With", data, use_default=True)
                 with_atr = self.get_sentence("WithAtr", data, use_default=True)
                 if with_atr:
@@ -117,6 +123,9 @@ class BackgroundGenerator(BaseSentenceGenerator):
 
             if self.exists_param("ATLType", data):
                 line = f"{line}:"
+
+            if self.exists_param("TransScene", data) and self.get_value("TransSub", data) not in ["结束", "过渡", "开场"]:
+                lines.append("window hide")
 
             lines.append(line)
 

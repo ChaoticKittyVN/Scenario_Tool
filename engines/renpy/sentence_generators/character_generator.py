@@ -62,6 +62,7 @@ class CharacterGenerator(BaseSentenceGenerator):
             "format": "({value})",
         },
         "SpriteATLType": {},
+        "TransScene": {},
     }
 
     @property
@@ -116,7 +117,7 @@ class CharacterGenerator(BaseSentenceGenerator):
 
             # 添加过渡效果
             transition = self.get_value("SpriteWith", data, use_default=True)
-            if transition != "empty":
+            if transition != "empty" and not self.exists_param("TransScene", data):
                 transition = self.get_sentence("SpriteWith", data, use_default=True)
                 with_atr = self.get_sentence("SpriteWithAtr", data)
                 if with_atr:

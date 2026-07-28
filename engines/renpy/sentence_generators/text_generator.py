@@ -17,6 +17,8 @@ class TextGenerator(BaseSentenceGenerator):
             "translate_type": "Name",
         },
         "Text": {},
+        "TransScene": {},
+        "TransSub": {},
     }
 
     SPECIAL_NAME_VALUES = {member.value for member in SpecialName}
@@ -47,10 +49,13 @@ class TextGenerator(BaseSentenceGenerator):
         text = self.get_value("Text", data)
         window = self.get_value("Window", data)
 
+        trans = self.get_value("TransScene", data)
+        trans_sub = self.get_value("TransSub", data)
+
         lines = []
 
         # 处理窗口显示
-        if window in [WindowMode.SHOW.value, WindowMode.SHOW_AND_HIDE.value]:
+        if window in [WindowMode.SHOW.value, WindowMode.SHOW_AND_HIDE.value] or (trans in ["新场景", "局部转场"] and trans_sub not in ["开始", "过渡", "开场"]):
             lines.append("window show")
 
         # 处理对话文本
