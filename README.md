@@ -1,19 +1,18 @@
-# Scenario Tool version 0.7.0（测试版本）
+# Scenario Tool 0.9.1
 
-视觉小说脚本生成工具，支持从 Excel 表格生成 Ren'Py 和 Naninovel 引擎脚本。
+视觉小说脚本生成工具，支持从 Excel 表格生成 Ren'Py、Naninovel 和 Utage 引擎脚本。
 
 ---
 
 ## ✨ 核心特性
 
-- 🎮 **多引擎支持** - 支持 Ren'Py 和 Naninovel 引擎
+- 🎮 **多引擎支持** - 支持 Ren'Py、Naninovel 和 Utage 引擎
 - 📊 **Excel 驱动** - 使用熟悉的 Excel 编写脚本
 - 🎨 **GUI 界面** - 提供友好的图形界面
 - 🔧 **参数映射** - 灵活的参数翻译系统
 - 📦 **资源管理** - 自动验证和同步资源文件
 - ⚠️ **类型安全** - 避免类型错误
-- 🔨 **模块化架构** - 轻松调用（至少目标是这样（AI让我加这条的））
-- 🧪 **高测试覆盖率** - 92% 测试覆盖率（250 个测试）
+- 🔨 **模块化架构** - 按核心处理、引擎实现和辅助工具拆分，便于扩展与维护
 
 ---
 
@@ -78,7 +77,7 @@ py generate_scenario.py
 scenario_tool/
 ├── core/           # 核心框架
 │   └── excel_management       # Excel表格操作类
-├── engines/        # 引擎实现（Ren'Py, Naninovel）
+├── engines/        # 引擎实现（Ren'Py、Naninovel、Utage）
 ├── gui/            # GUI 界面
 ├── tests/          # 测试代码
 ├── docs/           # 文档
@@ -101,40 +100,112 @@ graph LR
     F[从output文件夹中获取需要的脚本文件]
 ```
 
+---
 
-## 🧪 测试指南（v0.7.0测试版）
+## 🧰 附加功能
 
-作为测试用户，我们希望你重点关注：
+除基础的演出脚本生成外，项目还提供以下可直接执行的 Python 工具。所有命令均应在项目根目录运行。
 
-✅ **测试重点**：
+### 自动整理 Index
+
+按照有效文本行预览并重新填写连续的 `Index` 序号：
+
+```bash
+# 先预览，不修改文件
+python fill_scenario_index.py --input ./input --dry-run
+
+# 确认预览结果后正式执行
+python fill_scenario_index.py --input ./input
+```
+
+正式执行会原地修改 Excel 文件。当前脚本不支持 `--run` 参数。
+
+### 智能参数填充
+
+根据 YAML 规则填充默认值、继承上下文或生成规则化参数：
+
+```bash
+# 使用模块入口，并先进行干跑预览
+python -m tools.smart_fill --config ./config/filling_rules.yaml --input-dir ./input --dry-run
+```
+
+正式执行前应先确认规则文件可以被 YAML 正确解析，并检查干跑结果。
+
+### 配音、翻译与审查导出
+
+```bash
+# 导出配音台本；当前版本建议显式指定实际列名进行排序
+python export_dubbing_script.py --sort Name Idx
+
+# 合并导出翻译表格
+python export_translation_script.py --merge
+
+# 导出供人工或 AI 审查的纯文本
+python export_script_review.py
+```
+
+默认输出目录分别为：
+
+- `output/dialogue_exports/`
+- `output/translation_exports/`
+- `output/script_review/`
+
+### 文本与语音改动同步
+
+将审查表格中的文本或语音文件名回写到原始演出表格：
+
+```bash
+# 文本改动预览
+python sync_changes.py --input ./input --changes ./input/sync/review.xlsx --dry-run
+
+# 语音改动预览
+python sync_voice_changes.py --input ./input --changes ./input/sync/voice.xlsx --dry-run
+```
+
+同步工具正式运行时会原地修改 Excel 文件。导出表用于同步前，需要将定位列整理为 `ExcelFilename`、`SheetName` 和 `Index`。
+
+### 资源验证与同步
+
+```bash
+# 检查演出表格引用的资源是否存在
+python validate_resources.py
+
+# 根据验证报告同步缺失资源
+python sync_resources.py
+```
+
+验证报告保存在 `output/validation_reports/`。资源同步为交互式操作，建议先选择干跑模式预览复制计划。
+
+### 语音测试脚本生成
+
+从配音台本生成仅包含语音相关内容的测试脚本：
+
+```bash
+python -m tools.voice_only_script_generate --input ./input/voice --output ./output/voice_test
+```
+
+配音台本通常需要包含 `Name`、`Text`、`Voice` 和 `Index` 列。
+
+---
+
+## 📝 反馈与已知限制
+
+使用过程中可以重点反馈：
+
 - 工具上手难度
 - 工具使用的效率提升
 - 需要优化的不便之处
 
-📝 **反馈方式**：
+**反馈方式**：
 1. 前往issues页面提出反馈
 2. 描述问题出现的情况
 3. 提供示例文件（如可能）
 4. 截图错误信息
 
-⚠️ **已知限制**：
+**已知限制**：
 - 不支持Excel合并单元格
 - 暂不支持.xlsm格式（宏文件）
 - 工作表名称不能包含特殊字符 `: \ / ? * [ ]`
-
-
-## 📊 测试覆盖率
-
-✅ **当前覆盖率：92%**（250 个测试）
-
-核心模块 100% 覆盖：
-- `core/config_manager.py`
-- `core/constants.py`
-- `core/engine_processor.py`
-- `core/engine_registry.py`
-- `core/exceptions.py`
-
-详见 [测试指南](docs/markdown/testing.md)
 
 ---
 
@@ -203,4 +274,4 @@ pytest tests/ -v
 
 ---
 
-**最后更新**: 2025-12-03
+**最后更新**: 2026-08-05
