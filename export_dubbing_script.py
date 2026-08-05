@@ -7,6 +7,8 @@ from pathlib import Path
 import re
 from typing import List, Optional
 import pandas as pd
+from openpyxl.styles import Alignment
+from openpyxl.utils import get_column_letter
 
 from core.config_manager import AppConfig
 from core.logger import get_logger
@@ -180,13 +182,13 @@ class DialogueExporter:
                 voice_file_name = self.voice_filename_cache[cache_key]
 
                 all_rows.append({
-                    "Excel文件名": file_path.stem,
-                    "工作表名": sheet_name,
-                    "文本行号": index,
-                    "行号": idx + 2,
-                    "语音文件名": voice_file_name,
-                    "角色": str(speaker).strip(),
-                    "文本": str(text).strip()
+                    "Filename": file_path.stem,
+                    "Sheet": sheet_name,
+                    "Index": index,
+                    "Idx": idx + 2,
+                    "Voice": voice_file_name,
+                    "Name": str(speaker).strip(),
+                    "Text": str(text).strip()
                 })
 
         df_result = pd.DataFrame(all_rows)
@@ -220,7 +222,7 @@ class DialogueExporter:
             combined_df = combined_df.sort_values(by=self.sort_by)
 
             # 按角色分组
-            for role, group_df in combined_df.groupby("角色"):
+            for role, group_df in combined_df.groupby("Name"):
                 # 如果指定了角色列表且当前角色不在其中，则跳过
                 if self.selected_characters and role not in self.selected_characters:
                     continue
@@ -256,11 +258,49 @@ class DialogueExporter:
                 base_name = f.stem + "_配音台本"
                 self._save_dataframe(df, self.output_dir / base_name)
 
+    # 各列预设宽度（可根据实际需要调整）
+    COLUMN_WIDTHS = {
+        "Filename": 20,
+        "Sheet": 12,
+        "Index": 10,
+        "Idx": 8,
+        "Voice": 30,
+        "Name": 14,
+        "Text": 60,
+    }
+
     def _save_dataframe(self, df: pd.DataFrame, base_path: Path):
         """保存DataFrame为指定格式"""
         if self.output_format == "excel":
             output_path = base_path.with_suffix(".xlsx")
-            df.to_excel(output_path, index=False)
+            with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, sheet_name="Sheet1")
+                ws = writer.sheets["Sheet1"]
+
+                # 设置列宽和居中对齐
+                center_align = Alignment(horizontal="center", vertical="center")
+                for col_idx, col_name in enumerate(df.columns, start=1):
+                    col_letter = get_column_letter(col_idx)
+
+                    # 列宽：优先使用预设宽度，否则根据内容自适应
+                    if col_name in self.COLUMN_WIDTHS:
+                        ws.column_dimensions[col_letter].width = self.COLUMN_WIDTHS[col_name]
+                    else:
+                        # 自适应宽度：取列名和内容最大长度 + 2
+                        max_len = max(
+                            df[col_name].astype(str).map(len, na_action="ignore").max(),
+                            len(str(col_name))
+                        )
+                        ws.column_dimensions[col_letter].width = min(max_len + 2, 80)
+
+                    # 对所有单元格（包括表头）设置居中
+                    for row in ws.iter_rows(
+                        min_col=col_idx, max_col=col_idx,
+                        min_row=1, max_row=ws.max_row
+                    ):
+                        for cell in row:
+                            cell.alignment = center_align
+
         elif self.output_format == "csv":
             output_path = base_path.with_suffix(".csv")
             df.to_csv(output_path, index=False, encoding="utf-8-sig")
@@ -301,10 +341,10 @@ class DialogueExporter:
         result_rows = []
         
         for idx, row in dialogue_df.iterrows():
-            speaker = row.get("角色", "")
-            text = row.get("文本", "")
-            voice_file = row.get("语音文件名", "")
-            line_index = row.get("文本行号", "")
+            speaker = row.get("Name", "")
+            text = row.get("Text", "")
+            voice_file = row.get("Voice", "")
+            line_index = row.get("Index", "")
             
             # 构建新的文本（如果需要添加语音文件名和行号前缀）
             new_text = text
@@ -359,7 +399,7 @@ def convert_dialogue_to_performance(
         df = pd.read_csv(input_path, encoding="utf-8-sig")
     
     # 检查必需的列
-    required_cols = ["角色", "文本", "语音文件名"]
+    required_cols = ["Name", "Text", "Voice"]
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
         logger.error(f"缺少必需的列：{missing_cols}")
