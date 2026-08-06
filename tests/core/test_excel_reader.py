@@ -8,7 +8,11 @@ import pandas as pd
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from core.excel_management import ExcelFileManager, DataFrameProcessor
+from core.excel_management import (
+    DataFrameProcessor,
+    ExcelFileManager,
+    ExcelFileNotFoundError,
+)
 from core.config_manager import AppConfig
 
 
@@ -21,7 +25,7 @@ class TestExcelFileManager:
         
     def test_load_excel_file_not_found(self):
         """测试文件不存在的情况"""
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(ExcelFileNotFoundError):
             self.manager.load_excel(Path("nonexistent_file.xlsx"))
     
     def test_get_sheet_names(self, sample_excel_file):

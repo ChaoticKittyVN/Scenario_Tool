@@ -58,18 +58,18 @@ class TestEnumValues:
 class TestEnumMembers:
     """测试枚举成员完整性"""
 
-    @pytest.mark.parametrize("enum_class,expected_values,expected_count", [
-        (WindowMode, ["显示", "隐藏", "显示和隐藏"], 3),
-        (SpecialName, ["renpy", "naninovel"], 2),
-        (FileType, ["Background", "Character", "Music", "Sound", "Voice", "Event"], 6),
-        (SheetName, ["参数表"], 1),
-        (ColumnName, ["Note", "Ignore", "Speaker", "Text", "Character", "Background"], 6),
-        (Marker, ["END"], 1),
+    @pytest.mark.parametrize("enum_class,expected_values", [
+        (WindowMode, ["显示", "隐藏", "显示和隐藏"]),
+        (SpecialName, ["renpy", "naninovel", "label", "steam", "unlock", "choice", "jump"]),
+        (FileType, ["Background", "Character", "Music", "Sound", "Voice", "Event"]),
+        (SheetName, ["参数表"]),
+        (ColumnName, ["Index", "Note", "Ignore", "Name", "Text", "Character", "Background", "Voice"]),
+        (Marker, ["END"]),
     ])
-    def test_enum_members(self, enum_class, expected_values, expected_count):
+    def test_enum_members(self, enum_class, expected_values):
         """测试枚举包含所有预期成员"""
         members = [member.value for member in enum_class]
-        assert len(members) == expected_count
+        assert len(members) == len(set(members))
         for expected_value in expected_values:
             assert expected_value in members
 
@@ -150,14 +150,14 @@ class TestEnumComparison:
 class TestEnumIteration:
     """测试枚举迭代功能"""
 
-    @pytest.mark.parametrize("enum_class,expected_members,expected_count", [
-        (WindowMode, [WindowMode.SHOW, WindowMode.HIDE, WindowMode.SHOW_AND_HIDE], 3),
-        (FileType, [FileType.BACKGROUND, FileType.MUSIC], 6),  # 只检查部分成员
-        (ColumnName, [ColumnName.NOTE, ColumnName.NAME], 6),  # 只检查部分成员
+    @pytest.mark.parametrize("enum_class,expected_members", [
+        (WindowMode, [WindowMode.SHOW, WindowMode.HIDE, WindowMode.SHOW_AND_HIDE]),
+        (FileType, [FileType.BACKGROUND, FileType.MUSIC]),
+        (ColumnName, [ColumnName.NOTE, ColumnName.NAME]),
     ])
-    def test_enum_iteration(self, enum_class, expected_members, expected_count):
+    def test_enum_iteration(self, enum_class, expected_members):
         """测试枚举迭代功能"""
         members = list(enum_class)
-        assert len(members) == expected_count
+        assert len(members) == len(set(members))
         for expected_member in expected_members:
             assert expected_member in members

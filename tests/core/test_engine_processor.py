@@ -338,6 +338,13 @@ class TestProcessRow:
         assert "play sound sfx_door" in results
         assert len(results) == 2
 
+    def test_empty_value_detection_preserves_spaces(self):
+        assert EngineProcessor._is_empty_value(None) is True
+        assert EngineProcessor._is_empty_value("") is True
+        assert EngineProcessor._is_empty_value(float("nan")) is True
+        assert EngineProcessor._is_empty_value(pd.NA) is True
+        assert EngineProcessor._is_empty_value("   ") is False
+
     def test_process_row_with_no_matching_params(self, processor_with_generators):
         """测试处理没有匹配参数的行"""
         row_data = pd.Series({

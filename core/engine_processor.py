@@ -55,6 +55,32 @@ class EngineProcessor:
 
         logger.info(f"引擎处理器初始化: {engine_type}")
 
+    @staticmethod
+    def _is_empty_value(value: Any) -> bool:
+        """识别缺失值；纯空格字符串仍视为有效参数。"""
+        if value is None:
+            return True
+        if isinstance(value, str) and value == "":
+            return True
+        try:
+            missing = pd.isna(value)
+            return bool(missing)
+        except (TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _run_generator(generator, params: Dict[str, Any]) -> list:
+        """执行单个生成器，并隔离该生成器自身的异常。"""
+        try:
+            commands = generator.process(params)
+            return list(commands) if commands else []
+        except Exception as exc:
+            logger.error(
+                f"生成器 {generator.__class__.__name__} 处理失败: {exc}",
+                exc_info=True,
+            )
+            return []
+
     def setup(self):
         """设置处理器，初始化生成器和参数提取器"""
 
@@ -120,7 +146,10 @@ class EngineProcessor:
                 # 检查生成器的参数配置
                 if hasattr(generator, 'param_config'):
                     for param_name in generator.param_config.keys():
-                        if param_name in row_dict and row_dict[param_name] not in (None, ""):
+                        if (
+                            param_name in row_dict
+                            and not self._is_empty_value(row_dict[param_name])
+                        ):
                             return True
 
         return False
@@ -170,12 +199,13 @@ class EngineProcessor:
             return self.process_row(row_data)
         
         # 1. 处理独占模式生成器（接收所有参数）
-        exclusive_params = {k: v for k, v in row_dict.items() 
-                        if v not in (None, "")}
+        exclusive_params = {
+            key: value
+            for key, value in row_dict.items()
+            if not self._is_empty_value(value)
+        }
         if exclusive_params:
-            commands = exclusive_generator.process(exclusive_params)
-            if commands:
-                results.extend(commands)
+            results.extend(self._run_generator(exclusive_generator, exclusive_params))
         
         # 2. 处理允许与独占模式生成器一起处理的生成器
         for generator, needed_params in self.generator_param_map.items():
@@ -190,21 +220,22 @@ class EngineProcessor:
             # 提取该生成器需要的参数
             if needed_params is None:
                 # 接收所有参数的生成器
-                generator_params = {k: v for k, v in row_dict.items() 
-                                if v not in (None, "")}
+                generator_params = {
+                    key: value
+                    for key, value in row_dict.items()
+                    if not self._is_empty_value(value)
+                }
             else:
                 # 只提取需要的参数
                 generator_params = {}
                 for param_name in needed_params:
                     if param_name in row_dict:
                         value = row_dict[param_name]
-                        if value not in (None, ""):
+                        if not self._is_empty_value(value):
                             generator_params[param_name] = value
             
             if generator_params:
-                commands = generator.process(generator_params)
-                if commands:
-                    results.extend(commands)
+                results.extend(self._run_generator(generator, generator_params))
         
         return results
 
@@ -231,12 +262,13 @@ class EngineProcessor:
             # 处理接收所有参数的生成器（如Macro生成器）
             if needed_params is None:
                 # 接收所有非空参数
-                generator_params = {k: v for k, v in row_dict.items() 
-                                if v not in (None, "")}
+                generator_params = {
+                    key: value
+                    for key, value in row_dict.items()
+                    if not self._is_empty_value(value)
+                }
                 if generator_params:
-                    commands = generator.process(generator_params)
-                    if commands:
-                        results.extend(commands)
+                    results.extend(self._run_generator(generator, generator_params))
                 continue
             
             # 快速检查：这个generator需要的参数是否存在于行数据中
@@ -248,13 +280,11 @@ class EngineProcessor:
             for param_name in needed_params:
                 if param_name in row_dict:
                     value = row_dict[param_name]
-                    if value not in (None, ""):
+                    if not self._is_empty_value(value):
                         generator_params[param_name] = value
             
             if generator_params:
-                commands = generator.process(generator_params)
-                if commands:
-                    results.extend(commands)
+                results.extend(self._run_generator(generator, generator_params))
 
         return results
 
@@ -272,7 +302,7 @@ class EngineProcessor:
             return False
         
         row_dict = row_data.to_dict()
-        return "Macro" in row_dict and row_dict.get("Macro") not in (None, "")
+        return "Macro" in row_dict and not self._is_empty_value(row_dict.get("Macro"))
 
     def _find_macro_generator(self):
         """
@@ -319,12 +349,13 @@ class EngineProcessor:
             return self.process_row(row_data)
         
         # 1. 处理Macro生成器（接收所有参数）
-        macro_params = {k: v for k, v in row_dict.items() 
-                       if v not in (None, "")}
+        macro_params = {
+            key: value
+            for key, value in row_dict.items()
+            if not self._is_empty_value(value)
+        }
         if macro_params:
-            commands = macro_generator.process(macro_params)
-            if commands:
-                results.extend(commands)
+            results.extend(self._run_generator(macro_generator, macro_params))
         
         # 2. 处理允许与Macro一起处理的生成器
         for generator, needed_params in self.generator_param_map.items():
@@ -339,21 +370,22 @@ class EngineProcessor:
             # 提取该生成器需要的参数
             if needed_params is None:
                 # 接收所有参数的生成器
-                generator_params = {k: v for k, v in row_dict.items() 
-                                  if v not in (None, "")}
+                generator_params = {
+                    key: value
+                    for key, value in row_dict.items()
+                    if not self._is_empty_value(value)
+                }
             else:
                 # 只提取需要的参数
                 generator_params = {}
                 for param_name in needed_params:
                     if param_name in row_dict:
                         value = row_dict[param_name]
-                        if value not in (None, ""):
+                        if not self._is_empty_value(value):
                             generator_params[param_name] = value
             
             if generator_params:
-                commands = generator.process(generator_params)
-                if commands:
-                    results.extend(commands)
+                results.extend(self._run_generator(generator, generator_params))
         
         return results
 
