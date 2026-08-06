@@ -79,6 +79,8 @@ class CharacterGenerator(BaseSentenceGenerator):
 
         "AnimRepeat": {},
 
+        "AnimTime": {},
+
         "CharAnimWait": {},
 
         "Transition": {},
@@ -267,7 +269,7 @@ class CharacterGenerator(BaseSentenceGenerator):
                     repeat_times = int(self.get_value("AnimRepeat", data)) if self.exists_param("AnimRepeat", data) else self.animation_config[anim]["repeat"]
 
                     # 提前构建单次动画的命令列表（避免重复代码）
-                    anim_time = self.animation_config[anim].get("default_time", "0.1")
+                    anim_time = self.get_value("AnimTime", data) if self.exists_param("AnimTime", data) else self.animation_config[anim].get("default_time", "0.1")
                     single_commands = []
                     for line_template in self.animation_config[anim]["lines"]:
                         single_commands.append(line_template.format(

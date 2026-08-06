@@ -21,7 +21,7 @@ class CameraGenerator(BaseSentenceGenerator):
             "format": ",{value}"
             },
 
-        "Toggle": {
+        "CameraEffect": {
             "format": " toggle:{value}",
             "translate_type": "CameraEffect"
         },
@@ -89,11 +89,11 @@ class CameraGenerator(BaseSentenceGenerator):
         
         wait = self.get_sentence("CameraWait", data).lower()
 
-        if self.exists_param("Toggle", data):
-            if self.get_value("Toggle", data) in ["关闭", "off"]:
+        if self.exists_param("CameraEffect", data):
+            if self.get_value("CameraEffect", data) in ["关闭", "off"]:
                 camera_effect = " set:*.false"
             else:
-                camera_effect = self.get_sentence("Toggle", data)
+                camera_effect = self.get_sentence("CameraEffect", data)
         else:
             camera_effect = ""
 
@@ -104,4 +104,4 @@ class CameraGenerator(BaseSentenceGenerator):
 
         return lines
     def can_process(self, data):
-        return self.exists_param("Camera", data)
+        return self.exists_param("Camera", data) or self.exists_param("CameraEffect", data)

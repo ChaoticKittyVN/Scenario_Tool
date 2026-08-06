@@ -43,7 +43,7 @@ class PauseGenerator(BaseSentenceGenerator):
 
         trans_pause = self.get_value("TransPause", data)
 
-        if trans_pause:
+        if trans_pause and trans_pause != "0":
             lines.append(f"pause {trans_pause}")
         elif trans_sub not in ["开始"]:
             if trans in ["局部转场", "立绘转场"]:

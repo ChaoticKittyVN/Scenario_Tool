@@ -86,6 +86,9 @@ class BackgroundGenerator(BaseSentenceGenerator):
         data = self.do_translate(data)
         lines = []
 
+        if self.get_value("TransScene", data) not in ["转场组件", "转黑", "转白"] and self.get_value("TransSub", data) not in ["结束", "过渡", "开场"]:
+            lines.append("window hide")
+
         if self.exists_param("Background", data) or self.exists_param("Event", data):
             background = self.get_value("Background", data)
             event = self.get_value("Event", data)
@@ -123,9 +126,6 @@ class BackgroundGenerator(BaseSentenceGenerator):
 
             if self.exists_param("ATLType", data):
                 line = f"{line}:"
-
-            if self.exists_param("TransScene", data) and self.get_value("TransSub", data) not in ["结束", "过渡", "开场"]:
-                lines.append("window hide")
 
             lines.append(line)
 
