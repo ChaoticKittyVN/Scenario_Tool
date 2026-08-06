@@ -1,202 +1,252 @@
-"""
-GUI 样式定义
-"""
+"""System-aware GUI theme construction."""
 
-MODERN_STYLE = """
-/* 全局样式 */
-QMainWindow {
-    background-color: #f5f5f5;
+from __future__ import annotations
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPalette
+from PySide6.QtWidgets import QApplication
+
+
+LIGHT_COLORS = {
+    "window": "#f4f5f7",
+    "surface": "#ffffff",
+    "surface_alt": "#f7f8fa",
+    "text": "#202124",
+    "muted": "#68707a",
+    "border": "#d7dbe0",
+    "primary": "#276ef1",
+    "primary_hover": "#1f5ccc",
+    "primary_pressed": "#1749a8",
+    "selection": "#e8f0fe",
+    "selection_text": "#174ea6",
+    "secondary": "#eef0f3",
+    "secondary_hover": "#e1e4e8",
+    "disabled": "#dfe2e6",
+    "disabled_text": "#8a9099",
+    "success": "#238636",
+    "success_bg": "#e6f4ea",
+    "success_border": "#b7dfc5",
 }
 
-/* 标签页样式 */
-QTabWidget::pane {
-    border: 1px solid #dcdcdc;
-    background-color: white;
+DARK_COLORS = {
+    "window": "#17191c",
+    "surface": "#202328",
+    "surface_alt": "#181b1f",
+    "text": "#eef0f3",
+    "muted": "#a8adb5",
+    "border": "#3a3f46",
+    "primary": "#5b8def",
+    "primary_hover": "#78a2f2",
+    "primary_pressed": "#3f70cf",
+    "selection": "#263b64",
+    "selection_text": "#d6e4ff",
+    "secondary": "#2a2e34",
+    "secondary_hover": "#353a42",
+    "disabled": "#30343a",
+    "disabled_text": "#767d87",
+    "success": "#7ee787",
+    "success_bg": "#173d25",
+    "success_border": "#2f6b42",
+}
+
+
+def build_style(dark: bool) -> str:
+    colors = DARK_COLORS if dark else LIGHT_COLORS
+    return f"""
+QMainWindow, QWidget {{
+    color: {colors['text']};
+    background-color: {colors['window']};
+}}
+
+QTabWidget::pane {{
+    border: 1px solid {colors['border']};
+    background-color: {colors['surface']};
     border-radius: 4px;
-}
+}}
 
-QTabBar::tab {
-    background-color: #e8e8e8;
-    color: #333;
+QTabBar::tab {{
+    color: {colors['muted']};
+    background-color: {colors['secondary']};
+    border: 1px solid {colors['border']};
+    border-bottom: none;
     padding: 8px 20px;
     margin-right: 2px;
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
-}
+}}
 
-QTabBar::tab:selected {
-    background-color: white;
-    color: #2196F3;
+QTabBar::tab:selected {{
+    color: {colors['primary']};
+    background-color: {colors['surface']};
     font-weight: bold;
-}
+}}
 
-QTabBar::tab:hover {
-    background-color: #f0f0f0;
-}
+QTabBar::tab:hover {{
+    background-color: {colors['secondary_hover']};
+}}
 
-/* 分组框样式 */
-QGroupBox {
+QGroupBox {{
+    color: {colors['text']};
     font-weight: bold;
-    border: 1px solid #dcdcdc;
+    border: 1px solid {colors['border']};
     border-radius: 6px;
     margin-top: 12px;
     padding-top: 10px;
-    background-color: white;
-}
+    background-color: {colors['surface']};
+}}
 
-QGroupBox::title {
-    color: black;
+QGroupBox::title {{
+    color: {colors['primary']};
     subcontrol-origin: margin;
     subcontrol-position: top left;
     padding: 0 8px;
-    color: #2196F3;
-}
+}}
 
-/* 按钮样式 */
-QPushButton {
-    background-color: #2196F3;
-    color: white;
-    border: none;
+QPushButton {{
+    color: #ffffff;
+    background-color: {colors['primary']};
+    border: 1px solid {colors['primary']};
     border-radius: 4px;
     padding: 8px 16px;
     font-weight: bold;
-}
+}}
 
-QPushButton:hover {
-    background-color: #1976D2;
-}
+QPushButton:hover {{ background-color: {colors['primary_hover']}; }}
+QPushButton:pressed {{ background-color: {colors['primary_pressed']}; }}
+QPushButton:disabled {{
+    color: {colors['disabled_text']};
+    background-color: {colors['disabled']};
+    border-color: {colors['disabled']};
+}}
 
-QPushButton:pressed {
-    background-color: #0D47A1;
-}
+QPushButton#iconButton,
+QPushButton#secondaryButton {{
+    color: {colors['text']};
+    background-color: {colors['secondary']};
+    border-color: {colors['border']};
+}}
 
-QPushButton:disabled {
-    background-color: #BDBDBD;
-    color: #757575;
-}
+QPushButton#iconButton:hover,
+QPushButton#secondaryButton:hover {{
+    background-color: {colors['secondary_hover']};
+}}
 
-/* 小按钮（浏览、恢复默认） */
-QPushButton[objectName*="btn"]:!pressed {
-    background-color: #757575;
-}
-
-QPushButton[objectName*="btn"]:hover {
-    background-color: #616161;
-}
-
-QPushButton[objectName*="reset"] {
-    background-color: #FF9800;
-}
-
-QPushButton[objectName*="reset"]:hover {
-    background-color: #F57C00;
-}
-
-/* 输入框样式 */
-QLineEdit {
-    color: black;
-    border: 1px solid #dcdcdc;
+QLineEdit, QComboBox, QSpinBox {{
+    color: {colors['text']};
+    background-color: {colors['surface']};
+    border: 1px solid {colors['border']};
     border-radius: 4px;
     padding: 6px 10px;
-    background-color: white;
-}
+    selection-background-color: {colors['selection']};
+    selection-color: {colors['selection_text']};
+}}
 
-QLineEdit:focus {
-    color: black;
-    border: 2px solid #2196F3;
-}
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{
+    border: 2px solid {colors['primary']};
+}}
 
-QLineEdit:disabled {
-    color: black;
-    background-color: #f5f5f5;
-    color: #9e9e9e;
-}
+QLineEdit:disabled, QComboBox:disabled {{
+    color: {colors['disabled_text']};
+    background-color: {colors['disabled']};
+}}
 
-/* 下拉框样式 */
-QComboBox {
-    color: black;
-    border: 1px solid #dcdcdc;
-    border-radius: 4px;
-    padding: 6px 10px;
-    background-color: white;
-}
-
-QComboBox:focus {
-    color: black;
-    border: 2px solid #2196F3;
-}
-
-QComboBox QAbstractItemView {
-    color: black;
-    border: 1px solid #dcdcdc;
-    background-color: white;
-    selection-background-color: #E3F2FD;
-    selection-color: #1976D2;
+QComboBox QAbstractItemView {{
+    color: {colors['text']};
+    background-color: {colors['surface']};
+    border: 1px solid {colors['border']};
+    selection-background-color: {colors['selection']};
+    selection-color: {colors['selection_text']};
     outline: 0;
-}
+}}
 
-QComboBox QAbstractItemView::item {
-    padding: 6px 10px;
-}
+QComboBox QAbstractItemView::item {{ padding: 6px 10px; }}
 
-QComboBox QAbstractItemView::item:selected {
-    background-color: #E3F2FD;
-    color: #1976D2;
-    outline: 0;
-}
-
-/* 复选框样式 */
-QCheckBox {
-    color: black;
+QCheckBox {{
+    color: {colors['text']};
     spacing: 8px;
-}
+    background-color: transparent;
+}}
 
-QCheckBox::indicator {
-    width: 18px;
-    height: 18px;
-    border: 2px solid #dcdcdc;
-    border-radius: 3px;
-    background-color: white;
-}
-
-QCheckBox::indicator:checked {
-    background-color: #2196F3;
-    border-color: #2196F3;
-    image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOSIgdmlld0JveD0iMCAwIDEyIDkiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgNEw0LjUgNy41TDExIDEiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
-}
-
-/* 文本编辑框（日志）样式 */
-QTextEdit {
-    color: black;
-    border: 1px solid #dcdcdc;
+QTextEdit, QPlainTextEdit, QTextBrowser, QListWidget {{
+    color: {colors['text']};
+    background-color: {colors['surface_alt']};
+    border: 1px solid {colors['border']};
     border-radius: 4px;
-    background-color: #fafafa;
-    font-family: "Consolas", "Monaco", monospace;
-    font-size: 9pt;
-}
+    selection-background-color: {colors['selection']};
+    selection-color: {colors['selection_text']};
+}}
 
-/* 进度条样式 */
-QProgressBar {
-    border: 1px solid #dcdcdc;
+QTextEdit, QPlainTextEdit, QTextBrowser {{
+    font-family: "Consolas", "Microsoft YaHei UI", monospace;
+    font-size: 9pt;
+}}
+
+QListWidget {{
+    background-color: {colors['surface']};
+    padding: 4px;
+}}
+
+QListWidget::item {{ min-height: 28px; padding: 5px 8px; }}
+QListWidget::item:selected {{
+    color: {colors['selection_text']};
+    background-color: {colors['selection']};
+    border-radius: 3px;
+}}
+
+QScrollArea, QScrollArea > QWidget > QWidget,
+QWidget#toolPanel, QWidget#argumentContainer {{
+    color: {colors['text']};
+    background-color: {colors['surface']};
+}}
+
+QScrollArea {{
+    border: 1px solid {colors['border']};
+    border-radius: 4px;
+}}
+
+QProgressBar {{
+    color: {colors['text']};
+    border: 1px solid {colors['border']};
     border-radius: 4px;
     text-align: center;
-    background-color: #f5f5f5;
-}
+    background-color: {colors['surface_alt']};
+}}
 
-QProgressBar::chunk {
-    background-color: #4CAF50;
-    border-radius: 3px;
-}
+QProgressBar::chunk {{ background-color: {colors['success']}; border-radius: 3px; }}
+QLabel {{ color: {colors['text']}; background-color: transparent; }}
+QLabel#pageTitle {{ color: {colors['text']}; font-size: 16pt; font-weight: bold; }}
+QLabel#sectionTitle {{ color: {colors['text']}; font-size: 11pt; font-weight: bold; }}
+QLabel#mutedLabel {{ color: {colors['muted']}; }}
+QLabel#statusBadge {{
+    color: {colors['success']};
+    background-color: {colors['success_bg']};
+    border: 1px solid {colors['success_border']};
+    border-radius: 4px;
+    padding: 3px 7px;
+}}
 
-/* 标签样式 */
-QLabel {
-    color: #424242;
-}
-
-/* 状态栏样式 */
-QStatusBar {
-    background-color: #f5f5f5;
-    color: #616161;
-    border-top: 1px solid #dcdcdc;
-}
+QStatusBar {{
+    color: {colors['muted']};
+    background-color: {colors['window']};
+    border-top: 1px solid {colors['border']};
+}}
 """
+
+
+def system_uses_dark_theme(app: QApplication) -> bool:
+    scheme = app.styleHints().colorScheme()
+    if scheme == Qt.ColorScheme.Dark:
+        return True
+    if scheme == Qt.ColorScheme.Light:
+        return False
+    window_color = app.palette().color(QPalette.ColorRole.Window)
+    return window_color.lightness() < 128
+
+
+def apply_system_theme(app: QApplication) -> None:
+    def update_theme(*_args) -> None:
+        app.setStyleSheet(build_style(system_uses_dark_theme(app)))
+
+    app._scenario_theme_callback = update_theme
+    app.styleHints().colorSchemeChanged.connect(update_theme)
+    update_theme()

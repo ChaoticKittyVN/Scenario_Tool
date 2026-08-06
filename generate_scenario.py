@@ -4,8 +4,9 @@
 """
 import pandas as pd
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 from tqdm import tqdm
 from core.config_manager import AppConfig
 from core.param_process.param_translator import ParamTranslator
@@ -28,6 +29,20 @@ from core.excel_management import (
 from core.scenario_output import OutputManager, OutputFormat
 
 logger = get_logger()
+
+
+@dataclass
+class GenerationSummary:
+    total_files: int = 0
+    succeeded_files: int = 0
+    failed_files: int = 0
+    untranslatable_count: int = 0
+    untranslatable_log: Optional[Path] = None
+    error: Optional[str] = None
+
+    @property
+    def success(self) -> bool:
+        return self.error is None and self.total_files > 0 and self.failed_files == 0
 
 
 def is_excel_output(engine_config) -> bool:
@@ -399,10 +414,87 @@ def process_excel_file(file_path: Path, config: AppConfig, processor, translator
         raise ExcelParseError(f"处理文件失败: {file_path}") from e
 
 
-def main():
-    """主函数"""
+def generate_scenarios(
+    config: AppConfig,
+    progress_callback: Optional[Callable[[str], None]] = None,
+) -> GenerationSummary:
+    """Run the complete generation workflow shared by CLI and GUI."""
+
+    def progress(message: str) -> None:
+        if progress_callback:
+            progress_callback(message)
+
+    input_dir = Path(config.paths.input_dir)
+    if not input_dir.exists():
+        message = f"输入路径不存在: {input_dir}"
+        logger.error(message)
+        return GenerationSummary(error=message)
+    config.paths.ensure_dirs_exist()
+
+    excel_files = sorted(
+        (
+            path
+            for path in input_dir.iterdir()
+            if path.suffix.lower() in (".xlsx", ".xls")
+            and not path.name.startswith(TEMP_FILE_PREFIX)
+        ),
+        key=lambda path: path.name.lower(),
+    )
+    if not excel_files:
+        message = f"在 {input_dir} 中没有找到Excel文件"
+        logger.warning(message)
+        return GenerationSummary(error=message)
+
+    summary = GenerationSummary(total_files=len(excel_files))
+    logger.info(f"找到 {len(excel_files)} 个Excel文件，开始处理...")
+    logger.info(f"使用引擎: {config.engine.engine_type}")
+    progress(f"准备生成 {len(excel_files)} 个文件")
+
+    import_engine_module(config.engine.engine_type)
+    translator = ParamTranslator(
+        module_file=str(config.paths.param_config_dir / "param_mappings.py"),
+        variant_module_file=str(config.paths.param_config_dir / "variant_mappings.py"),
+    )
+    processor = create_processor(config, translator)
+
+    for index, excel_file in enumerate(excel_files, 1):
+        progress(f"[{index}/{len(excel_files)}] 处理 {excel_file.name}")
+        try:
+            process_excel_file(excel_file, config, processor, translator)
+            summary.succeeded_files += 1
+        except (ExcelFileNotFoundError, ExcelFormatError) as exc:
+            summary.failed_files += 1
+            logger.error(f"处理文件失败，跳过: {excel_file} - {exc}")
+        except Exception as exc:
+            summary.failed_files += 1
+            logger.error(f"处理文件失败: {excel_file} - {exc}", exc_info=True)
+
+    summary.untranslatable_count = translator.get_untranslatable_count()
+    if summary.untranslatable_count > 0:
+        logger.info(f"发现 {summary.untranslatable_count} 个无法翻译的参数")
+        summary.untranslatable_log = translator.export_untranslatable_log(
+            config.paths.output_dir
+        )
+        if summary.untranslatable_log:
+            logger.info(
+                f"无法翻译的参数详细信息已保存至: {summary.untranslatable_log}"
+            )
+    else:
+        logger.info("所有参数均成功翻译")
+
+    logger.info(
+        "脚本生成完成: "
+        f"成功 {summary.succeeded_files}, 失败 {summary.failed_files}"
+    )
+    progress(
+        f"生成完成：成功 {summary.succeeded_files}，失败 {summary.failed_files}"
+    )
+    return summary
+
+
+def main() -> int:
+    """CLI entry point."""
     try:
-        # 加载配置
         config_path = Path("config.yaml")
         if config_path.exists():
             logger.info(f"从配置文件加载: {config_path}")
@@ -410,69 +502,12 @@ def main():
         else:
             logger.info("使用默认配置")
             config = AppConfig.create_default("naninovel")
-
-        # 确保目录存在
-        config.paths.ensure_dirs_exist()
-
-        # 确保输入路径存在
-        if not config.paths.input_dir.exists():
-            logger.error(f"输入路径不存在: {config.paths.input_dir}")
-            return
-
-        # 获取所有Excel文件
-        excel_files = [
-            f for f in config.paths.input_dir.iterdir()
-            if f.suffix in ['.xlsx', '.xls'] and not f.name.startswith(TEMP_FILE_PREFIX)
-        ]
-
-        if not excel_files:
-            logger.warning(f"在 {config.paths.input_dir} 中没有找到Excel文件")
-            return
-
-        logger.info(f"找到 {len(excel_files)} 个Excel文件，开始处理...")
-        logger.info(f"使用引擎: {config.engine.engine_type}")
-
-        # 根据配置动态导入引擎模块
-        import_engine_module(config.engine.engine_type)
-
-        # 创建翻译器（用于追踪无法翻译的参数）
-        translator = ParamTranslator(
-            module_file=str(config.paths.param_config_dir / "param_mappings.py"),
-            variant_module_file=str(config.paths.param_config_dir / "variant_mappings.py")
-        )
-    
-        processor = create_processor(config, translator)
-
-        # 处理每个Excel文件
-        for excel_file in excel_files:
-            try:
-                process_excel_file(excel_file, config, processor, translator)
-            except ExcelFileNotFoundError as e:
-                logger.error(f"文件不存在，跳过: {excel_file} - {e}")
-                continue
-            except ExcelFormatError as e:
-                logger.error(f"Excel格式错误，跳过: {excel_file} - {e}")
-                continue
-            except Exception as e:
-                logger.error(f"处理文件失败: {excel_file} - {e}")
-                continue
-
-        logger.info("所有文件处理完成")
-
-        # 导出无法翻译的参数日志
-        untranslatable_count = translator.get_untranslatable_count()
-        if untranslatable_count > 0:
-            logger.info(f"发现 {untranslatable_count} 个无法翻译的参数")
-            log_path = translator.export_untranslatable_log(config.paths.output_dir)
-            if log_path:
-                logger.info(f"无法翻译的参数详细信息已保存至: {log_path}")
-        else:
-            logger.info("所有参数均成功翻译")
-
-    except Exception as e:
-        logger.critical(f"程序执行失败: {e}", exc_info=True)
-        raise
+        summary = generate_scenarios(config)
+        return 0 if summary.success else 1
+    except Exception as exc:
+        logger.critical(f"程序执行失败: {exc}", exc_info=True)
+        return 2
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

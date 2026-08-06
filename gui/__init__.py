@@ -5,4 +5,4 @@ GUI 包
 from .main import MainWindow, main
 
 __all__ = ['MainWindow', 'main']
-__version__ = '1.0.0'
+__version__ = '0.9.2'

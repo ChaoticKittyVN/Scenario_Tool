@@ -18,7 +18,7 @@ class MainWindowUI:
     def setup_ui(self, main_window: QMainWindow):
         """设置 UI"""
         main_window.setWindowTitle("Scenario Tool - 视觉小说脚本工具")
-        main_window.resize(900, 700)
+        main_window.resize(1120, 780)
 
         # 中央部件
         central_widget = QWidget()
@@ -130,7 +130,7 @@ class MainWindowUI:
         layout = QVBoxLayout(tab)
 
         # 配置组
-        config_group = QGroupBox("参数映射配置")
+        config_group = QGroupBox("参数映射与参数表配置")
         config_layout = QVBoxLayout()
 
         # 引擎类型
@@ -171,7 +171,7 @@ class MainWindowUI:
 
         # 操作按钮
         btn_layout = QHBoxLayout()
-        self.param_update_btn = QPushButton("更新参数映射")
+        self.param_update_btn = QPushButton("更新映射并同步参数表")
         self.param_update_btn.setMinimumHeight(40)
         btn_layout.addWidget(self.param_update_btn)
         layout.addLayout(btn_layout)
@@ -297,6 +297,7 @@ class MainWindowUI:
     def _create_config_tab(self):
         """创建配置标签页"""
         tab = QWidget()
+        self.config_tab = tab
         layout = QVBoxLayout(tab)
 
         # 路径配置组

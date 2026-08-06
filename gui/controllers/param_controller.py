@@ -28,12 +28,16 @@ class ParamUpdateWorker(QThread):
             self.progress.emit("开始更新参数映射...")
 
             updater = ParamUpdater(self.config)
-            success = updater.update_mappings()
+            success = updater.update_mappings(
+                generate_mapping_files=True,
+                update_parameter_sheets=True,
+                dry_run=False,
+            )
 
             if success:
-                self.finished.emit(True, "参数映射更新成功")
+                self.finished.emit(True, "参数映射与演出表格参数表更新成功")
             else:
-                self.finished.emit(False, "参数映射更新失败")
+                self.finished.emit(False, "参数映射或参数表更新失败")
 
         except Exception as e:
             logger.error(f"参数映射更新失败: {e}", exc_info=True)
@@ -69,7 +73,6 @@ class ParamController(QObject):
 
     def _on_progress(self, message: str):
         """处理进度更新"""
-        logger.info(message)
         self.worker_progress.emit(message)
 
     def _on_finished(self, success: bool, message: str):

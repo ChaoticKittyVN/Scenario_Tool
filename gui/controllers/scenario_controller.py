@@ -2,14 +2,11 @@
 脚本生成控制器
 连接 GUI 和脚本生成核心逻辑
 """
-from pathlib import Path
 from PySide6.QtCore import QObject, Signal, QThread
 from core.config_manager import AppConfig
-from core.param_process.param_translator import ParamTranslator
 from core.logger import get_logger
 
-# 直接导入 CLI 工具的函数
-from generate_scenario import process_excel_file
+from generate_scenario import generate_scenarios
 
 logger = get_logger()
 
@@ -27,52 +24,19 @@ class ScenarioGeneratorWorker(QThread):
     def run(self):
         """执行脚本生成"""
         try:
-            self.progress.emit("开始生成脚本...")
-
-            # 处理所有 Excel 文件
-            input_dir = Path(self.config.paths.input_dir)
-            excel_files = [
-                f for f in input_dir.iterdir()
-                if f.suffix in ['.xlsx', '.xls'] and not f.name.startswith('~')
-            ]
-
-            if not excel_files:
-                self.finished.emit(False, "未找到 Excel 文件")
-                return
-
-            # 创建翻译器（用于追踪无法翻译的参数）
-            translator = ParamTranslator(
-                module_file=str(self.config.paths.param_config_dir / "param_mappings.py"),
-                variant_module_file=str(self.config.paths.param_config_dir / "variant_mappings.py")
-            )
-
-            # 处理每个文件
-            success_count = 0
-            for excel_file in excel_files:
-                try:
-                    self.progress.emit(f"处理文件: {excel_file.name}")
-                    process_excel_file(excel_file, self.config, translator)
-                    success_count += 1
-                except Exception as e:
-                    logger.error(f"处理文件 {excel_file.name} 失败: {e}")
-                    self.progress.emit(f"处理文件 {excel_file.name} 失败: {str(e)}")
-
-            # 导出无法翻译的参数日志
-            untranslatable_count = translator.get_untranslatable_count()
-            if untranslatable_count > 0:
-                self.progress.emit(f"发现 {untranslatable_count} 个无法翻译的参数")
-                log_path = translator.export_untranslatable_log(self.config.paths.output_dir)
-                if log_path:
-                    self.progress.emit(f"无法翻译的参数详细信息已保存至: {log_path.name}")
-
-            if success_count == len(excel_files):
-                self.progress.emit("脚本生成完成")
-                if untranslatable_count > 0:
-                    self.finished.emit(True, f"成功生成 {success_count} 个脚本（发现 {untranslatable_count} 个无法翻译的参数）")
-                else:
-                    self.finished.emit(True, f"成功生成 {success_count} 个脚本")
-            elif success_count > 0:
-                self.finished.emit(False, f"部分成功: {success_count}/{len(excel_files)} 个脚本生成成功")
+            summary = generate_scenarios(self.config, self.progress.emit)
+            if summary.error:
+                self.finished.emit(False, summary.error)
+            elif summary.success:
+                message = f"成功生成 {summary.succeeded_files} 个脚本"
+                if summary.untranslatable_count:
+                    message += f"，发现 {summary.untranslatable_count} 个无法翻译的参数"
+                self.finished.emit(True, message)
+            elif summary.succeeded_files:
+                self.finished.emit(
+                    False,
+                    f"部分成功: {summary.succeeded_files}/{summary.total_files} 个文件生成成功",
+                )
             else:
                 self.finished.emit(False, "所有文件处理失败")
 
@@ -110,7 +74,6 @@ class ScenarioController(QObject):
 
     def _on_progress(self, message: str):
         """处理进度更新"""
-        logger.info(message)
         self.worker_progress.emit(message)
 
     def _on_finished(self, success: bool, message: str):

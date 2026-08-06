@@ -1,6 +1,7 @@
 """
 GUI 应用主入口
 """
+import os
 import sys
 from pathlib import Path
 from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox
@@ -11,16 +12,18 @@ from PySide6.QtGui import QIcon
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from gui.ui.main_window import MainWindowUI
+from gui.ui.tool_runner_page import ToolRunnerPage
 from gui.controllers.scenario_controller import ScenarioController
 from gui.controllers.param_controller import ParamController
 from gui.controllers.resource_controller import ResourceController
 from gui.utils.log_handler import QTextEditLogger
-from gui.utils.styles import MODERN_STYLE
+from gui.utils.styles import apply_system_theme
 from core.config_manager import AppConfig
 from core.logger import get_logger
 import logging
 
 logger = get_logger()
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class MainWindow(QMainWindow):
@@ -37,6 +40,11 @@ class MainWindow(QMainWindow):
         # 设置 UI
         self.ui = MainWindowUI()
         self.ui.setup_ui(self)
+
+        # 工具页独立管理动态发现、参数表单和子进程执行。
+        self.tool_page = ToolRunnerPage(PROJECT_ROOT, self)
+        self.ui.tab_widget.addTab(self.tool_page, "工具箱")
+        self.tool_page.status_changed.connect(self.ui.status_bar.showMessage)
 
         # 加载配置
         self.config = self._load_config()
@@ -63,7 +71,7 @@ class MainWindow(QMainWindow):
 
     def _load_config(self) -> AppConfig:
         """加载配置文件"""
-        config_path = Path("config.yaml")
+        config_path = PROJECT_ROOT / "config.yaml"
         if not config_path.exists():
             logger.warning("配置文件不存在，使用默认配置")
             return AppConfig.from_dict({})
@@ -100,8 +108,13 @@ class MainWindow(QMainWindow):
         from core.engine_registry import EngineRegistry
         engines = EngineRegistry.list_engines()
         engine_names = [meta.display_name for meta in engines.values()]
-        self.ui.param_engine_combo.clear()
-        self.ui.param_engine_combo.addItems(engine_names)
+        for combo in (
+            self.ui.scenario_engine_combo,
+            self.ui.param_engine_combo,
+            self.ui.config_engine_combo,
+        ):
+            combo.clear()
+            combo.addItems(engine_names)
 
         # 设置引擎类型（从engine_name查找display_name）
         engine_type = self.config.engine.engine_type
@@ -119,6 +132,9 @@ class MainWindow(QMainWindow):
         # 设置路径
         self.ui.scenario_input_edit.setText(str(self.config.paths.input_dir))
         self.ui.scenario_output_edit.setText(str(self.config.paths.output_dir))
+        self.ui.scenario_ignore_check.setChecked(self.config.processing.ignore_mode)
+        self.ui.scenario_ignore_edit.setEnabled(self.config.processing.ignore_mode)
+        self.ui.scenario_ignore_edit.setText(", ".join(self.config.processing.ignore_words))
 
         # 设置参数映射页面的值
         self.ui.param_config_dir_edit.setText(str(self.config.paths.param_config_dir))
@@ -225,6 +241,9 @@ class MainWindow(QMainWindow):
 
         self.ui.scenario_input_edit.setText(str(self.config.paths.input_dir))
         self.ui.scenario_output_edit.setText(str(self.config.paths.output_dir))
+        self.ui.scenario_ignore_check.setChecked(self.config.processing.ignore_mode)
+        self.ui.scenario_ignore_edit.setEnabled(self.config.processing.ignore_mode)
+        self.ui.scenario_ignore_edit.setText(", ".join(self.config.processing.ignore_words))
 
     def _browse_input_dir(self):
         """浏览输入目录"""
@@ -256,6 +275,12 @@ class MainWindow(QMainWindow):
 
         temp_config.paths.input_dir = Path(self.ui.scenario_input_edit.text())
         temp_config.paths.output_dir = Path(self.ui.scenario_output_edit.text())
+        temp_config.processing.ignore_mode = self.ui.scenario_ignore_check.isChecked()
+        temp_config.processing.ignore_words = [
+            word.strip()
+            for word in self.ui.scenario_ignore_edit.text().split(",")
+            if word.strip()
+        ]
 
         # 清空日志
         self.ui.scenario_log.clear()
@@ -569,11 +594,14 @@ class MainWindow(QMainWindow):
             }
 
             # 保存到文件
-            with open("config.yaml", "w", encoding="utf-8") as f:
+            with open(PROJECT_ROOT / "config.yaml", "w", encoding="utf-8") as f:
                 yaml.dump(config_dict, f, allow_unicode=True, default_flow_style=False)
 
             # 重新加载配置
             self.config = self._load_config()
+            self.scenario_controller.config = self.config
+            self.param_controller.config = self.config
+            self.resource_controller.config = self.config
             self._init_ui_state()
 
             QMessageBox.information(self, "成功", "配置已保存")
@@ -587,11 +615,12 @@ class MainWindow(QMainWindow):
 
     def _on_tab_changed(self, index):
         """选项卡切换时检查配置是否保存"""
+        config_index = self.ui.tab_widget.indexOf(self.ui.config_tab)
         # 如果从配置选项卡切换到其他选项卡，且配置已修改
-        if self.config_modified and hasattr(self, '_last_tab_index') and self._last_tab_index == 3 and index != 3:
+        if self.config_modified and hasattr(self, '_last_tab_index') and self._last_tab_index == config_index and index != config_index:
             # 先切回配置选项卡，阻止信号避免递归
             self.ui.tab_widget.blockSignals(True)
-            self.ui.tab_widget.setCurrentIndex(3)
+            self.ui.tab_widget.setCurrentIndex(config_index)
             self.ui.tab_widget.blockSignals(False)
 
             # 弹出对话框
@@ -621,21 +650,38 @@ class MainWindow(QMainWindow):
             return
 
         # 进入配置选项卡时，只重新加载配置选项卡的UI
-        if index == 3:
+        if index == config_index:
             self._reload_config_tab_ui()
             self.config_modified = False
 
         # 记录当前选项卡索引
         self._last_tab_index = index
 
+    def closeEvent(self, event):
+        """Stop child tool processes before closing the application."""
+        if self.tool_page.controller.is_running:
+            reply = QMessageBox.question(
+                self,
+                "工具仍在运行",
+                "关闭窗口会终止当前工具，是否继续？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                event.ignore()
+                return
+            self.tool_page.shutdown()
+        event.accept()
+
 
 def main():
     """主函数"""
+    os.chdir(PROJECT_ROOT)
     app = QApplication(sys.argv)
 
     # 设置应用样式
     app.setStyle("Fusion")
-    app.setStyleSheet(MODERN_STYLE)
+    apply_system_theme(app)
 
     # 创建并显示主窗口
     window = MainWindow()
