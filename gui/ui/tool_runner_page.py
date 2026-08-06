@@ -35,16 +35,29 @@ from gui.tools import ToolArgument, ToolCatalog, ToolDescriptor
 class ToolRunnerPage(QWidget):
     status_changed = Signal(str)
 
-    def __init__(self, repo_root: Path, parent: QWidget | None = None):
+    def __init__(
+        self,
+        repo_root: Path,
+        parent: QWidget | None = None,
+        python_executable: Path | str | None = None,
+    ):
         super().__init__(parent)
         self.repo_root = repo_root.resolve()
         self.catalog = ToolCatalog(self.repo_root / "tools")
-        self.controller = ToolProcessController(self.repo_root, self)
+        self.controller = ToolProcessController(
+            self.repo_root,
+            self,
+            python_executable=python_executable,
+        )
         self.current_tool: ToolDescriptor | None = None
         self.argument_widgets: dict[str, QWidget] = {}
         self._setup_ui()
         self._connect_signals()
         self.refresh_tools()
+
+    def set_python_executable(self, executable: Path | str | None) -> None:
+        self.controller.set_python_executable(executable)
+        self._update_command_preview()
 
     def _setup_ui(self) -> None:
         root_layout = QHBoxLayout(self)

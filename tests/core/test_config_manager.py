@@ -151,7 +151,7 @@ class TestAppConfig:
         config = AppConfig()
         assert isinstance(config.paths, PathConfig)
         assert isinstance(config.processing, ProcessingConfig)
-        assert isinstance(config.engine, NaninovelConfig)
+        assert isinstance(config.engine, RenpyConfig)
 
     def test_create_default_naninovel(self):
         """测试创建默认 Naninovel 配置"""
@@ -167,7 +167,7 @@ class TestAppConfig:
 
     def test_create_default_invalid_engine(self):
         """测试创建不支持的引擎配置"""
-        with pytest.raises(ValueError, match="不支持的引擎类型"):
+        with pytest.raises(ValueError, match="invalid_engine"):
             AppConfig.create_default("invalid_engine")
 
     def test_from_dict_minimal(self):
@@ -176,7 +176,7 @@ class TestAppConfig:
         config = AppConfig.from_dict(data)
         assert isinstance(config.paths, PathConfig)
         assert isinstance(config.processing, ProcessingConfig)
-        assert isinstance(config.engine, NaninovelConfig)
+        assert isinstance(config.engine, RenpyConfig)
 
     def test_from_dict_with_paths(self):
         """测试从包含路径的字典创建配置"""
@@ -245,7 +245,7 @@ class TestAppConfig:
                 'engine_type': 'invalid'
             }
         }
-        with pytest.raises(ValueError, match="不支持的引擎类型"):
+        with pytest.raises(ValueError, match="invalid"):
             AppConfig.from_dict(data)
 
     def test_from_file_json(self, tmp_path):
@@ -425,3 +425,61 @@ class TestAppConfig:
     def test_projects_must_be_mapping(self):
         with pytest.raises(ValueError, match="projects 配置必须是"):
             AppConfig.from_dict({"projects": ["chapter_a"]})
+
+    def test_update_file_preserves_unknown_fields(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(
+            """
+paths:
+  input_dir: old_input
+processing:
+  ignore_mode: false
+  merge_excel_output: true
+engine:
+  engine_type: renpy
+  default_transition: fade
+future_feature:
+  enabled: true
+""".strip(),
+            encoding="utf-8",
+        )
+
+        loaded = AppConfig.update_file(
+            config_file,
+            {
+                "paths": {"input_dir": "new_input"},
+                "processing": {"ignore_mode": True},
+            },
+        )
+        raw = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+
+        assert loaded.paths.input_dir == Path("new_input")
+        assert loaded.processing.ignore_mode is True
+        assert raw["processing"]["merge_excel_output"] is True
+        assert raw["engine"]["default_transition"] == "fade"
+        assert raw["future_feature"] == {"enabled": True}
+
+    def test_update_file_can_replace_engine_section(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(
+            """
+engine:
+  engine_type: renpy
+  default_transition: fade
+  label_indent: true
+""".strip(),
+            encoding="utf-8",
+        )
+
+        loaded = AppConfig.update_file(
+            config_file,
+            {"engine": {"engine_type": "naninovel"}},
+            replace_sections=["engine"],
+        )
+        raw = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+
+        assert isinstance(loaded.engine, NaninovelConfig)
+        assert raw["engine"] == {"engine_type": "naninovel"}
+
+    def test_create_default_uses_renpy(self):
+        assert isinstance(AppConfig.create_default().engine, RenpyConfig)

@@ -20,13 +20,36 @@ def format_command(program: str, arguments: Sequence[str]) -> str:
     return subprocess.list2cmdline([program, *arguments])
 
 
-def resolve_python_executable() -> Path:
-    executable = Path(sys.executable).resolve()
+def resolve_python_executable(configured: Path | str | None = None) -> Path:
+    executable = Path(configured).expanduser().resolve() if configured else Path(sys.executable).resolve()
+    if configured and not executable.is_file():
+        executable = Path(sys.executable).resolve()
     if executable.stem.lower() == "pythonw":
         console_executable = executable.with_name("python.exe")
         if console_executable.exists():
             return console_executable
     return executable
+
+
+def inspect_python_executable(executable: Path | str) -> tuple[bool, str]:
+    """Validate a Python executable and return its reported version."""
+    path = Path(executable).expanduser().resolve()
+    if not path.is_file():
+        return False, f"文件不存在: {path}"
+    try:
+        completed = subprocess.run(
+            [str(path), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, str(exc)
+    output = (completed.stdout or completed.stderr).strip()
+    if completed.returncode != 0:
+        return False, output or f"退出码 {completed.returncode}"
+    return True, output or "Python"
 
 
 class ToolProcessController(QObject):
@@ -35,10 +58,15 @@ class ToolProcessController(QObject):
     process_finished = Signal(bool, int, str)
     running_changed = Signal(bool)
 
-    def __init__(self, repo_root: Path, parent: QObject | None = None):
+    def __init__(
+        self,
+        repo_root: Path,
+        parent: QObject | None = None,
+        python_executable: Path | str | None = None,
+    ):
         super().__init__(parent)
         self.repo_root = repo_root.resolve()
-        self.python_executable = resolve_python_executable()
+        self.python_executable = resolve_python_executable(python_executable)
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._read_output)
@@ -46,6 +74,11 @@ class ToolProcessController(QObject):
         self.process.finished.connect(self._on_finished)
         self.process.errorOccurred.connect(self._on_error)
         self._command = ""
+
+    def set_python_executable(self, executable: Path | str | None) -> None:
+        if self.is_running:
+            raise RuntimeError("工具运行期间不能切换 Python")
+        self.python_executable = resolve_python_executable(executable)
 
     @property
     def is_running(self) -> bool:

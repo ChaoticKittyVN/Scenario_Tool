@@ -2,7 +2,7 @@
 配置管理模块
 提供类型安全的配置管理功能
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import json
@@ -10,6 +10,55 @@ import yaml
 from core.logger import get_logger
 
 logger = get_logger()
+
+
+def _known_dataclass_values(config_class, values: Any) -> Dict[str, Any]:
+    """只提取当前配置模型认识的字段，允许新版配置被旧 GUI 读取。"""
+    if not isinstance(values, dict):
+        return {}
+    known_names = {field_info.name for field_info in fields(config_class)}
+    return {key: value for key, value in values.items() if key in known_names}
+
+
+def _deep_merge(base: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
+    """递归合并配置字典，保留 updates 未涉及的字段。"""
+    for key, value in updates.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def _read_config_data(config_path: Path) -> Dict[str, Any]:
+    config_path = Path(config_path)
+    if not config_path.exists():
+        return {}
+    if config_path.suffix == '.json':
+        with open(config_path, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+    elif config_path.suffix in ['.yaml', '.yml']:
+        with open(config_path, 'r', encoding='utf-8') as file:
+            data = yaml.safe_load(file)
+    else:
+        raise ValueError(f"不支持的配置文件格式: {config_path.suffix}")
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise ValueError("配置文件根节点必须是映射")
+    return data
+
+
+def _write_config_data(config_path: Path, data: Dict[str, Any]) -> None:
+    config_path = Path(config_path)
+    if config_path.suffix == '.json':
+        with open(config_path, 'w', encoding='utf-8') as file:
+            json.dump(data, file, indent=2, ensure_ascii=False)
+    elif config_path.suffix in ['.yaml', '.yml']:
+        with open(config_path, 'w', encoding='utf-8') as file:
+            yaml.safe_dump(data, file, allow_unicode=True, sort_keys=False)
+    else:
+        raise ValueError(f"不支持的配置文件格式: {config_path.suffix}")
 
 
 @dataclass
@@ -111,7 +160,8 @@ def _create_engine_config(engine_type: str, engine_data: Optional[Dict[str, Any]
     # 如果提供了配置数据，使用数据创建；否则使用默认值
     if engine_data and isinstance(engine_data, dict):
         # 过滤掉engine_type，因为它是类属性
-        filtered_data = {k: v for k, v in engine_data.items() if k != 'engine_type'}
+        filtered_data = _known_dataclass_values(config_class, engine_data)
+        filtered_data.pop('engine_type', None)
         engine = config_class(**filtered_data)
     else:
         engine = config_class()
@@ -160,16 +210,7 @@ class AppConfig:
         """
         config_path = Path(config_path)
 
-        if config_path.suffix == '.json':
-            with open(config_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        elif config_path.suffix in ['.yaml', '.yml']:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                data = yaml.safe_load(f)
-        else:
-            raise ValueError(f"不支持的配置文件格式: {config_path.suffix}")
-
-        return cls.from_dict(data)
+        return cls.from_dict(_read_config_data(config_path))
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'AppConfig':
@@ -182,9 +223,15 @@ class AppConfig:
         Returns:
             AppConfig: 配置对象
         """
-        paths = PathConfig(**data.get('paths', {}))
-        processing = ProcessingConfig(**data.get('processing', {}))
-        resources = ResourceConfig(**data.get('resources', {}))
+        if not isinstance(data, dict):
+            raise ValueError("配置数据必须是映射")
+        paths = PathConfig(**_known_dataclass_values(PathConfig, data.get('paths', {})))
+        processing = ProcessingConfig(
+            **_known_dataclass_values(ProcessingConfig, data.get('processing', {}))
+        )
+        resources = ResourceConfig(
+            **_known_dataclass_values(ResourceConfig, data.get('resources', {}))
+        )
         projects_data = data.get('projects', {}) or {}
         if not isinstance(projects_data, dict):
             raise ValueError("projects 配置必须是项目键到文件名识别文本的映射")
@@ -211,15 +258,8 @@ class AppConfig:
             projects=projects,
         )
 
-    def to_file(self, config_path: Path):
-        """
-        保存到配置文件
-
-        Args:
-            config_path: 配置文件路径
-        """
-        config_path = Path(config_path)
-
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为完整的项目配置字典。"""
         data = {
             'paths': {
                 'input_dir': str(self.paths.input_dir),
@@ -248,7 +288,6 @@ class AppConfig:
 
         # 将引擎配置的所有字段添加到engine字典中
         # 使用dataclasses.fields获取所有字段
-        from dataclasses import fields
         for field_info in fields(self.engine):
             if field_info.name != 'engine_type':  # engine_type已经在上面添加了
                 value = getattr(self.engine, field_info.name)
@@ -260,15 +299,36 @@ class AppConfig:
                 else:
                     data['engine'][field_info.name] = value
 
-        if config_path.suffix == '.json':
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-        elif config_path.suffix in ['.yaml', '.yml']:
-            with open(config_path, 'w', encoding='utf-8') as f:
-                yaml.dump(data, f, allow_unicode=True)
+        return data
+
+    def to_file(self, config_path: Path):
+        """保存完整的项目配置。"""
+        _write_config_data(Path(config_path), self.to_dict())
 
     @classmethod
-    def create_default(cls, engine_type: str = "naninovel") -> 'AppConfig':
+    def update_file(
+        cls,
+        config_path: Path,
+        updates: Dict[str, Any],
+        replace_sections: Optional[List[str]] = None,
+    ) -> 'AppConfig':
+        """局部更新项目配置，保留 GUI 尚不认识的字段。"""
+        config_path = Path(config_path)
+        data = _read_config_data(config_path)
+        for section in replace_sections or []:
+            if section in updates:
+                data[section] = updates[section]
+        merge_updates = {
+            key: value
+            for key, value in updates.items()
+            if key not in set(replace_sections or [])
+        }
+        _deep_merge(data, merge_updates)
+        _write_config_data(config_path, data)
+        return cls.from_dict(data)
+
+    @classmethod
+    def create_default(cls, engine_type: str = "renpy") -> 'AppConfig':
         """
         创建默认配置
 

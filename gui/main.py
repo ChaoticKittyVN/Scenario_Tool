@@ -13,11 +13,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from gui.ui.main_window import MainWindowUI
 from gui.ui.tool_runner_page import ToolRunnerPage
+from gui.app_settings import LocalGuiSettings
 from gui.controllers.scenario_controller import ScenarioController
 from gui.controllers.param_controller import ParamController
 from gui.controllers.resource_controller import ResourceController
 from gui.utils.log_handler import QTextEditLogger
 from gui.utils.styles import apply_system_theme
+from gui.controllers.tool_controller import (
+    inspect_python_executable,
+    resolve_python_executable,
+)
 from core.config_manager import AppConfig
 from core.logger import get_logger
 import logging
@@ -31,6 +36,9 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.local_settings = LocalGuiSettings()
+        self._pending_python_executable = self.local_settings.python_executable
+        self._python_uses_auto = self._pending_python_executable is None
 
         # 设置窗口图标
         icon_path = Path(__file__).parent / "assets" / "icon.png"
@@ -42,7 +50,11 @@ class MainWindow(QMainWindow):
         self.ui.setup_ui(self)
 
         # 工具页独立管理动态发现、参数表单和子进程执行。
-        self.tool_page = ToolRunnerPage(PROJECT_ROOT, self)
+        self.tool_page = ToolRunnerPage(
+            PROJECT_ROOT,
+            self,
+            python_executable=self._pending_python_executable,
+        )
         self.ui.tab_widget.addTab(self.tool_page, "工具箱")
         self.tool_page.status_changed.connect(self.ui.status_bar.showMessage)
 
@@ -63,6 +75,11 @@ class MainWindow(QMainWindow):
 
         # 初始化 UI 状态
         self._init_ui_state()
+        self._reload_local_settings_ui()
+
+        geometry = self.local_settings.window_geometry
+        if geometry is not None:
+            self.restoreGeometry(geometry)
 
         # 连接信号和槽
         self._connect_signals()
@@ -213,6 +230,9 @@ class MainWindow(QMainWindow):
         self.ui.config_project_root_btn.clicked.connect(self._browse_config_project_root)
         self.ui.config_source_root_btn.clicked.connect(self._browse_config_source_root)
         self.ui.config_save_btn.clicked.connect(self._on_save_config)
+        self.ui.config_python_btn.clicked.connect(self._browse_tool_python)
+        self.ui.config_python_auto_btn.clicked.connect(self._use_automatic_python)
+        self.ui.config_local_save_btn.clicked.connect(self._on_save_local_settings)
 
         # 监听配置修改
         self.ui.config_input_edit.textChanged.connect(self._mark_config_modified)
@@ -552,10 +572,66 @@ class MainWindow(QMainWindow):
         if dir_path:
             self.ui.config_source_root_edit.setText(dir_path)
 
-    def _on_save_config(self):
-        """保存配置"""
+    def _reload_local_settings_ui(self):
+        """加载不属于项目的本机 GUI 设置。"""
+        configured = self.local_settings.python_executable
+        self._pending_python_executable = configured
+        self._python_uses_auto = configured is None
+        self._refresh_python_setting_ui()
+
+    def _refresh_python_setting_ui(self):
+        candidate = (
+            resolve_python_executable()
+            if self._python_uses_auto
+            else Path(self._pending_python_executable)
+        )
+        self.ui.config_python_edit.setText(str(candidate))
+        success, version = inspect_python_executable(candidate)
+        mode = "自动" if self._python_uses_auto else "自定义"
+        status = version if success else f"不可用: {version}"
+        self.ui.config_python_status.setText(f"{mode} | {status}")
+
+    def _browse_tool_python(self):
+        current = self.ui.config_python_edit.text()
+        start_dir = str(Path(current).parent) if current else str(PROJECT_ROOT)
+        executable, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择工具执行用 Python",
+            start_dir,
+            "Python executable (python.exe python3.exe python);;All files (*)",
+        )
+        if executable:
+            self._pending_python_executable = Path(executable)
+            self._python_uses_auto = False
+            self._refresh_python_setting_ui()
+
+    def _use_automatic_python(self):
+        self._pending_python_executable = None
+        self._python_uses_auto = True
+        self._refresh_python_setting_ui()
+
+    def _on_save_local_settings(self):
+        candidate = (
+            resolve_python_executable()
+            if self._python_uses_auto
+            else Path(self._pending_python_executable)
+        )
+        success, version = inspect_python_executable(candidate)
+        if not success:
+            QMessageBox.critical(self, "Python 不可用", version)
+            return
         try:
-            import yaml
+            configured = None if self._python_uses_auto else candidate
+            self.local_settings.set_python_executable(configured)
+            self.tool_page.set_python_executable(configured)
+            self._reload_local_settings_ui()
+            QMessageBox.information(self, "成功", f"本机设置已保存\n{version}")
+        except Exception as exc:
+            QMessageBox.critical(self, "失败", f"保存本机设置失败: {exc}")
+
+    def _on_save_config(self):
+        """保存可随项目共享的配置。"""
+        try:
             from core.engine_registry import EngineRegistry
 
             # 从UI读取配置
@@ -570,38 +646,37 @@ class MainWindow(QMainWindow):
                     engine_name = name
                     break
 
-            config_dict = {
+            selected_engine = engine_name if engine_name else "renpy"
+            config_updates = {
                 "paths": {
                     "input_dir": self.ui.config_input_edit.text(),
                     "output_dir": self.ui.config_output_edit.text(),
                     "param_config_dir": self.ui.config_param_edit.text(),
                     "log_dir": self.ui.config_log_edit.text(),
-                    "input_voice_dir": str(self.config.paths.input_voice_dir),
                 },
                 "processing": {
                     "ignore_mode": self.ui.config_ignore_check.isChecked(),
                     "ignore_words": ignore_words,
-                    "batch_size": self.config.processing.batch_size,
-                    "enable_progress_bar": self.config.processing.enable_progress_bar,
-                    "multi_project_mode": self.config.processing.multi_project_mode,
                 },
                 "engine": {
-                    "engine_type": engine_name if engine_name else "renpy",
+                    "engine_type": selected_engine,
                 },
                 "resources": {
                     "project_root": self.ui.config_project_root_edit.text(),
                     "source_root": self.ui.config_source_root_edit.text(),
-                    "extensions": self.config.resources.extensions,
                 },
-                "projects": self.config.projects,
             }
 
-            # 保存到文件
-            with open(PROJECT_ROOT / "config.yaml", "w", encoding="utf-8") as f:
-                yaml.dump(config_dict, f, allow_unicode=True, default_flow_style=False)
-
-            # 重新加载配置
-            self.config = self._load_config()
+            replace_sections = (
+                ["engine"]
+                if selected_engine != self.config.engine.engine_type
+                else []
+            )
+            self.config = AppConfig.update_file(
+                PROJECT_ROOT / "config.yaml",
+                config_updates,
+                replace_sections=replace_sections,
+            )
             self.scenario_controller.config = self.config
             self.param_controller.config = self.config
             self.resource_controller.config = self.config
@@ -674,6 +749,7 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
             self.tool_page.shutdown()
+        self.local_settings.set_window_geometry(self.saveGeometry())
         event.accept()
 
 
