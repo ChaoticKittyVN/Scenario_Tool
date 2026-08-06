@@ -27,6 +27,7 @@ class PathConfig:
         self.output_dir = Path(self.output_dir)
         self.param_config_dir = Path(self.param_config_dir)
         self.log_dir = Path(self.log_dir)
+        self.input_voice_dir = Path(self.input_voice_dir)
 
     def ensure_dirs_exist(self):
         """确保所有目录存在"""
@@ -43,6 +44,7 @@ class ProcessingConfig:
     ignore_words: List[str] = field(default_factory=lambda: [""])
     batch_size: int = 100
     enable_progress_bar: bool = True
+    multi_project_mode: bool = False
 
 
 @dataclass
@@ -140,6 +142,7 @@ class AppConfig:
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
     engine: EngineConfig = field(default_factory=lambda: _create_engine_config("renpy"))
     resources: ResourceConfig = field(default_factory=ResourceConfig)
+    projects: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_file(cls, config_path: Path) -> 'AppConfig':
@@ -182,6 +185,10 @@ class AppConfig:
         paths = PathConfig(**data.get('paths', {}))
         processing = ProcessingConfig(**data.get('processing', {}))
         resources = ResourceConfig(**data.get('resources', {}))
+        projects_data = data.get('projects', {}) or {}
+        if not isinstance(projects_data, dict):
+            raise ValueError("projects 配置必须是项目键到文件名识别文本的映射")
+        projects = {str(key): str(value) for key, value in projects_data.items()}
 
         # 根据引擎类型创建对应配置
         engine_data = data.get('engine', {})
@@ -196,7 +203,13 @@ class AppConfig:
         # 通过引擎注册表动态创建配置实例
         engine = _create_engine_config(engine_type, engine_data)
 
-        return cls(paths=paths, processing=processing, engine=engine, resources=resources)
+        return cls(
+            paths=paths,
+            processing=processing,
+            engine=engine,
+            resources=resources,
+            projects=projects,
+        )
 
     def to_file(self, config_path: Path):
         """
@@ -213,12 +226,14 @@ class AppConfig:
                 'output_dir': str(self.paths.output_dir),
                 'param_config_dir': str(self.paths.param_config_dir),
                 'log_dir': str(self.paths.log_dir),
+                'input_voice_dir': str(self.paths.input_voice_dir),
             },
             'processing': {
                 'ignore_mode': self.processing.ignore_mode,
                 'ignore_words': self.processing.ignore_words,
                 'batch_size': self.processing.batch_size,
                 'enable_progress_bar': self.processing.enable_progress_bar,
+                'multi_project_mode': self.processing.multi_project_mode,
             },
             'engine': {
                 'engine_type': self.engine.engine_type,
@@ -227,7 +242,8 @@ class AppConfig:
                 'project_root': str(self.resources.project_root),
                 'source_root': str(self.resources.source_root),
                 'extensions': self.resources.extensions,
-            }
+            },
+            'projects': self.projects,
         }
 
         # 将引擎配置的所有字段添加到engine字典中

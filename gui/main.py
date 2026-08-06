@@ -576,12 +576,14 @@ class MainWindow(QMainWindow):
                     "output_dir": self.ui.config_output_edit.text(),
                     "param_config_dir": self.ui.config_param_edit.text(),
                     "log_dir": self.ui.config_log_edit.text(),
+                    "input_voice_dir": str(self.config.paths.input_voice_dir),
                 },
                 "processing": {
                     "ignore_mode": self.ui.config_ignore_check.isChecked(),
                     "ignore_words": ignore_words,
-                    "batch_size": 100,
-                    "enable_progress_bar": True,
+                    "batch_size": self.config.processing.batch_size,
+                    "enable_progress_bar": self.config.processing.enable_progress_bar,
+                    "multi_project_mode": self.config.processing.multi_project_mode,
                 },
                 "engine": {
                     "engine_type": engine_name if engine_name else "renpy",
@@ -590,7 +592,8 @@ class MainWindow(QMainWindow):
                     "project_root": self.ui.config_project_root_edit.text(),
                     "source_root": self.ui.config_source_root_edit.text(),
                     "extensions": self.config.resources.extensions,
-                }
+                },
+                "projects": self.config.projects,
             }
 
             # 保存到文件

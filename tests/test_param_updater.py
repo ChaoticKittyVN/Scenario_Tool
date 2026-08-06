@@ -891,6 +891,89 @@ class TestParamUpdaterCli:
         assert args.workbook == ["chapter.xlsx"]
 
 
+class TestMultiProjectParamUpdater:
+    @pytest.fixture
+    def updater(self, tmp_path):
+        config = Mock(spec=AppConfig)
+        config.engine = Mock()
+        config.engine.engine_type = "renpy"
+        config.paths = Mock()
+        config.paths.param_config_dir = tmp_path / "param_config"
+        config.paths.input_dir = tmp_path / "input"
+        config.paths.param_config_dir.mkdir()
+        config.paths.input_dir.mkdir()
+        config.processing = Mock()
+        config.processing.multi_project_mode = True
+        config.projects = {
+            "chapter_a": "第一篇",
+            "chapter_b": "第二篇",
+        }
+        return ParamUpdater(config)
+
+    @staticmethod
+    def _write_param_file(path, values):
+        with pd.ExcelWriter(path, engine="openpyxl") as writer:
+            pd.DataFrame(
+                {
+                    "ExcelParam": list(values),
+                    "ScenarioParam": [value.lower() for value in values],
+                }
+            ).to_excel(writer, sheet_name="Music", index=False)
+
+    def test_disabled_mode_ignores_project_param_files(self, updater):
+        base_file = updater.config.paths.param_config_dir / "param_data_renpy.xlsx"
+        project_file = updater.config.paths.param_config_dir / "param_data_chapter_a.xlsx"
+        self._write_param_file(base_file, ["BaseMusic"])
+        self._write_param_file(project_file, ["ProjectMusic"])
+        updater.config.processing.multi_project_mode = False
+
+        assert updater.update_mappings(update_parameter_sheets=False) is True
+
+        namespace = {}
+        exec(
+            (updater.config.paths.param_config_dir / "param_mappings.py").read_text(
+                encoding="utf-8"
+            ),
+            namespace,
+        )
+        assert namespace["PARAM_MAPPINGS"]["Music"] == {
+            "BaseMusic": "basemusic"
+        }
+
+    def test_enabled_mode_merges_project_mapping_files(self, updater):
+        param_dir = updater.config.paths.param_config_dir
+        self._write_param_file(param_dir / "param_data_renpy.xlsx", ["BaseMusic"])
+        self._write_param_file(param_dir / "param_data_chapter_a.xlsx", ["ChapterMusic"])
+
+        assert updater.update_mappings(update_parameter_sheets=False) is True
+
+        namespace = {}
+        exec(
+            (param_dir / "param_mappings.py").read_text(encoding="utf-8"),
+            namespace,
+        )
+        assert namespace["PARAM_MAPPINGS"]["Music"] == {
+            "BaseMusic": "basemusic",
+            "ChapterMusic": "chaptermusic",
+        }
+
+    def test_workbook_receives_only_matching_project_values(self, updater):
+        project_file = updater.config.paths.param_config_dir / "param_data_chapter_a.xlsx"
+        self._write_param_file(project_file, ["ChapterMusic"])
+        base_data = {"Music": ["BaseMusic"]}
+        cache = {}
+
+        matched = updater._validation_data_for_workbook(
+            Path("第一篇_演出表.xlsx"), base_data, cache
+        )
+        unmatched = updater._validation_data_for_workbook(
+            Path("公共演出表.xlsx"), base_data, cache
+        )
+
+        assert matched == {"Music": ["BaseMusic", "ChapterMusic"]}
+        assert unmatched == base_data
+
+
 class TestEdgeCases:
     """测试边界情况"""
 

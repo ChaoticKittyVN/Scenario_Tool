@@ -399,3 +399,29 @@ class TestAppConfig:
         assert loaded.paths.output_dir == original.paths.output_dir
         assert loaded.processing.enable_progress_bar == original.processing.enable_progress_bar
         assert loaded.engine.engine_type == original.engine.engine_type
+
+    def test_multi_project_config_roundtrip(self, tmp_path):
+        config = AppConfig.from_dict({
+            "processing": {"multi_project_mode": True},
+            "projects": {
+                "chapter_a": "第一篇",
+                "chapter_b": "第二篇",
+            },
+            "paths": {"input_voice_dir": "./voices"},
+            "engine": {"engine_type": "renpy"},
+        })
+
+        config_file = tmp_path / "multi_project.yaml"
+        config.to_file(config_file)
+        loaded = AppConfig.from_file(config_file)
+
+        assert loaded.processing.multi_project_mode is True
+        assert loaded.projects == {
+            "chapter_a": "第一篇",
+            "chapter_b": "第二篇",
+        }
+        assert loaded.paths.input_voice_dir == Path("./voices")
+
+    def test_projects_must_be_mapping(self):
+        with pytest.raises(ValueError, match="projects 配置必须是"):
+            AppConfig.from_dict({"projects": ["chapter_a"]})

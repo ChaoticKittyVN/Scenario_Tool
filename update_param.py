@@ -42,6 +42,116 @@ class ParamUpdater:
         self.excel_manager = ExcelFileManager(cache_enabled=True)
         self.df_processor = DataFrameProcessor(config)
 
+    @property
+    def multi_project_mode(self) -> bool:
+        """是否启用按项目扩展参数数据。"""
+        processing = getattr(self.config, "processing", None)
+        return getattr(processing, "multi_project_mode", False) is True
+
+    @property
+    def projects(self) -> Dict[str, str]:
+        """返回有效的项目键与文件名识别文本。"""
+        projects = getattr(self.config, "projects", {})
+        if not isinstance(projects, dict):
+            return {}
+        return {
+            str(project_key): str(match_text)
+            for project_key, match_text in projects.items()
+            if str(project_key).strip() and str(match_text).strip()
+        }
+
+    def _find_project_param_files(self) -> List[tuple[Path, str]]:
+        """查找配置中启用的项目参数文件。"""
+        if not self.multi_project_mode:
+            return []
+
+        param_dir = Path(self.config.paths.param_config_dir)
+        results = []
+        for project_key in self.projects:
+            project_file = param_dir / f"param_data_{project_key}.xlsx"
+            if project_file.exists():
+                results.append((project_file, project_key))
+                logger.info(f"发现项目参数文件: {project_file.name} (项目: {project_key})")
+            else:
+                logger.warning(f"项目参数文件不存在，跳过: {project_file}")
+        return results
+
+    @staticmethod
+    def _merge_mappings(
+        mappings_list: List[Dict[str, Dict[str, str]]],
+    ) -> Dict[str, Dict[str, str]]:
+        """依次合并映射，后面的项目配置覆盖同名映射。"""
+        merged: Dict[str, Dict[str, str]] = {}
+        for mappings in mappings_list:
+            for sheet_name, sheet_mapping in mappings.items():
+                merged.setdefault(sheet_name, {}).update(sheet_mapping)
+        return merged
+
+    @staticmethod
+    def _merge_validation_data(
+        data_list: List[Dict[str, List[str]]],
+    ) -> Dict[str, List[str]]:
+        """按参数类型合并、去重验证值，并保留原有顺序。"""
+        merged: Dict[str, List[str]] = {}
+        for data in data_list:
+            for param_type, values in data.items():
+                target = merged.setdefault(param_type, [])
+                existing = set(target)
+                for value in values:
+                    if value not in existing:
+                        target.append(value)
+                        existing.add(value)
+        return merged
+
+    def _match_project_for_excel(self, excel_file: Path) -> Optional[str]:
+        """根据工作簿文件名匹配项目。"""
+        if not self.multi_project_mode:
+            return None
+
+        filename = excel_file.name
+        matches = [
+            (project_key, match_text)
+            for project_key, match_text in self.projects.items()
+            if match_text in filename
+        ]
+        if not matches:
+            logger.debug(f"文件 {filename} 未匹配到项目参数")
+            return None
+        if len(matches) > 1:
+            matched_keys = ", ".join(project_key for project_key, _ in matches)
+            logger.warning(f"文件 {filename} 匹配到多个项目 ({matched_keys})，使用第一个")
+        project_key, match_text = matches[0]
+        logger.info(f"文件 {filename} 匹配到项目: {project_key} ({match_text})")
+        return project_key
+
+    def _validation_data_for_workbook(
+        self,
+        excel_file: Path,
+        base_validation_data: Dict[str, List[str]],
+        project_cache: Dict[str, Dict[str, List[str]]],
+    ) -> Dict[str, List[str]]:
+        """为单个工作簿合并基础参数和匹配项目的扩展参数。"""
+        project_key = self._match_project_for_excel(excel_file)
+        if project_key is None:
+            return base_validation_data
+
+        if project_key not in project_cache:
+            project_file = (
+                Path(self.config.paths.param_config_dir)
+                / f"param_data_{project_key}.xlsx"
+            )
+            if not project_file.exists():
+                logger.warning(f"项目 '{project_key}' 的参数文件不存在: {project_file}")
+                project_cache[project_key] = {}
+            else:
+                project_cache[project_key] = self.collect_validation_data(project_file)
+
+        project_data = project_cache[project_key]
+        if not project_data:
+            return base_validation_data
+        logger.info(f"为 {excel_file.name} 合并项目 '{project_key}' 的定制参数")
+        return self._merge_validation_data([base_validation_data, project_data])
+
     def read_param_file(self, param_file: Path, skip_template: bool = True) -> Dict[str, Dict[str, str]]:
         """
         读取参数文件并生成映射
@@ -286,15 +396,21 @@ class ParamUpdater:
         success_count = 0
         updated_count = 0
         unchanged_count = 0
+        project_cache: Dict[str, Dict[str, List[str]]] = {}
 
         for excel_file in excel_files:
             try:
                 logger.debug(f"处理文件: {excel_file.name}")
+                workbook_validation_data = self._validation_data_for_workbook(
+                    excel_file,
+                    validation_data,
+                    project_cache,
+                )
 
                 # 准备参数数据（按照 all_params 的顺序）
                 parameter_data = {}
                 for param_type in all_params:
-                    params = validation_data.get(param_type, [])
+                    params = workbook_validation_data.get(param_type, [])
                     parameter_data[param_type] = params
 
                 # 使用增强的 ExcelEditor 方法更新参数表
@@ -367,12 +483,21 @@ class ParamUpdater:
         ]
         logger.info("DRY RUN：不会修改演出表格")
         logger.info(f"将同步 {len(excel_files)} 个工作簿、{len(all_params)} 个参数类型")
+        project_cache: Dict[str, Dict[str, List[str]]] = {}
         for excel_file in excel_files:
-            logger.info(f"  参数表目标: {excel_file}")
-        for param_type in all_params:
-            logger.debug(
-                f"  参数类型 {param_type}: {len(validation_data.get(param_type, []))} 个值"
+            workbook_validation_data = self._validation_data_for_workbook(
+                excel_file,
+                validation_data,
+                project_cache,
             )
+            project_key = self._match_project_for_excel(excel_file)
+            project_label = f", 项目={project_key}" if project_key else ""
+            logger.info(f"  参数表目标: {excel_file}{project_label}")
+            for param_type in all_params:
+                logger.debug(
+                    f"    参数类型 {param_type}: "
+                    f"{len(workbook_validation_data.get(param_type, []))} 个值"
+                )
         return True
 
     def update_mappings(
@@ -405,7 +530,14 @@ class ParamUpdater:
 
         try:
             logger.debug(f"读取参数文件: {param_file}")
-            mappings = self.read_param_file(param_file)
+            mappings_list = [self.read_param_file(param_file)]
+            project_param_files = self._find_project_param_files()
+            for project_file, project_key in project_param_files:
+                project_mappings = self.read_param_file(project_file)
+                if project_mappings:
+                    mappings_list.append(project_mappings)
+                    logger.info(f"已加载项目 '{project_key}' 的参数映射")
+            mappings = self._merge_mappings(mappings_list)
 
             if generate_mapping_files and not mappings:
                 logger.error("未能读取到任何参数映射")
@@ -419,7 +551,8 @@ class ParamUpdater:
                     self.generate_mappings_file(mappings, output_file)
 
             total_mappings = sum(len(m) for m in mappings.values())
-            logger.info(f"基础参数映射: {len(mappings)} 个工作表, {total_mappings} 个映射")
+            mode_label = "多项目合并参数映射" if self.multi_project_mode else "基础参数映射"
+            logger.info(f"{mode_label}: {len(mappings)} 个工作表, {total_mappings} 个映射")
             
         except Exception as e:
             logger.error(f"处理基础参数映射时失败: {e}")

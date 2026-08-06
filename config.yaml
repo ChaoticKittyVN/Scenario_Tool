@@ -10,9 +10,14 @@ processing:
   batch_size: 100
   enable_progress_bar: true
   ignore_mode: false
+  # 开启后，update_param 会按下方 projects 配置加载篇章专用参数文件。
+  multi_project_mode: false
   ignore_words:
   - 忽略
   - ''
+# 项目键 chapter_a 对应 param_config/param_data_chapter_a.xlsx；
+# 识别文本用于匹配演出表文件名，例如：chapter_a: 第一篇
+projects: {}
 resources:
   extensions:
     图片:
