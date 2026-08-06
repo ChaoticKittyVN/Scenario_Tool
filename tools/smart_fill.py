@@ -1,4 +1,4 @@
-"""Apply declarative table transformations to scenario workbooks."""
+"""通用表格变更工具。"""
 
 from __future__ import annotations
 
@@ -19,6 +19,22 @@ from core.table_transform import TableTransformEngine, summarize_results
 
 
 logger = get_logger()
+
+
+TOOL_UI = {
+    "title": "通用表格变更",
+    "description": "按照 YAML 规则预览或执行演出表格的批量变更。",
+    "arguments": {
+        "config": {"label": "规则文件", "group": "输入", "kind": "file", "file_filter": "YAML 文件 (*.yaml *.yml)", "order": 10},
+        "input_dir": {"label": "输入目录", "group": "输入", "kind": "directory", "order": 20},
+        "sheets": {"label": "限定工作表", "group": "处理范围", "placeholder": "多个名称使用逗号分隔", "order": 30},
+        "dry_run": {"label": "安全预览", "group": "执行模式", "order": 40},
+        "apply": {"label": "实际执行", "group": "执行模式", "order": 41},
+        "report": {"label": "报告文件", "group": "输出", "kind": "save_file", "file_filter": "JSON 文件 (*.json)", "order": 50},
+        "no_report": {"label": "不生成报告", "group": "输出", "order": 60},
+        "verbose": {"label": "显示详细变更", "group": "高级参数", "order": 90},
+    },
+}
 
 
 def build_parser() -> argparse.ArgumentParser:

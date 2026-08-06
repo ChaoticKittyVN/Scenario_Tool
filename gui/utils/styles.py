@@ -167,6 +167,28 @@ QCheckBox {{
     background-color: transparent;
 }}
 
+QCheckBox::indicator {{
+    width: 15px;
+    height: 15px;
+    border: 1px solid {colors['muted']};
+    border-radius: 3px;
+    background-color: {colors['surface']};
+}}
+
+QCheckBox::indicator:hover {{
+    border: 2px solid {colors['primary']};
+}}
+
+QCheckBox::indicator:checked {{
+    border: 2px solid {colors['primary']};
+    background-color: {colors['primary']};
+}}
+
+QCheckBox::indicator:disabled {{
+    border-color: {colors['disabled_text']};
+    background-color: {colors['disabled']};
+}}
+
 QTextEdit, QPlainTextEdit, QTextBrowser, QListWidget {{
     color: {colors['text']};
     background-color: {colors['surface_alt']};

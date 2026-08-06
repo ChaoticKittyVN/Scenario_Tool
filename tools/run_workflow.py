@@ -1,4 +1,4 @@
-"""Execute multiple repository Python tools from a declarative YAML workflow."""
+"""批量工作流执行器。"""
 
 from __future__ import annotations
 
@@ -18,6 +18,25 @@ import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+TOOL_UI = {
+    "title": "批量工作流执行器",
+    "description": "从 YAML 工作流依次执行多个项目工具，默认使用安全预览模式。",
+    "arguments": {
+        "workflow": {"label": "工作流文件", "group": "必填参数", "kind": "file", "file_filter": "YAML 文件 (*.yaml *.yml)", "order": 10},
+        "dry_run": {"label": "安全预览", "group": "执行模式", "order": 20},
+        "apply": {"label": "实际执行", "group": "执行模式", "order": 21},
+        "step": {"label": "限定步骤", "group": "执行范围", "placeholder": "每行一个步骤 ID", "order": 30},
+        "overrides": {"label": "变量覆盖", "group": "执行范围", "placeholder": "每行一个 NAME=VALUE", "order": 40},
+        "report": {"label": "报告文件", "group": "输出", "kind": "save_file", "file_filter": "JSON 文件 (*.json)", "order": 50},
+        "no_report": {"label": "不生成报告", "group": "输出", "order": 60},
+        "continue_on_error": {"label": "失败后继续", "group": "高级参数", "order": 80},
+        "verbose": {"label": "显示完整输出", "group": "高级参数", "order": 81},
+        "list_steps": {"label": "仅列出步骤", "group": "高级参数", "order": 82},
+        "python": {"hidden": True, "order": 99},
+    },
+}
 
 
 class WorkflowError(ValueError):

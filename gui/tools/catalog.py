@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ast
 import shlex
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -43,6 +43,13 @@ def _split_values(value: str) -> list[str]:
     return [item.strip("\"'") for item in shlex.split(value, posix=False)]
 
 
+def _metadata_order(value: Any, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return fallback
+
+
 @dataclass(frozen=True)
 class ToolArgument:
     flags: tuple[str, ...]
@@ -54,6 +61,13 @@ class ToolArgument:
     choices: tuple[Any, ...] = ()
     nargs: str | int | None = None
     type_name: str | None = None
+    label: str = ""
+    group: str = "常用参数"
+    kind: str = "auto"
+    placeholder: str = ""
+    file_filter: str = ""
+    hidden: bool = False
+    order: int = 100
 
     @property
     def option(self) -> str:
@@ -73,6 +87,28 @@ class ToolArgument:
     @property
     def takes_multiple(self) -> bool:
         return self.nargs in ("+", "*") or isinstance(self.nargs, int)
+
+    @property
+    def display_label(self) -> str:
+        return self.label or self.option
+
+    @property
+    def display_type(self) -> str:
+        if self.kind == "file":
+            return "文件"
+        if self.kind == "save_file":
+            return "输出文件"
+        if self.kind == "directory":
+            return "目录"
+        if self.is_boolean:
+            return "开关"
+        if self.choices:
+            return "选项"
+        if self.takes_multiple or self.action == "append":
+            return "多值"
+        if self.type_name in ("Path", "pathlib.Path"):
+            return "路径"
+        return "文本"
 
     def values_to_argv(self, value: Any) -> list[str]:
         if self.is_boolean:
@@ -145,14 +181,21 @@ class ToolCatalog:
             source = script_path.read_text(encoding="utf-8")
             tree = ast.parse(source, filename=str(script_path))
             description = (ast.get_docstring(tree) or "").strip()
-            arguments = tuple(self._read_arguments(tree))
-            title = description.splitlines()[0].strip() if description else script_path.stem.replace("_", " ")
+            ui_metadata = self._read_ui_metadata(tree)
+            arguments = self._apply_ui_metadata(
+                self._read_arguments(tree),
+                ui_metadata.get("arguments", {}),
+            )
+            title = str(ui_metadata.get("title") or "").strip()
+            if not title:
+                title = description.splitlines()[0].strip() if description else script_path.stem.replace("_", " ")
+            display_description = str(ui_metadata.get("description") or "").strip() or description
             return ToolDescriptor(
                 name=script_path.stem,
                 script_path=script_path.resolve(),
                 title=title,
-                description=description,
-                arguments=arguments,
+                description=display_description,
+                arguments=tuple(arguments),
             )
         except (OSError, SyntaxError, UnicodeError) as exc:
             return ToolDescriptor(
@@ -162,6 +205,44 @@ class ToolCatalog:
                 description="",
                 parse_error=str(exc),
             )
+
+    @staticmethod
+    def _read_ui_metadata(tree: ast.Module) -> dict[str, Any]:
+        for node in tree.body:
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if not any(isinstance(target, ast.Name) and target.id == "TOOL_UI" for target in targets):
+                continue
+            value = _literal(node.value)
+            return value if isinstance(value, dict) else {}
+        return {}
+
+    @staticmethod
+    def _apply_ui_metadata(
+        arguments: list[ToolArgument],
+        metadata: Any,
+    ) -> list[ToolArgument]:
+        if not isinstance(metadata, dict):
+            return arguments
+        result = []
+        for index, argument in enumerate(arguments):
+            overrides = metadata.get(argument.dest, {})
+            if not isinstance(overrides, dict):
+                overrides = {}
+            result.append(
+                replace(
+                    argument,
+                    label=str(overrides.get("label") or ""),
+                    group=str(overrides.get("group") or "常用参数"),
+                    kind=str(overrides.get("kind") or "auto"),
+                    placeholder=str(overrides.get("placeholder") or ""),
+                    file_filter=str(overrides.get("file_filter") or ""),
+                    hidden=bool(overrides.get("hidden", False)),
+                    order=_metadata_order(overrides.get("order"), index + 100),
+                )
+            )
+        return sorted(result, key=lambda item: item.order)
 
     @staticmethod
     def _read_arguments(tree: ast.AST) -> list[ToolArgument]:

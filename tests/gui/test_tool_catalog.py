@@ -84,3 +84,39 @@ def test_real_tool_catalog_discovers_current_tools():
     assert "fill_scenario_index" in tools
     assert tools["smart_fill"].supports_dry_run
     assert any(argument.dest == "config" for argument in tools["smart_fill"].arguments)
+    assert tools["smart_fill"].title == "通用表格变更"
+    assert tools["run_workflow"].title == "批量工作流执行器"
+
+    smart_arguments = {argument.dest: argument for argument in tools["smart_fill"].arguments}
+    workflow_arguments = {argument.dest: argument for argument in tools["run_workflow"].arguments}
+    assert smart_arguments["config"].label == "规则文件"
+    assert smart_arguments["config"].kind == "file"
+    assert smart_arguments["report"].group == "输出"
+    assert workflow_arguments["workflow"].required
+    assert workflow_arguments["workflow"].kind == "file"
+    assert workflow_arguments["python"].hidden is True
+
+
+def test_invalid_ui_order_falls_back_to_argument_order(tmp_path):
+    script = tmp_path / "sample.py"
+    script.write_text(
+        '''"""Sample tool."""
+import argparse
+
+TOOL_UI = {
+    "arguments": {
+        "value": {"label": "Value", "order": "not-a-number"},
+    },
+}
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--value")
+''',
+        encoding="utf-8",
+    )
+
+    descriptor = ToolCatalog(tmp_path).read(script)
+
+    assert descriptor.parse_error is None
+    assert descriptor.arguments[0].label == "Value"
+    assert descriptor.arguments[0].order == 100

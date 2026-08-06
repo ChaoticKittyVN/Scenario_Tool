@@ -197,7 +197,24 @@ class MainWindow(QMainWindow):
         self.ui.param_config_dir_edit.textChanged.connect(self._update_param_file_labels)
         self.ui.param_config_dir_btn.clicked.connect(self._browse_param_config_dir)
         self.ui.param_reset_btn.clicked.connect(self._on_reset_param)
-        self.ui.param_update_btn.clicked.connect(self._on_update_param)
+        self.ui.param_mappings_btn.clicked.connect(
+            lambda _checked=False: self._on_update_param(
+                generate_mapping_files=True,
+                update_parameter_sheets=False,
+            )
+        )
+        self.ui.param_sheet_btn.clicked.connect(
+            lambda _checked=False: self._on_update_param(
+                generate_mapping_files=False,
+                update_parameter_sheets=True,
+            )
+        )
+        self.ui.param_update_btn.clicked.connect(
+            lambda _checked=False: self._on_update_param(
+                generate_mapping_files=True,
+                update_parameter_sheets=True,
+            )
+        )
 
         # 控制器信号
         self.param_controller.worker_progress.connect(self._on_param_progress)
@@ -374,7 +391,11 @@ class MainWindow(QMainWindow):
         self.ui.param_file_label.setText(f"{param_dir}/{param_file}")
         self.ui.param_variant_label.setText(f"{param_dir}/variant_data.xlsx")
 
-    def _on_update_param(self):
+    def _on_update_param(
+        self,
+        generate_mapping_files: bool = True,
+        update_parameter_sheets: bool = True,
+    ):
         """更新参数映射"""
         from core.engine_registry import EngineRegistry
         from copy import deepcopy
@@ -397,11 +418,23 @@ class MainWindow(QMainWindow):
         self.ui.param_log.clear()
         self.ui.param_progress.setValue(0)
 
-        # 禁用按钮
-        self.ui.param_update_btn.setEnabled(False)
+        # 禁用参数操作按钮
+        self._set_param_buttons_enabled(False)
 
         # 使用临时配置开始更新
-        self.param_controller.update_param_mappings(temp_config)
+        self.param_controller.update_param_mappings(
+            temp_config,
+            generate_mapping_files=generate_mapping_files,
+            update_parameter_sheets=update_parameter_sheets,
+        )
+
+    def _set_param_buttons_enabled(self, enabled: bool):
+        for button in (
+            self.ui.param_mappings_btn,
+            self.ui.param_sheet_btn,
+            self.ui.param_update_btn,
+        ):
+            button.setEnabled(enabled)
 
     def _on_param_progress(self, message: str):
         """参数映射进度更新"""
@@ -412,7 +445,7 @@ class MainWindow(QMainWindow):
         """参数映射完成"""
         self.ui.param_progress.setValue(100 if success else 0)
         self.ui.param_log.append(f"\n{'成功' if success else '失败'}: {message}")
-        self.ui.param_update_btn.setEnabled(True)
+        self._set_param_buttons_enabled(True)
 
         # 显示消息框
         if success:

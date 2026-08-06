@@ -9,4 +9,8 @@ def test_theme_styles_cover_all_tool_page_surfaces():
     assert "#202328" in dark
     assert "QScrollArea > QWidget > QWidget" in light
     assert "QWidget#argumentContainer" in dark
+    assert "QCheckBox::indicator" in light
+    assert "QCheckBox::indicator:checked" in dark
+    assert "border: 1px solid #68707a" in light
+    assert "border: 1px solid #a8adb5" in dark
     assert light != dark

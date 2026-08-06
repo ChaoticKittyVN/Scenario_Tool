@@ -42,3 +42,49 @@ def test_param_worker_explicitly_runs_complete_update_flow():
         dry_run=False,
     )
     assert finished == [(True, "参数映射与演出表格参数表更新成功")]
+
+
+def test_param_worker_can_generate_mappings_without_syncing_sheets():
+    config = AppConfig(engine=RenpyConfig())
+    worker = ParamUpdateWorker(
+        config,
+        generate_mapping_files=True,
+        update_parameter_sheets=False,
+    )
+    finished = []
+    worker.finished.connect(lambda success, message: finished.append((success, message)))
+    updater = Mock()
+    updater.update_mappings.return_value = True
+
+    with patch("update_param.ParamUpdater", return_value=updater):
+        worker.run()
+
+    updater.update_mappings.assert_called_once_with(
+        generate_mapping_files=True,
+        update_parameter_sheets=False,
+        dry_run=False,
+    )
+    assert finished == [(True, "生成参数映射成功")]
+
+
+def test_param_worker_can_sync_sheets_without_generating_mappings():
+    config = AppConfig(engine=RenpyConfig())
+    worker = ParamUpdateWorker(
+        config,
+        generate_mapping_files=False,
+        update_parameter_sheets=True,
+    )
+    finished = []
+    worker.finished.connect(lambda success, message: finished.append((success, message)))
+    updater = Mock()
+    updater.update_mappings.return_value = True
+
+    with patch("update_param.ParamUpdater", return_value=updater):
+        worker.run()
+
+    updater.update_mappings.assert_called_once_with(
+        generate_mapping_files=False,
+        update_parameter_sheets=True,
+        dry_run=False,
+    )
+    assert finished == [(True, "同步演出表参数表成功")]

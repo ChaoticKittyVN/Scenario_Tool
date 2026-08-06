@@ -10,7 +10,9 @@ from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QFileDialog,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -32,6 +34,58 @@ from gui.controllers.tool_controller import ToolProcessController, format_comman
 from gui.tools import ToolArgument, ToolCatalog, ToolDescriptor
 
 
+class PathArgumentEdit(QWidget):
+    textChanged = Signal(str)
+
+    def __init__(
+        self,
+        kind: str,
+        file_filter: str = "",
+        parent: QWidget | None = None,
+    ):
+        super().__init__(parent)
+        self.kind = kind
+        self.file_filter = file_filter or "All files (*)"
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        self.edit = QLineEdit()
+        self.edit.textChanged.connect(self.textChanged)
+        layout.addWidget(self.edit, 1)
+        self.browse_button = QPushButton()
+        self.browse_button.setObjectName("iconButton")
+        self.browse_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
+        self.browse_button.setToolTip("选择路径")
+        self.browse_button.setFixedSize(32, 32)
+        self.browse_button.clicked.connect(self._browse)
+        layout.addWidget(self.browse_button)
+
+    def text(self) -> str:
+        return self.edit.text()
+
+    def setPlaceholderText(self, text: str) -> None:
+        self.edit.setPlaceholderText(text)
+
+    def _browse(self) -> None:
+        current = self.edit.text().strip()
+        start = current or str(Path.cwd())
+        if self.kind == "directory":
+            selected = QFileDialog.getExistingDirectory(self, "选择目录", start)
+        elif self.kind == "save_file":
+            selected, _ = QFileDialog.getSaveFileName(self, "选择输出文件", start, self.file_filter)
+        else:
+            selected, _ = QFileDialog.getOpenFileName(self, "选择文件", start, self.file_filter)
+        if selected:
+            self.edit.setText(selected)
+
+
+class ExecutionModeControl(QComboBox):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.addItem("安全预览（不写入文件）", "dry_run")
+        self.addItem("实际执行（会写入文件）", "apply")
+
+
 class ToolRunnerPage(QWidget):
     status_changed = Signal(str)
 
@@ -51,6 +105,7 @@ class ToolRunnerPage(QWidget):
         )
         self.current_tool: ToolDescriptor | None = None
         self.argument_widgets: dict[str, QWidget] = {}
+        self.argument_forms: dict[str, QFormLayout] = {}
         self._setup_ui()
         self._connect_signals()
         self.refresh_tools()
@@ -129,9 +184,10 @@ class ToolRunnerPage(QWidget):
 
         self.argument_container = QWidget()
         self.argument_container.setObjectName("argumentContainer")
-        self.argument_form = QFormLayout(self.argument_container)
-        self.argument_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-        self.argument_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.argument_layout = QVBoxLayout(self.argument_container)
+        self.argument_layout.setContentsMargins(8, 4, 8, 8)
+        self.argument_layout.setSpacing(8)
+        self.argument_layout.addStretch()
         argument_scroll = QScrollArea()
         argument_scroll.setWidgetResizable(True)
         argument_scroll.setWidget(self.argument_container)
@@ -253,67 +309,128 @@ class ToolRunnerPage(QWidget):
         if descriptor.parse_error:
             description += f"\n\n参数解析失败：{descriptor.parse_error}"
         self.description_view.setPlainText(description)
-        for argument in descriptor.arguments:
+        visible_arguments = [argument for argument in descriptor.arguments if not argument.hidden]
+        mode_arguments = {argument.dest: argument for argument in visible_arguments}
+        mode_added = False
+        for argument in visible_arguments:
+            if argument.dest in ("dry_run", "apply") and {"dry_run", "apply"} <= mode_arguments.keys():
+                if not mode_added:
+                    self._add_execution_mode_control(
+                        mode_arguments["dry_run"],
+                        mode_arguments["apply"],
+                    )
+                    mode_added = True
+                continue
             self._add_argument_control(argument)
-        if not descriptor.arguments:
+        if not visible_arguments:
             empty_label = QLabel("该工具未声明命令行参数，可直接执行或使用下方附加参数。")
             empty_label.setObjectName("mutedLabel")
-            self.argument_form.addRow(empty_label)
-        self._connect_mutually_exclusive_flags()
+            self.argument_layout.insertWidget(0, empty_label)
         self.preview_badge.setText("支持安全预览" if descriptor.supports_dry_run else "执行前确认")
         self.run_button.setEnabled(not descriptor.parse_error and not self.controller.is_running)
         self._update_command_preview()
 
     def _clear_form(self) -> None:
-        while self.argument_form.rowCount():
-            self.argument_form.removeRow(0)
+        while self.argument_layout.count():
+            item = self.argument_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
         self.argument_widgets.clear()
+        self.argument_forms.clear()
+
+    def _form_for_group(self, group_name: str) -> QFormLayout:
+        if group_name in self.argument_forms:
+            return self.argument_forms[group_name]
+        group = QGroupBox(group_name)
+        form = QFormLayout(group)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(8)
+        self.argument_layout.addWidget(group)
+        self.argument_forms[group_name] = form
+        return form
+
+    @staticmethod
+    def _label_text(argument: ToolArgument) -> str:
+        required = " *" if argument.required else ""
+        return f"{argument.display_label}{required}  [{argument.display_type}]"
+
+    def _add_execution_mode_control(
+        self,
+        dry_run: ToolArgument,
+        apply: ToolArgument,
+    ) -> None:
+        control = ExecutionModeControl()
+        control.setToolTip(f"{dry_run.help}\n{apply.help}".strip())
+        control.currentIndexChanged.connect(self._update_command_preview)
+        self.argument_widgets["dry_run"] = control
+        self.argument_widgets["apply"] = control
+        self._form_for_group(dry_run.group).addRow("执行方式  [模式]", control)
 
     def _add_argument_control(self, argument: ToolArgument) -> None:
-        label_text = argument.option + (" *" if argument.required else "")
+        label_text = self._label_text(argument)
+        placeholder = argument.placeholder or argument.help
         if argument.is_boolean:
-            widget: QWidget = QCheckBox(argument.help or "启用")
-            if argument.option == "--dry-run":
-                widget.setChecked(True)
+            widget: QWidget = QCheckBox("启用")
         elif argument.choices:
             combo = QComboBox()
             combo.addItem("使用脚本默认值", None)
             for choice in argument.choices:
                 combo.addItem(str(choice), str(choice))
             widget = combo
+        elif argument.kind in ("file", "save_file", "directory"):
+            path_edit = PathArgumentEdit(argument.kind, argument.file_filter)
+            path_edit.setPlaceholderText(placeholder)
+            widget = path_edit
+        elif argument.takes_multiple or argument.action == "append":
+            values_edit = QPlainTextEdit()
+            values_edit.setPlaceholderText(placeholder or "每行一个值")
+            values_edit.setFixedHeight(62)
+            widget = values_edit
         else:
             edit = QLineEdit()
-            placeholder = argument.help
             if argument.default not in (None, "", False):
                 placeholder = f"默认: {argument.default}" + (f" | {placeholder}" if placeholder else "")
             edit.setPlaceholderText(placeholder)
             widget = edit
-        widget.setToolTip(argument.help)
+        tooltip = f"命令行参数: {argument.option}"
+        if argument.help:
+            tooltip += f"\n{argument.help}"
+        widget.setToolTip(tooltip)
         self.argument_widgets[argument.dest] = widget
-        self.argument_form.addRow(label_text, widget)
+        self._form_for_group(argument.group).addRow(label_text, widget)
         if isinstance(widget, QCheckBox):
             widget.toggled.connect(self._update_command_preview)
         elif isinstance(widget, QComboBox):
             widget.currentIndexChanged.connect(self._update_command_preview)
         elif isinstance(widget, QLineEdit):
             widget.textChanged.connect(self._update_command_preview)
-
-    def _connect_mutually_exclusive_flags(self) -> None:
-        dry_run = self.argument_widgets.get("dry_run")
-        apply = self.argument_widgets.get("apply")
-        if isinstance(dry_run, QCheckBox) and isinstance(apply, QCheckBox):
-            dry_run.toggled.connect(lambda checked: apply.setChecked(False) if checked else None)
-            apply.toggled.connect(lambda checked: dry_run.setChecked(False) if checked else None)
+        elif isinstance(widget, PathArgumentEdit):
+            widget.textChanged.connect(self._update_command_preview)
+        elif isinstance(widget, QPlainTextEdit):
+            widget.textChanged.connect(self._update_command_preview)
 
     def _collect_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {}
         for dest, widget in self.argument_widgets.items():
-            if isinstance(widget, QCheckBox):
+            if isinstance(widget, ExecutionModeControl):
+                values[dest] = widget.currentData() == dest
+            elif isinstance(widget, QCheckBox):
                 values[dest] = widget.isChecked()
             elif isinstance(widget, QComboBox):
                 values[dest] = widget.currentData()
             elif isinstance(widget, QLineEdit):
                 values[dest] = widget.text().strip()
+            elif isinstance(widget, PathArgumentEdit):
+                values[dest] = widget.text().strip()
+            elif isinstance(widget, QPlainTextEdit):
+                values[dest] = [
+                    line.strip()
+                    for line in widget.toPlainText().splitlines()
+                    if line.strip()
+                ]
         return values
 
     def _extra_arguments(self) -> list[str]:

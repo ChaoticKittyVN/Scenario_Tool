@@ -171,7 +171,24 @@ class MainWindowUI:
 
         # 操作按钮
         btn_layout = QHBoxLayout()
+        self.param_mappings_btn = QPushButton("仅生成映射文件")
+        self.param_mappings_btn.setObjectName("secondaryButton")
+        self.param_mappings_btn.setToolTip(
+            "从 param_data 和 variant_data 生成 Python 映射文件，不修改演出表格"
+        )
+        self.param_mappings_btn.setMinimumHeight(40)
+        btn_layout.addWidget(self.param_mappings_btn)
+
+        self.param_sheet_btn = QPushButton("仅同步参数表")
+        self.param_sheet_btn.setObjectName("secondaryButton")
+        self.param_sheet_btn.setToolTip(
+            "使用现有 param_data 和 variant_data 更新演出表格中的参数表"
+        )
+        self.param_sheet_btn.setMinimumHeight(40)
+        btn_layout.addWidget(self.param_sheet_btn)
+
         self.param_update_btn = QPushButton("更新映射并同步参数表")
+        self.param_update_btn.setToolTip("依次生成映射文件并同步演出表格参数表")
         self.param_update_btn.setMinimumHeight(40)
         btn_layout.addWidget(self.param_update_btn)
         layout.addLayout(btn_layout)
