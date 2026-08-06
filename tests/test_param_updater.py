@@ -11,6 +11,12 @@ from update_param import ParamUpdater, parse_args
 from core.config_manager import AppConfig
 
 
+def test_update_param_facade_reexports_core_updater():
+    from core.param_update import ParamUpdater as CoreParamUpdater
+
+    assert ParamUpdater is CoreParamUpdater
+
+
 class TestParamUpdater:
     """测试 ParamUpdater 类"""
 
