@@ -5,7 +5,7 @@ import pytest
 import pandas as pd
 from pathlib import Path
 from unittest.mock import Mock, patch
-from update_param import ParamUpdater
+from update_param import ParamUpdater, parse_args
 from core.config_manager import AppConfig
 
 
@@ -501,6 +501,47 @@ class TestParamUpdater:
             assert '音乐1' in music_col_values
             wb.close()
 
+    def test_update_scenario_param_sheets_with_explicit_workbooks(self, updater, tmp_path):
+        """显式工作簿列表应绕过 input_dir，只更新指定文件。"""
+        from openpyxl import Workbook, load_workbook
+
+        explicit_file = tmp_path / "explicit.xlsx"
+        untouched_file = updater.config.paths.input_dir / "untouched.xlsx"
+        for excel_file in (explicit_file, untouched_file):
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "参数表"
+            ws["A1"] = "Music"
+            ws["A2"] = "旧音乐"
+            wb.save(excel_file)
+            wb.close()
+
+        validation_data = {"Music": ["音乐1", "音乐2"]}
+        result = updater.update_scenario_param_sheets(validation_data, [explicit_file])
+
+        assert result is True
+        explicit_wb = load_workbook(explicit_file)
+        untouched_wb = load_workbook(untouched_file)
+        explicit_sheet = explicit_wb["参数表"]
+        music_column = next(
+            cell.column for cell in explicit_sheet[1] if cell.value == "Music"
+        )
+        assert explicit_sheet.cell(row=2, column=music_column).value == "音乐1"
+        assert untouched_wb["参数表"]["A2"].value == "旧音乐"
+        explicit_wb.close()
+        untouched_wb.close()
+
+    def test_update_scenario_param_sheets_missing_explicit_workbook(self, updater, tmp_path):
+        """显式目标不存在时不应回退处理 input_dir。"""
+        validation_data = {"Music": ["音乐1"]}
+
+        result = updater.update_scenario_param_sheets(
+            validation_data,
+            [tmp_path / "missing.xlsx"],
+        )
+
+        assert result is True
+
 
 class TestParamUpdaterIntegration:
     """集成测试：测试完整的参数更新流程"""
@@ -748,6 +789,97 @@ class TestUpdateMappingsMethod:
 
         # 应该成功
         assert result is True
+
+    def test_update_mappings_mappings_only(self, updater):
+        """仅映射模式不应更新任何演出表格。"""
+        param_file = updater.config.paths.param_config_dir / "param_data_renpy.xlsx"
+        with pd.ExcelWriter(param_file, engine="openpyxl") as writer:
+            pd.DataFrame(
+                {"ExcelParam": ["音乐1"], "ScenarioParam": ["music1"]}
+            ).to_excel(writer, sheet_name="Music", index=False)
+
+        with patch.object(updater, "update_scenario_param_sheets") as update_sheets:
+            result = updater.update_mappings(update_parameter_sheets=False)
+
+        assert result is True
+        assert (updater.config.paths.param_config_dir / "param_mappings.py").exists()
+        update_sheets.assert_not_called()
+
+    def test_update_mappings_parameter_sheet_only(self, updater):
+        """仅参数表模式不应重新生成映射模块。"""
+        param_file = updater.config.paths.param_config_dir / "param_data_renpy.xlsx"
+        with pd.ExcelWriter(param_file, engine="openpyxl") as writer:
+            pd.DataFrame(
+                {"ExcelParam": ["音乐1"], "ScenarioParam": ["music1"]}
+            ).to_excel(writer, sheet_name="Music", index=False)
+
+        with (
+            patch.object(updater, "generate_mappings_file") as generate_file,
+            patch.object(updater, "update_scenario_param_sheets", return_value=True) as update_sheets,
+        ):
+            result = updater.update_mappings(generate_mapping_files=False)
+
+        assert result is True
+        generate_file.assert_not_called()
+        update_sheets.assert_called_once()
+
+    def test_update_mappings_dry_run_does_not_write(self, updater):
+        """dry-run 应完成读取和预览，但不能写文件或 Excel。"""
+        param_file = updater.config.paths.param_config_dir / "param_data_renpy.xlsx"
+        with pd.ExcelWriter(param_file, engine="openpyxl") as writer:
+            pd.DataFrame(
+                {"ExcelParam": ["音乐1"], "ScenarioParam": ["music1"]}
+            ).to_excel(writer, sheet_name="Music", index=False)
+
+        with (
+            patch.object(updater, "generate_mappings_file") as generate_file,
+            patch.object(updater, "update_scenario_param_sheets") as update_sheets,
+            patch.object(updater, "preview_scenario_param_sheets", return_value=True) as preview,
+        ):
+            result = updater.update_mappings(dry_run=True)
+
+        assert result is True
+        generate_file.assert_not_called()
+        update_sheets.assert_not_called()
+        preview.assert_called_once()
+        assert not (updater.config.paths.param_config_dir / "param_mappings.py").exists()
+
+
+class TestParamUpdaterCli:
+    def test_default_arguments_preserve_full_apply(self, monkeypatch):
+        """无参数执行必须保持生成映射并同步 input 的旧流程。"""
+        monkeypatch.setattr("sys.argv", ["update_param.py"])
+
+        args = parse_args()
+
+        assert args.config == "config.yaml"
+        assert args.engine is None
+        assert args.workbook is None
+        assert args.dry_run is False
+        assert args.apply is False
+        assert args.mappings_only is False
+        assert args.parameter_sheet_only is False
+
+    def test_cli_modes(self, monkeypatch):
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "update_param.py",
+                "--engine",
+                "naninovel",
+                "--dry-run",
+                "--parameter-sheet-only",
+                "--workbook",
+                "chapter.xlsx",
+            ],
+        )
+
+        args = parse_args()
+
+        assert args.engine == "naninovel"
+        assert args.dry_run is True
+        assert args.parameter_sheet_only is True
+        assert args.workbook == ["chapter.xlsx"]
 
 
 class TestEdgeCases:

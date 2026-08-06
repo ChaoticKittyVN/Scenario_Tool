@@ -2,6 +2,7 @@
 参数映射更新工具
 从 Excel 参数文件生成 Python 参数映射模块
 """
+import argparse
 import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -10,7 +11,7 @@ from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
 from core.sentence_generator_manager import SentenceGeneratorManager
-from core.config_manager import AppConfig
+from core.config_manager import AppConfig, _create_engine_config
 from core.logger import get_logger
 from core.excel_management import (
     ExcelManagerError,
@@ -230,7 +231,11 @@ class ParamUpdater:
             logger.error(f"获取数据验证参数类型时发生错误: {e}")
             return {}
 
-    def update_scenario_param_sheets(self, validation_data: Dict[str, List[str]]) -> bool:
+    def update_scenario_param_sheets(
+        self,
+        validation_data: Dict[str, List[str]],
+        scenario_workbooks: Optional[List[Path]] = None,
+    ) -> bool:
         """
         更新演出表格中的参数表工作表
 
@@ -255,18 +260,24 @@ class ParamUpdater:
 
         all_params = sorted(validate_params + translate_params)
 
-        # 获取 input 目录
-        input_dir = Path(self.config.paths.input_dir)
-        if not input_dir.exists():
-            logger.error(f"输入目录不存在: {input_dir}")
-            return False
+        if scenario_workbooks is None:
+            input_dir = Path(self.config.paths.input_dir)
+            if not input_dir.exists():
+                logger.error(f"输入目录不存在: {input_dir}")
+                return False
+            excel_files = list(input_dir.glob("*.xlsx"))
+        else:
+            excel_files = [Path(path) for path in scenario_workbooks]
 
-        # 查找所有 Excel 文件
-        excel_files = list(input_dir.glob("*.xlsx"))
         excel_files = [f for f in excel_files if not f.name.startswith("~")]
+        missing_files = [f for f in excel_files if not f.exists()]
+        for missing_file in missing_files:
+            logger.error(f"指定的演出表格不存在: {missing_file}")
+        excel_files = [f for f in excel_files if f.exists() and f.suffix.lower() == ".xlsx"]
 
         if not excel_files:
-            logger.warning(f"在 {input_dir} 中没有找到 Excel 文件")
+            location = str(input_dir) if scenario_workbooks is None else "显式工作簿列表"
+            logger.warning(f"在 {location} 中没有找到 Excel 文件")
             return True
 
         logger.info(f"找到 {len(excel_files)} 个演出表格文件")
@@ -312,10 +323,65 @@ class ParamUpdater:
         logger.info(f"处理完成，成功更新 {success_count}/{len(excel_files)} 个文件")
         return success_count > 0
 
-    def update_mappings(self) -> bool:
-        """更新参数映射"""
+    def preview_scenario_param_sheets(
+        self,
+        validation_data: Dict[str, List[str]],
+        scenario_workbooks: Optional[List[Path]] = None,
+    ) -> bool:
+        """预览参数表同步范围，不写入任何文件。"""
+        param_types = self.get_all_validate_params()
+        if not param_types:
+            logger.error("无法获取参数翻译类型词典")
+            return False
+
+        all_params = sorted(
+            param_types.get("validate_types", [])
+            + param_types.get("translate_types", [])
+        )
+        if scenario_workbooks is None:
+            input_dir = Path(self.config.paths.input_dir)
+            if not input_dir.exists():
+                logger.error(f"输入目录不存在: {input_dir}")
+                return False
+            excel_files = list(input_dir.glob("*.xlsx"))
+        else:
+            excel_files = [Path(path) for path in scenario_workbooks]
+
+        excel_files = [
+            path
+            for path in excel_files
+            if path.exists()
+            and path.suffix.lower() == ".xlsx"
+            and not path.name.startswith("~")
+        ]
+        logger.info("DRY RUN：不会修改演出表格")
+        logger.info(f"将同步 {len(excel_files)} 个工作簿、{len(all_params)} 个参数类型")
+        for excel_file in excel_files:
+            logger.info(f"  参数表目标: {excel_file}")
+        for param_type in all_params:
+            logger.debug(
+                f"  参数类型 {param_type}: {len(validation_data.get(param_type, []))} 个值"
+            )
+        return True
+
+    def update_mappings(
+        self,
+        scenario_workbooks: Optional[List[Path]] = None,
+        generate_mapping_files: bool = True,
+        update_parameter_sheets: bool = True,
+        dry_run: bool = False,
+    ) -> bool:
+        """生成映射并/或同步参数表；默认行为保持原完整流程。"""
         logger.info("=" * 60)
         logger.info(f"开始更新参数映射 (引擎: {self.engine_type})")
+        if dry_run:
+            logger.info("模式: DRY RUN")
+        elif generate_mapping_files and not update_parameter_sheets:
+            logger.info("模式: 仅生成映射")
+        elif update_parameter_sheets and not generate_mapping_files:
+            logger.info("模式: 仅同步参数表")
+        else:
+            logger.info("模式: 完整更新")
         logger.info("=" * 60)
 
         # 阶段1: 生成基础参数映射
@@ -330,13 +396,16 @@ class ParamUpdater:
             logger.info(f"读取参数文件: {param_file}")
             mappings = self.read_param_file(param_file)
 
-            if not mappings:
+            if generate_mapping_files and not mappings:
                 logger.error("未能读取到任何参数映射")
                 return False
 
             output_file = self.config.paths.param_config_dir / "param_mappings.py"
-            logger.info(f"生成参数映射文件: {output_file}")
-            self.generate_mappings_file(mappings, output_file)
+            if generate_mapping_files:
+                action = "将生成" if dry_run else "生成"
+                logger.info(f"{action}参数映射文件: {output_file}")
+                if not dry_run:
+                    self.generate_mappings_file(mappings, output_file)
 
             total_mappings = sum(len(m) for m in mappings.values())
             logger.info(f"基础参数映射: {len(mappings)} 个工作表, {total_mappings} 个映射")
@@ -352,21 +421,30 @@ class ParamUpdater:
         if variant_file.exists():
             logger.info(f"读取差分参数文件: {variant_file}")
             try:
-                # 差分参数文件不跳过模板工作表，保持与原项目一致
-                variant_mappings = self.read_param_file(variant_file, skip_template=False)
+                if generate_mapping_files:
+                    # 差分参数文件不跳过模板工作表，保持与原项目一致
+                    variant_mappings = self.read_param_file(variant_file, skip_template=False)
 
-                # 生成差分映射文件（保持与原项目一致，包含空映射）
-                variant_output = self.config.paths.param_config_dir / "variant_mappings.py"
-                logger.info(f"生成差分参数映射文件: {variant_output}")
-                self.generate_mappings_file(variant_mappings, variant_output)
+                    # 生成差分映射文件（保持与原项目一致，包含空映射）
+                    variant_output = self.config.paths.param_config_dir / "variant_mappings.py"
+                    action = "将生成" if dry_run else "生成"
+                    logger.info(f"{action}差分参数映射文件: {variant_output}")
+                    if not dry_run:
+                        self.generate_mappings_file(variant_mappings, variant_output)
 
-                # 统计有效映射（排除模板）
-                valid_mappings = {k: v for k, v in variant_mappings.items() if v and "模板" not in k}
-                if valid_mappings:
-                    total_variant = sum(len(m) for m in valid_mappings.values())
-                    logger.info(f"差分参数映射: {len(valid_mappings)} 个角色, {total_variant} 个映射")
-                else:
-                    logger.info("差分参数文件中没有有效的角色映射")
+                    # 统计有效映射（排除模板）
+                    valid_mappings = {
+                        key: value
+                        for key, value in variant_mappings.items()
+                        if value and "模板" not in key
+                    }
+                    if valid_mappings:
+                        total_variant = sum(len(mapping) for mapping in valid_mappings.values())
+                        logger.info(
+                            f"差分参数映射: {len(valid_mappings)} 个角色, {total_variant} 个映射"
+                        )
+                    else:
+                        logger.info("差分参数文件中没有有效的角色映射")
                     
                 # 将文件路径赋值给变量
                 variant_file_path = variant_file
@@ -377,23 +455,33 @@ class ParamUpdater:
         else:
             logger.info("差分参数文件不存在，跳过")
 
-        # 阶段3: 更新演出表格的参数表
-        logger.info("=" * 60)
-        logger.info("更新演出表格参数表")
-        logger.info("=" * 60)
+        if update_parameter_sheets:
+            # 阶段3: 更新演出表格的参数表
+            logger.info("=" * 60)
+            logger.info("更新演出表格参数表")
+            logger.info("=" * 60)
 
-        try:
-            validation_data = self.collect_validation_data(param_file, variant_file_path)
-            if validation_data:
-                logger.info(f"收集到 {len(validation_data)} 个参数类型的验证数据")
-                success = self.update_scenario_param_sheets(validation_data)
-                if not success:
-                    logger.warning("更新演出表格参数表时出现错误，但主流程继续")
-            else:
-                logger.warning("未能收集到验证数据，跳过演出表格更新")
-        except Exception as e:
-            logger.error(f"更新演出表格参数表时失败: {e}")
-            # 不返回False，因为参数映射文件已经生成成功
+            try:
+                validation_data = self.collect_validation_data(param_file, variant_file_path)
+                if validation_data:
+                    logger.info(f"收集到 {len(validation_data)} 个参数类型的验证数据")
+                    if dry_run:
+                        success = self.preview_scenario_param_sheets(
+                            validation_data,
+                            scenario_workbooks,
+                        )
+                    else:
+                        success = self.update_scenario_param_sheets(
+                            validation_data,
+                            scenario_workbooks,
+                        )
+                    if not success:
+                        logger.warning("更新演出表格参数表时出现错误，但主流程继续")
+                else:
+                    logger.warning("未能收集到验证数据，跳过演出表格更新")
+            except Exception as e:
+                logger.error(f"更新演出表格参数表时失败: {e}")
+                # 不返回False，因为参数映射文件可能已经生成成功
 
         logger.info("=" * 60)
         logger.info(f"参数映射更新完成")
@@ -402,34 +490,88 @@ class ParamUpdater:
         return True
 
 
-def main():
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="更新参数映射并同步演出表格的参数表。")
+    parser.add_argument("--config", default="config.yaml", help="配置文件路径。")
+    parser.add_argument(
+        "--engine",
+        choices=["renpy", "naninovel", "utage"],
+        help="覆盖 config.yaml 中的 engine_type。",
+    )
+    parser.add_argument(
+        "--workbook",
+        action="append",
+        help="只同步指定演出工作簿的参数表，可重复指定。省略时处理配置中的 input_dir。",
+    )
+    execution_mode = parser.add_mutually_exclusive_group()
+    execution_mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="只读取并报告将执行的操作，不写入映射文件或 Excel。",
+    )
+    execution_mode.add_argument(
+        "--apply",
+        action="store_true",
+        help="显式执行写入；不带 --dry-run 时本来就会执行，用于提高命令可读性。",
+    )
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument(
+        "--mappings-only",
+        action="store_true",
+        help="只生成 param_mappings.py 和 variant_mappings.py，不更新演出表格。",
+    )
+    scope.add_argument(
+        "--parameter-sheet-only",
+        action="store_true",
+        help="只从 param_data/variant_data 同步参数表，不重新生成映射模块。",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
     """主函数"""
     try:
+        args = parse_args()
         # 加载配置
-        config_path = Path("config.yaml")
+        config_path = Path(args.config)
         if not config_path.exists():
-            logger.error("配置文件不存在: config.yaml")
-            return
+            logger.error(f"配置文件不存在: {config_path}")
+            return 2
 
         config = AppConfig.from_file(config_path)
+        if args.engine:
+            config.engine = _create_engine_config(args.engine)
 
         # 创建更新器
         updater = ParamUpdater(config)
 
         # 执行更新
-        success = updater.update_mappings()
+        workbooks = [Path(path).resolve() for path in args.workbook] if args.workbook else None
+        generate_mapping_files = not args.parameter_sheet_only
+        update_parameter_sheets = not args.mappings_only
+        if args.mappings_only and workbooks:
+            logger.warning("--mappings-only 模式不会使用 --workbook 参数")
+        success = updater.update_mappings(
+            workbooks,
+            generate_mapping_files=generate_mapping_files,
+            update_parameter_sheets=update_parameter_sheets,
+            dry_run=args.dry_run,
+        )
 
         if success:
             logger.info("参数映射更新成功")
+            return 0
         else:
             logger.error("参数映射更新失败")
+            return 1
 
     except KeyboardInterrupt:
         logger.info("用户中断操作")
+        return 130
     except Exception as e:
         logger.critical(f"参数更新过程失败: {e}", exc_info=True)
-        raise
+        return 2
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
