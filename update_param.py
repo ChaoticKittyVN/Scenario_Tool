@@ -500,6 +500,149 @@ class ParamUpdater:
                 )
         return True
 
+    def _default_param_file(self) -> Path:
+        """返回当前引擎的基础参数文件。"""
+        return (
+            Path(self.config.paths.param_config_dir)
+            / f"param_data_{self.engine_type}.xlsx"
+        )
+
+    def _variant_data_file(self) -> Path:
+        """返回差分参数文件。"""
+        return Path(self.config.paths.param_config_dir) / "variant_data.xlsx"
+
+    def generate_param_mappings(self, dry_run: bool = False) -> bool:
+        """生成 param_mappings.py。"""
+        param_file = self._default_param_file()
+        if not param_file.exists():
+            logger.error(f"参数文件不存在: {param_file}")
+            logger.info("请确保参数文件存在")
+            return False
+
+        try:
+            logger.debug(f"读取参数文件: {param_file}")
+            mappings_list = [self.read_param_file(param_file)]
+            project_param_files = self._find_project_param_files()
+            for project_file, project_key in project_param_files:
+                project_mappings = self.read_param_file(project_file)
+                if project_mappings:
+                    mappings_list.append(project_mappings)
+                    logger.info(f"已加载项目 '{project_key}' 的参数映射")
+            mappings = self._merge_mappings(mappings_list)
+
+            if not mappings:
+                logger.error("未能读取到任何参数映射")
+                return False
+
+            output_file = Path(self.config.paths.param_config_dir) / "param_mappings.py"
+            action = "将生成" if dry_run else "生成"
+            logger.debug(f"{action}参数映射文件: {output_file}")
+            if not dry_run:
+                self.generate_mappings_file(mappings, output_file)
+
+            total_mappings = sum(len(mapping) for mapping in mappings.values())
+            mode_label = "多项目合并参数映射" if self.multi_project_mode else "基础参数映射"
+            logger.info(
+                f"{mode_label}: {len(mappings)} 个工作表, {total_mappings} 个映射"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"处理基础参数映射时失败: {e}")
+            return False
+
+    def generate_variant_mappings(
+        self,
+        dry_run: bool = False,
+    ) -> tuple[bool, Optional[Path]]:
+        """生成 variant_mappings.py，并返回可用于参数表同步的 variant_data 路径。"""
+        variant_file = self._variant_data_file()
+        if not variant_file.exists():
+            logger.debug("差分参数文件不存在，跳过")
+            return True, None
+
+        logger.debug(f"读取差分参数文件: {variant_file}")
+        try:
+            # 差分参数文件不跳过模板工作表，保持与原项目一致
+            variant_mappings = self.read_param_file(variant_file, skip_template=False)
+
+            # 生成差分映射文件（保持与原项目一致，包含空映射）
+            variant_output = (
+                Path(self.config.paths.param_config_dir) / "variant_mappings.py"
+            )
+            action = "将生成" if dry_run else "生成"
+            logger.debug(f"{action}差分参数映射文件: {variant_output}")
+            if not dry_run:
+                self.generate_mappings_file(variant_mappings, variant_output)
+
+            # 统计有效映射（排除模板）
+            valid_mappings = {
+                key: value
+                for key, value in variant_mappings.items()
+                if value and "模板" not in key
+            }
+            if valid_mappings:
+                total_variant = sum(
+                    len(mapping) for mapping in valid_mappings.values()
+                )
+                logger.info(
+                    f"差分参数映射: {len(valid_mappings)} 个角色, "
+                    f"{total_variant} 个映射"
+                )
+            else:
+                logger.info("差分参数文件中没有有效的角色映射")
+
+            return True, variant_file
+        except Exception as e:
+            logger.error(f"处理差分参数映射时失败: {e}")
+            return False, None
+
+    def sync_parameter_sheets(
+        self,
+        scenario_workbooks: Optional[List[Path]] = None,
+        dry_run: bool = False,
+    ) -> bool:
+        """收集基础、篇章和差分验证数据，并同步演出表参数表。"""
+        param_file = self._default_param_file()
+        if not param_file.exists():
+            logger.error(f"参数文件不存在: {param_file}")
+            logger.info("请确保参数文件存在")
+            return False
+
+        logger.debug("=" * 60)
+        logger.debug("更新演出表格参数表")
+        logger.debug("=" * 60)
+
+        if hasattr(self, "_variant_file_for_parameter_sync"):
+            variant_file = self._variant_file_for_parameter_sync
+        else:
+            configured_variant_file = self._variant_data_file()
+            variant_file = (
+                configured_variant_file if configured_variant_file.exists() else None
+            )
+        try:
+            validation_data = self.collect_validation_data(param_file, variant_file)
+            if not validation_data:
+                logger.warning("未能收集到验证数据，跳过演出表格更新")
+                return True
+
+            logger.debug(f"收集到 {len(validation_data)} 个参数类型的验证数据")
+            if dry_run:
+                success = self.preview_scenario_param_sheets(
+                    validation_data,
+                    scenario_workbooks,
+                )
+            else:
+                success = self.update_scenario_param_sheets(
+                    validation_data,
+                    scenario_workbooks,
+                )
+            if not success:
+                logger.warning("更新演出表格参数表时出现错误，但主流程继续")
+            return success
+        except Exception as e:
+            logger.error(f"更新演出表格参数表时失败: {e}")
+            return False
+
     def update_mappings(
         self,
         scenario_workbooks: Optional[List[Path]] = None,
@@ -520,112 +663,31 @@ class ParamUpdater:
             logger.info("执行模式: 完整更新")
         logger.debug("=" * 60)
 
-        # 阶段1: 生成基础参数映射
-        param_file = Path(self.config.paths.param_config_dir) / f"param_data_{self.engine_type}.xlsx"
-
+        param_file = self._default_param_file()
         if not param_file.exists():
             logger.error(f"参数文件不存在: {param_file}")
-            logger.info(f"请确保参数文件存在")
+            logger.info("请确保参数文件存在")
             return False
 
-        try:
-            logger.debug(f"读取参数文件: {param_file}")
-            mappings_list = [self.read_param_file(param_file)]
-            project_param_files = self._find_project_param_files()
-            for project_file, project_key in project_param_files:
-                project_mappings = self.read_param_file(project_file)
-                if project_mappings:
-                    mappings_list.append(project_mappings)
-                    logger.info(f"已加载项目 '{project_key}' 的参数映射")
-            mappings = self._merge_mappings(mappings_list)
-
-            if generate_mapping_files and not mappings:
-                logger.error("未能读取到任何参数映射")
+        variant_file_path: Optional[Path] = None
+        if generate_mapping_files:
+            if not self.generate_param_mappings(dry_run):
                 return False
-
-            output_file = self.config.paths.param_config_dir / "param_mappings.py"
-            if generate_mapping_files:
-                action = "将生成" if dry_run else "生成"
-                logger.debug(f"{action}参数映射文件: {output_file}")
-                if not dry_run:
-                    self.generate_mappings_file(mappings, output_file)
-
-            total_mappings = sum(len(m) for m in mappings.values())
-            mode_label = "多项目合并参数映射" if self.multi_project_mode else "基础参数映射"
-            logger.info(f"{mode_label}: {len(mappings)} 个工作表, {total_mappings} 个映射")
-            
-        except Exception as e:
-            logger.error(f"处理基础参数映射时失败: {e}")
-            return False
-
-        # 阶段2: 生成差分参数映射
-        variant_file = Path(self.config.paths.param_config_dir) / "variant_data.xlsx"
-        variant_file_path = None  # 明确设置为 None
-
-        if variant_file.exists():
-            logger.debug(f"读取差分参数文件: {variant_file}")
-            try:
-                if generate_mapping_files:
-                    # 差分参数文件不跳过模板工作表，保持与原项目一致
-                    variant_mappings = self.read_param_file(variant_file, skip_template=False)
-
-                    # 生成差分映射文件（保持与原项目一致，包含空映射）
-                    variant_output = self.config.paths.param_config_dir / "variant_mappings.py"
-                    action = "将生成" if dry_run else "生成"
-                    logger.debug(f"{action}差分参数映射文件: {variant_output}")
-                    if not dry_run:
-                        self.generate_mappings_file(variant_mappings, variant_output)
-
-                    # 统计有效映射（排除模板）
-                    valid_mappings = {
-                        key: value
-                        for key, value in variant_mappings.items()
-                        if value and "模板" not in key
-                    }
-                    if valid_mappings:
-                        total_variant = sum(len(mapping) for mapping in valid_mappings.values())
-                        logger.info(
-                            f"差分参数映射: {len(valid_mappings)} 个角色, {total_variant} 个映射"
-                        )
-                    else:
-                        logger.info("差分参数文件中没有有效的角色映射")
-                    
-                # 将文件路径赋值给变量
-                variant_file_path = variant_file
-                    
-            except Exception as e:
-                logger.error(f"处理差分参数映射时失败: {e}")
-                # 继续执行，不因为差分参数失败而停止整个流程
-        else:
-            logger.debug("差分参数文件不存在，跳过")
+            _, variant_file_path = self.generate_variant_mappings(dry_run)
 
         if update_parameter_sheets:
-            # 阶段3: 更新演出表格的参数表
-            logger.debug("=" * 60)
-            logger.debug("更新演出表格参数表")
-            logger.debug("=" * 60)
-
+            if generate_mapping_files:
+                self._variant_file_for_parameter_sync = variant_file_path
             try:
-                validation_data = self.collect_validation_data(param_file, variant_file_path)
-                if validation_data:
-                    logger.debug(f"收集到 {len(validation_data)} 个参数类型的验证数据")
-                    if dry_run:
-                        success = self.preview_scenario_param_sheets(
-                            validation_data,
-                            scenario_workbooks,
-                        )
-                    else:
-                        success = self.update_scenario_param_sheets(
-                            validation_data,
-                            scenario_workbooks,
-                        )
-                    if not success:
-                        logger.warning("更新演出表格参数表时出现错误，但主流程继续")
-                else:
-                    logger.warning("未能收集到验证数据，跳过演出表格更新")
-            except Exception as e:
-                logger.error(f"更新演出表格参数表时失败: {e}")
-                # 不返回False，因为参数映射文件可能已经生成成功
+                self.sync_parameter_sheets(
+                    scenario_workbooks=scenario_workbooks,
+                    dry_run=dry_run,
+                )
+            finally:
+                if generate_mapping_files and hasattr(
+                    self, "_variant_file_for_parameter_sync"
+                ):
+                    del self._variant_file_for_parameter_sync
 
         logger.debug("=" * 60)
         logger.info("参数映射更新完成")

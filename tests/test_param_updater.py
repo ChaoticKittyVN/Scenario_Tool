@@ -708,6 +708,33 @@ class TestUpdateMappingsMethod:
         # 应该返回 False
         assert result is False
 
+    def test_update_mappings_runs_three_stages_in_order(self, updater):
+        """默认完整流程应依次执行基础映射、差分映射和参数表同步。"""
+        updater._default_param_file().touch()
+        calls = []
+
+        with (
+            patch.object(
+                updater,
+                "generate_param_mappings",
+                side_effect=lambda dry_run=False: calls.append("param") or True,
+            ),
+            patch.object(
+                updater,
+                "generate_variant_mappings",
+                side_effect=lambda dry_run=False: calls.append("variant") or (True, None),
+            ),
+            patch.object(
+                updater,
+                "sync_parameter_sheets",
+                side_effect=lambda scenario_workbooks=None, dry_run=False: calls.append("sync") or True,
+            ),
+        ):
+            result = updater.update_mappings()
+
+        assert result is True
+        assert calls == ["param", "variant", "sync"]
+
     def test_update_mappings_success_without_variant(self, updater, tmp_path):
         """测试成功更新映射（没有差分文件）"""
         # 创建参数文件
@@ -807,7 +834,7 @@ class TestUpdateMappingsMethod:
                 {"ExcelParam": ["音乐1"], "ScenarioParam": ["music1"]}
             ).to_excel(writer, sheet_name="Music", index=False)
 
-        with patch.object(updater, "update_scenario_param_sheets") as update_sheets:
+        with patch.object(updater, "sync_parameter_sheets") as update_sheets:
             result = updater.update_mappings(update_parameter_sheets=False)
 
         assert result is True
@@ -823,13 +850,15 @@ class TestUpdateMappingsMethod:
             ).to_excel(writer, sheet_name="Music", index=False)
 
         with (
-            patch.object(updater, "generate_mappings_file") as generate_file,
-            patch.object(updater, "update_scenario_param_sheets", return_value=True) as update_sheets,
+            patch.object(updater, "generate_param_mappings") as generate_param,
+            patch.object(updater, "generate_variant_mappings") as generate_variant,
+            patch.object(updater, "sync_parameter_sheets", return_value=True) as update_sheets,
         ):
             result = updater.update_mappings(generate_mapping_files=False)
 
         assert result is True
-        generate_file.assert_not_called()
+        generate_param.assert_not_called()
+        generate_variant.assert_not_called()
         update_sheets.assert_called_once()
 
     def test_update_mappings_dry_run_does_not_write(self, updater):
@@ -852,6 +881,24 @@ class TestUpdateMappingsMethod:
         update_sheets.assert_not_called()
         preview.assert_called_once()
         assert not (updater.config.paths.param_config_dir / "param_mappings.py").exists()
+
+    def test_variant_mapping_failure_does_not_fail_full_update(self, updater):
+        """差分映射失败应保持原容错策略并继续参数表阶段。"""
+        updater._default_param_file().touch()
+
+        with (
+            patch.object(updater, "generate_param_mappings", return_value=True),
+            patch.object(
+                updater,
+                "generate_variant_mappings",
+                return_value=(False, None),
+            ),
+            patch.object(updater, "sync_parameter_sheets", return_value=True) as sync,
+        ):
+            result = updater.update_mappings()
+
+        assert result is True
+        sync.assert_called_once_with(scenario_workbooks=None, dry_run=False)
 
 
 class TestParamUpdaterCli:
@@ -972,6 +1019,48 @@ class TestMultiProjectParamUpdater:
 
         assert matched == {"Music": ["BaseMusic", "ChapterMusic"]}
         assert unmatched == base_data
+
+    def test_sync_parameter_sheets_applies_project_values_only_to_match(self, updater):
+        """参数表同步应只向匹配篇章的工作簿合并篇章参数。"""
+        from openpyxl import Workbook, load_workbook
+
+        param_dir = updater.config.paths.param_config_dir
+        self._write_param_file(param_dir / "param_data_renpy.xlsx", ["BaseMusic"])
+        self._write_param_file(
+            param_dir / "param_data_chapter_a.xlsx",
+            ["ChapterMusic"],
+        )
+
+        matched_file = updater.config.paths.input_dir / "第一篇_演出表.xlsx"
+        unmatched_file = updater.config.paths.input_dir / "公共演出表.xlsx"
+        for excel_file in (matched_file, unmatched_file):
+            workbook = Workbook()
+            workbook.active.title = "场景"
+            workbook.save(excel_file)
+            workbook.close()
+
+        with patch.object(
+            updater,
+            "get_all_validate_params",
+            return_value={"translate_types": ["Music"], "validate_types": []},
+        ):
+            assert updater.sync_parameter_sheets() is True
+
+        matched_workbook = load_workbook(matched_file)
+        unmatched_workbook = load_workbook(unmatched_file)
+        matched_values = [
+            matched_workbook["参数表"].cell(row=row, column=1).value
+            for row in range(2, matched_workbook["参数表"].max_row + 1)
+        ]
+        unmatched_values = [
+            unmatched_workbook["参数表"].cell(row=row, column=1).value
+            for row in range(2, unmatched_workbook["参数表"].max_row + 1)
+        ]
+        matched_workbook.close()
+        unmatched_workbook.close()
+
+        assert matched_values == ["BaseMusic", "ChapterMusic"]
+        assert unmatched_values == ["BaseMusic"]
 
 
 class TestEdgeCases:
