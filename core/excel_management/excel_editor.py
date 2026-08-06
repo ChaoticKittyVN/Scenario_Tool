@@ -35,7 +35,7 @@ class ExcelEditor:
     
     def __init__(self):
         """初始化Excel写入器"""
-        pass
+        self.last_update_status = "not_run"
     
     @handle_excel_operation
     def create_validation_template(self,
@@ -127,11 +127,24 @@ class ExcelEditor:
         Returns:
             bool: 是否更新成功
         """
+        wb = None
+        self.last_update_status = "failed"
         try:
-            logger.info(f"更新参数表: {file_path} -> {sheet_name}")
+            logger.debug(f"更新参数表: {file_path} -> {sheet_name}")
             
             # 加载工作簿
             wb = load_workbook(file_path)
+
+            if sheet_name in wb.sheetnames and self._parameter_sheet_matches(
+                wb,
+                wb[sheet_name],
+                sheet_name,
+                parameter_data,
+                create_named_ranges,
+            ):
+                self.last_update_status = "unchanged"
+                logger.debug(f"参数表内容和命名区域无变化，跳过保存: {file_path}")
+                return True
             
             # 获取或创建工作表
             if sheet_name in wb.sheetnames:
@@ -161,12 +174,78 @@ class ExcelEditor:
             
             # 保存工作簿
             wb.save(file_path)
-            logger.info(f"参数表更新成功: {file_path}")
+            self.last_update_status = "updated"
+            logger.debug(f"参数表更新成功: {file_path}")
             return True
             
         except Exception as e:
             logger.error(f"更新参数表失败: {file_path}", exc_info=True)
             raise ExcelWriteError(f"更新参数表失败: {file_path}", e)
+        finally:
+            if wb is not None:
+                wb.close()
+
+    def _parameter_sheet_matches(
+        self,
+        wb: Workbook,
+        ws,
+        sheet_name: str,
+        parameter_data: Dict[str, List[str]],
+        create_named_ranges: bool,
+    ) -> bool:
+        """检查参数表内容及预期命名区域是否与目标状态完全一致。"""
+        expected_columns = list(parameter_data.items())
+        expected_column_count = len(expected_columns)
+        expected_row_count = max(
+            (len(values) + 1 for _, values in expected_columns),
+            default=0,
+        )
+
+        for col_idx, (param_type, param_values) in enumerate(expected_columns, 1):
+            if ws.cell(row=1, column=col_idx).value != param_type:
+                return False
+            for row_idx, expected_value in enumerate(param_values, 2):
+                if ws.cell(row=row_idx, column=col_idx).value != expected_value:
+                    return False
+
+        for row in ws.iter_rows(
+            min_row=1,
+            max_row=max(ws.max_row, expected_row_count, 1),
+            min_col=1,
+            max_col=max(ws.max_column, expected_column_count, 1),
+        ):
+            for cell in row:
+                if cell.row <= expected_row_count and cell.column <= expected_column_count:
+                    _, values = expected_columns[cell.column - 1]
+                    allowed_row_count = len(values) + 1
+                    if cell.row <= allowed_row_count:
+                        continue
+                if cell.value is not None:
+                    return False
+
+        if create_named_ranges:
+            for col_idx, (param_type, param_values) in enumerate(expected_columns, 1):
+                if not param_values:
+                    continue
+                range_name = f"{param_type}List"
+                defined_name = wb.defined_names.get(range_name)
+                if (
+                    defined_name is None
+                    or defined_name.attr_text
+                    != self._named_range_formula(sheet_name, col_idx)
+                ):
+                    return False
+
+        return True
+
+    @staticmethod
+    def _named_range_formula(sheet_name: str, col_idx: int) -> str:
+        col_letter = get_column_letter(col_idx)
+        return (
+            f"OFFSET({sheet_name}!${col_letter}$2,0,0,"
+            f"COUNTA({sheet_name}!${col_letter}:${col_letter})-1,1)"
+        )
+
     def _create_named_range(
         self,
         wb: Workbook,
@@ -184,14 +263,10 @@ class ExcelEditor:
             col_idx: 列索引
         """
         try:
-            from openpyxl.utils import get_column_letter
             from openpyxl.workbook.defined_name import DefinedName
             
             range_name = f"{param_type}List"
-            col_letter = get_column_letter(col_idx)
-            
-            # 动态范围公式
-            dynamic_range = f"OFFSET({sheet_name}!${col_letter}$2,0,0,COUNTA({sheet_name}!${col_letter}:${col_letter})-1,1)"
+            dynamic_range = self._named_range_formula(sheet_name, col_idx)
             
             # 删除已存在的同名区域
             if range_name in wb.defined_names:

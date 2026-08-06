@@ -58,7 +58,7 @@ class ExcelFileManager:
             logger.debug(f"从缓存加载Excel文件: {file_path}")
             return self._file_cache[file_path]
         
-        logger.info(f"加载Excel文件: {file_path}")
+        logger.debug(f"加载Excel文件: {file_path}")
         try:
             # 读取所有工作表，所有列作为字符串类型处理
             data = pd.read_excel(file_path, sheet_name=None, dtype=str)

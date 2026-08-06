@@ -24,14 +24,17 @@ class ColoredFormatter(logging.Formatter):
 
     def format(self, record):
         # 获取日志级别对应的颜色
-        levelname = record.levelname
-        color = self.COLORS.get(levelname, self.RESET)
+        original_levelname = record.levelname
+        color = self.COLORS.get(original_levelname, self.RESET)
 
         # 给日志级别添加颜色和加粗
-        record.levelname = f"{self.BOLD}{color}{levelname}{self.RESET}"
+        record.levelname = f"{self.BOLD}{color}{original_levelname}{self.RESET}"
 
-        # 格式化消息
-        return super().format(record)
+        try:
+            return super().format(record)
+        finally:
+            # 同一条记录还会交给文件处理器，不能把 ANSI 颜色泄漏到日志文件。
+            record.levelname = original_levelname
 
 
 class ScenarioToolLogger:

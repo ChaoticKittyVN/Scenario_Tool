@@ -28,7 +28,7 @@ class SentenceGeneratorManager:
         """加载所有生成器类和参数配置"""
         if self._loaded:
             return
-        logger.info(f"开始加载 {self.engine_type} 引擎的生成器")
+        logger.debug(f"开始加载 {self.engine_type} 引擎的生成器")
         self._discover_generator_classes()
         self._collect_param_configs()
         self._loaded = True
@@ -72,7 +72,7 @@ class SentenceGeneratorManager:
             if param_config and isinstance(param_config, dict):
                 self.param_configs.update(param_config)
                 total_params += len(param_config)
-        logger.info(f"从 {len(self.generator_classes)} 个生成器收集了 {total_params} 个参数配置")
+        logger.debug(f"从 {len(self.generator_classes)} 个生成器收集了 {total_params} 个参数配置")
 
     def create_generator_instances(
         self,
@@ -89,9 +89,9 @@ class SentenceGeneratorManager:
             except Exception as e:
                 logger.error(f"创建 {generator_class.__name__} 实例失败: {e}")
         instances.sort(key=lambda g: g.priority)
-        logger.info(f"共创建 {len(instances)} 个生成器")
+        logger.debug(f"共创建 {len(instances)} 个生成器")
         for i, generator in enumerate(instances, 1):
-            logger.info(f"  {i}. {generator.__class__.__name__} (优先级: {generator.priority})")
+            logger.debug(f"  {i}. {generator.__class__.__name__} (优先级: {generator.priority})")
         return instances
 
     def get_all_param_names(self) -> List[str]:
@@ -128,6 +128,6 @@ class SentenceGeneratorManager:
         # 转换为排序后的列表
         result["translate_types"] = sorted(list(translate_types))
         result["validate_types"] = sorted(list(validate_types))
-        logger.info(f"收集到 {len(translate_types)} 个翻译参数: {result['translate_types']}")
-        logger.info(f"收集到 {len(validate_types)} 个验证参数: {result['validate_types']}")
+        logger.debug(f"收集到 {len(translate_types)} 个翻译参数: {result['translate_types']}")
+        logger.debug(f"收集到 {len(validate_types)} 个验证参数: {result['validate_types']}")
         return result

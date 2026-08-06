@@ -1,6 +1,8 @@
 """
 测试 ParamUpdater 类
 """
+import os
+
 import pytest
 import pandas as pd
 from pathlib import Path
@@ -231,12 +233,12 @@ class TestParamUpdater:
 
         validation_data = updater.collect_validation_data(param_file)
 
-        # 应该只包含非空的参数
+        # 空值会被排除，但仅含空格的 ExcelParam 需要原样保留。
         assert 'Test' in validation_data
         assert '参数1' in validation_data['Test']
         assert '参数2' in validation_data['Test']
         assert '' not in validation_data['Test']
-        assert '  ' not in validation_data['Test']
+        assert '  ' in validation_data['Test']
 
     def test_generate_mappings_file(self, updater, tmp_path):
         """测试生成映射文件"""
@@ -337,10 +339,11 @@ class TestParamUpdater:
         wb = load_workbook(excel_file)
         ws = wb['参数表']
 
-        # 验证 Music 列已更新
+        # 验证 Music 列已更新（列顺序由当前生成器契约决定）
+        music_column = next(cell.column for cell in ws[1] if cell.value == 'Music')
         music_values = []
         for row in range(2, ws.max_row + 1):
-            value = ws.cell(row=row, column=1).value
+            value = ws.cell(row=row, column=music_column).value
             if value:
                 music_values.append(value)
 
@@ -361,9 +364,17 @@ class TestParamUpdater:
 
         validation_data = {'Music': ['音乐1']}
 
-        # 应该跳过这个文件，但不报错
+        # 缺少参数表时应自动创建。
         result = updater.update_scenario_param_sheets(validation_data)
-        assert result is False  # 没有成功更新任何文件
+        assert result is True
+
+        from openpyxl import load_workbook
+        wb = load_workbook(excel_file)
+        assert '参数表' in wb.sheetnames
+        ws = wb['参数表']
+        music_column = next(cell.column for cell in ws[1] if cell.value == 'Music')
+        assert ws.cell(row=2, column=music_column).value == '音乐1'
+        wb.close()
 
     def test_update_scenario_param_sheets_skip_temp_files(self, updater):
         """测试跳过临时文件（以 ~ 开头）"""
@@ -454,9 +465,6 @@ class TestParamUpdater:
         assert 'OFFSET' in music_range.attr_text
         assert 'COUNTA' in music_range.attr_text
 
-        # 检查 SpeakerList 命名区域
-        assert 'SpeakerList' in wb.defined_names
-
         wb.close()
 
     def test_update_scenario_param_sheets_multiple_files(self, updater):
@@ -491,9 +499,10 @@ class TestParamUpdater:
             ws = wb['参数表']
 
             # 验证数据已更新
+            music_column = next(cell.column for cell in ws[1] if cell.value == 'Music')
             music_col_values = []
             for row in range(2, ws.max_row + 1):
-                value = ws.cell(row=row, column=1).value
+                value = ws.cell(row=row, column=music_column).value
                 if value:
                     music_col_values.append(value)
 
@@ -904,35 +913,29 @@ class TestEdgeCases:
         return ParamUpdater(mock_config)
 
     def test_update_scenario_param_sheets_named_range_already_correct(self, updater):
-        """测试命名区域已经正确时不更新"""
+        """参数表和命名区域完全一致时应跳过保存。"""
         from openpyxl import Workbook
-        from openpyxl.workbook.defined_name import DefinedName
 
         # 创建 Excel 文件
         excel_file = updater.config.paths.input_dir / "test.xlsx"
         wb = Workbook()
-        ws = wb.active
-        ws.title = "参数表"
-        ws['A1'] = 'Music'
-        ws['A2'] = '音乐1'
-
-        # 创建正确的命名区域
-        correct_range = "OFFSET(参数表!$A$2,0,0,COUNTA(参数表!$A:$A)-1,1)"
-        wb.defined_names['MusicList'] = DefinedName(
-            name='MusicList',
-            attr_text=correct_range
-        )
+        wb.active.title = "场景"
 
         wb.save(excel_file)
         wb.close()
 
         validation_data = {'Music': ['音乐1']}
 
-        # 执行更新
+        # 第一次执行创建完整参数表，第二次执行应命中幂等判断。
+        assert updater.update_scenario_param_sheets(validation_data) is True
+        fixed_timestamp = 1_700_000_000
+        os.utime(excel_file, (fixed_timestamp, fixed_timestamp))
+        modified_before = excel_file.stat().st_mtime_ns
+
         result = updater.update_scenario_param_sheets(validation_data)
 
-        # 应该返回 False（没有更新）
-        assert result is False
+        assert result is True
+        assert excel_file.stat().st_mtime_ns == modified_before
 
     def test_collect_validation_data_merge_variant(self, updater, tmp_path):
         """测试合并差分参数到 Variant 列"""

@@ -60,7 +60,7 @@ class ParamUpdater:
         try:
             # 使用新的ExcelFileManager读取所有工作表
             sheets = self.excel_manager.load_excel(param_file)
-            logger.info(f"读取到 {len(sheets)} 个工作表")
+            logger.debug(f"读取到 {len(sheets)} 个工作表")
 
             mappings = {}
 
@@ -88,7 +88,7 @@ class ParamUpdater:
                 if not skip_template or sheet_mapping:
                     mappings[sheet_name] = sheet_mapping
                     if sheet_mapping:
-                        logger.info(f"工作表 {sheet_name}: {len(sheet_mapping)} 个映射")
+                        logger.debug(f"工作表 {sheet_name}: {len(sheet_mapping)} 个映射")
 
             return mappings
 
@@ -125,7 +125,7 @@ class ParamUpdater:
                 f.write(pprint.pformat(mappings, width=100, sort_dicts=False))
                 f.write("\n")
 
-            logger.info(f"参数映射已保存到: {output_file}")
+            logger.debug(f"参数映射已保存到: {output_file}")
 
         except Exception as e:
             logger.error(f"保存参数映射文件失败: {e}", exc_info=True)
@@ -280,14 +280,16 @@ class ParamUpdater:
             logger.warning(f"在 {location} 中没有找到 Excel 文件")
             return True
 
-        logger.info(f"找到 {len(excel_files)} 个演出表格文件")
+        logger.debug(f"找到 {len(excel_files)} 个演出表格文件")
         # 创建 ExcelEditor 实例
         excel_writer = ExcelEditor()
         success_count = 0
+        updated_count = 0
+        unchanged_count = 0
 
         for excel_file in excel_files:
             try:
-                logger.info(f"处理文件: {excel_file.name}")
+                logger.debug(f"处理文件: {excel_file.name}")
 
                 # 准备参数数据（按照 all_params 的顺序）
                 parameter_data = {}
@@ -305,8 +307,13 @@ class ParamUpdater:
                     )
 
                     if success:
-                        logger.info(f"  成功更新参数表: {excel_file.name}")
                         success_count += 1
+                        if excel_writer.last_update_status == "unchanged":
+                            unchanged_count += 1
+                            logger.info(f"参数表无变化: {excel_file.name}")
+                        else:
+                            updated_count += 1
+                            logger.info(f"参数表已更新: {excel_file.name}")
                     else:
                         logger.error(f"  更新参数表失败: {excel_file.name}")
                         
@@ -320,7 +327,11 @@ class ParamUpdater:
             except Exception as e:
                 logger.error(f"  处理文件 {excel_file.name} 时发生错误: {e}", exc_info=True)
 
-        logger.info(f"处理完成，成功更新 {success_count}/{len(excel_files)} 个文件")
+        failed_count = len(excel_files) - success_count
+        logger.info(
+            "参数表处理完成: "
+            f"已更新 {updated_count}, 无变化 {unchanged_count}, 失败 {failed_count}"
+        )
         return success_count > 0
 
     def preview_scenario_param_sheets(
@@ -372,17 +383,17 @@ class ParamUpdater:
         dry_run: bool = False,
     ) -> bool:
         """生成映射并/或同步参数表；默认行为保持原完整流程。"""
-        logger.info("=" * 60)
-        logger.info(f"开始更新参数映射 (引擎: {self.engine_type})")
+        logger.debug("=" * 60)
+        logger.info(f"开始更新参数映射: 引擎={self.engine_type}")
         if dry_run:
-            logger.info("模式: DRY RUN")
+            logger.info("执行模式: DRY RUN")
         elif generate_mapping_files and not update_parameter_sheets:
-            logger.info("模式: 仅生成映射")
+            logger.info("执行模式: 仅生成映射")
         elif update_parameter_sheets and not generate_mapping_files:
-            logger.info("模式: 仅同步参数表")
+            logger.info("执行模式: 仅同步参数表")
         else:
-            logger.info("模式: 完整更新")
-        logger.info("=" * 60)
+            logger.info("执行模式: 完整更新")
+        logger.debug("=" * 60)
 
         # 阶段1: 生成基础参数映射
         param_file = Path(self.config.paths.param_config_dir) / f"param_data_{self.engine_type}.xlsx"
@@ -393,7 +404,7 @@ class ParamUpdater:
             return False
 
         try:
-            logger.info(f"读取参数文件: {param_file}")
+            logger.debug(f"读取参数文件: {param_file}")
             mappings = self.read_param_file(param_file)
 
             if generate_mapping_files and not mappings:
@@ -403,7 +414,7 @@ class ParamUpdater:
             output_file = self.config.paths.param_config_dir / "param_mappings.py"
             if generate_mapping_files:
                 action = "将生成" if dry_run else "生成"
-                logger.info(f"{action}参数映射文件: {output_file}")
+                logger.debug(f"{action}参数映射文件: {output_file}")
                 if not dry_run:
                     self.generate_mappings_file(mappings, output_file)
 
@@ -419,7 +430,7 @@ class ParamUpdater:
         variant_file_path = None  # 明确设置为 None
 
         if variant_file.exists():
-            logger.info(f"读取差分参数文件: {variant_file}")
+            logger.debug(f"读取差分参数文件: {variant_file}")
             try:
                 if generate_mapping_files:
                     # 差分参数文件不跳过模板工作表，保持与原项目一致
@@ -428,7 +439,7 @@ class ParamUpdater:
                     # 生成差分映射文件（保持与原项目一致，包含空映射）
                     variant_output = self.config.paths.param_config_dir / "variant_mappings.py"
                     action = "将生成" if dry_run else "生成"
-                    logger.info(f"{action}差分参数映射文件: {variant_output}")
+                    logger.debug(f"{action}差分参数映射文件: {variant_output}")
                     if not dry_run:
                         self.generate_mappings_file(variant_mappings, variant_output)
 
@@ -453,18 +464,18 @@ class ParamUpdater:
                 logger.error(f"处理差分参数映射时失败: {e}")
                 # 继续执行，不因为差分参数失败而停止整个流程
         else:
-            logger.info("差分参数文件不存在，跳过")
+            logger.debug("差分参数文件不存在，跳过")
 
         if update_parameter_sheets:
             # 阶段3: 更新演出表格的参数表
-            logger.info("=" * 60)
-            logger.info("更新演出表格参数表")
-            logger.info("=" * 60)
+            logger.debug("=" * 60)
+            logger.debug("更新演出表格参数表")
+            logger.debug("=" * 60)
 
             try:
                 validation_data = self.collect_validation_data(param_file, variant_file_path)
                 if validation_data:
-                    logger.info(f"收集到 {len(validation_data)} 个参数类型的验证数据")
+                    logger.debug(f"收集到 {len(validation_data)} 个参数类型的验证数据")
                     if dry_run:
                         success = self.preview_scenario_param_sheets(
                             validation_data,
@@ -483,9 +494,9 @@ class ParamUpdater:
                 logger.error(f"更新演出表格参数表时失败: {e}")
                 # 不返回False，因为参数映射文件可能已经生成成功
 
-        logger.info("=" * 60)
-        logger.info(f"参数映射更新完成")
-        logger.info("=" * 60)
+        logger.debug("=" * 60)
+        logger.info("参数映射更新完成")
+        logger.debug("=" * 60)
 
         return True
 
@@ -559,7 +570,6 @@ def main() -> int:
         )
 
         if success:
-            logger.info("参数映射更新成功")
             return 0
         else:
             logger.error("参数映射更新失败")

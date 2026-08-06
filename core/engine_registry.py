@@ -46,7 +46,7 @@ class EngineRegistry:
         if metadata.name in instance._engines:
             logger.warning(f"引擎 '{metadata.name}' 已存在，将被覆盖")
         instance._engines[metadata.name] = metadata
-        logger.info(f"注册引擎: {metadata.display_name} ({metadata.name})")
+        logger.debug(f"注册引擎: {metadata.display_name} ({metadata.name})")
 
     @classmethod
     def get(cls, engine_name: str) -> EngineMetadata:
