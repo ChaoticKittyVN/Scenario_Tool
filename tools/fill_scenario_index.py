@@ -4,6 +4,11 @@ Index列清理填充工具
 """
 import sys
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from typing import Dict, List, Optional, Any, Callable
 import pandas as pd
 from core.logger import get_logger
@@ -412,7 +417,7 @@ class FillIndexTool(BaseParamTool):
         print("=" * 60)
         
         if changes and show_run_hint:
-            print("\n💡 提示：使用 --run 参数执行实际修改")
+            print("\n💡 提示：移除 --dry-run 后执行实际修改")
         print()
 
 
@@ -426,16 +431,16 @@ def main():
         epilog="""
 示例用法:
   # 基本用法（干跑模式，只预览）
-  python fill_scenario_index.py --input ./scenario
+  python fill_scenario_index.py --input ./scenario --dry-run
   
   # 正式执行
-  python fill_scenario_index.py --input ./scenario --run
+  python fill_scenario_index.py --input ./scenario
   
   # 自定义排除的名称
   python fill_scenario_index.py --input ./scenario --exclude name1 name2 name3
   
   # 指定特定目录
-  python fill_scenario_index.py --input ./my_scenarios --run
+  python fill_scenario_index.py --input ./my_scenarios --yes
         """
     )
     
@@ -445,6 +450,8 @@ def main():
                        help='输出目录（默认原地修改）')
     parser.add_argument('--dry-run', action='store_true',
                        help='干跑模式（只预览，不修改）')
+    parser.add_argument('--yes', '-y', action='store_true',
+                       help='正式运行时跳过交互确认，供批处理或工作流调用')
     parser.add_argument('--exclude', nargs='+', default=None,
                        help='自定义需要排除的名称列表（默认使用 constants 中定义的特殊名称）')
     parser.add_argument('--verbose', '-v', action='store_true',
@@ -466,10 +473,11 @@ def main():
     else:
         logger.warning("正式运行模式 - 将实际修改 Excel 文件")
         print("\n⚠️  正式运行模式 - 将实际修改 Excel 文件\n")
-        confirm = input("确认要继续吗？(y/N): ")
-        if confirm.lower() != 'y':
-            print("已取消操作")
-            return 0
+        if not args.yes:
+            confirm = input("确认要继续吗？(y/N): ")
+            if confirm.lower() != 'y':
+                print("已取消操作")
+                return 0
     
     # 创建工具实例
     tool = FillIndexTool(excluded_names=args.exclude, dry_run=dry_run)

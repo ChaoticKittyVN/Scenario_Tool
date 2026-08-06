@@ -5,11 +5,17 @@
 1. 原始剧本 Excel（多工作表）
 2. 配音台本 Excel/CSV（单工作表，包含 Name、Text、Voice、Index 列）
 """
+import sys
 import pandas as pd
 import os
 from pathlib import Path
 from typing import Optional
 from tqdm import tqdm
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from core.config_manager import AppConfig
 from core.param_process.param_translator import ParamTranslator
 from core.engine_registry import EngineRegistry

@@ -1,182 +1,149 @@
-"""
-智能参数填充工具
-根据 YAML 配置自动填充 Excel 表格中的参数
+"""Apply declarative table transformations to scenario workbooks."""
 
-使用方法:
-    py run_tool.py fill [--config CONFIG] [--input-dir DIR] [--sheets SHEETS]
+from __future__ import annotations
 
-示例:
-    py run_tool.py fill                                    # 使用默认配置
-    py run_tool.py fill --config my_rules.yaml            # 指定配置文件
-    py run_tool.py fill --sheets 对话，剧本               # 只处理指定工作表
-"""
 import argparse
+import json
 import sys
+from datetime import datetime
 from pathlib import Path
-from core.logger import get_logger
+from typing import Optional, Sequence
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from core.config_manager import AppConfig
-from core.param_filler import SmartParameterFiller
+from core.logger import get_logger
+from core.table_transform import TableTransformEngine, summarize_results
+
 
 logger = get_logger()
 
 
-def parse_args():
-    """解析命令行参数"""
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description='智能参数填充工具 - 根据配置自动填充 Excel 表格参数',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-示例:
-  %(prog)s                              使用默认配置处理所有文件
-  %(prog)s --config my_rules.yaml       使用自定义配置文件
-  %(prog)s --sheets 对话，剧本          只处理指定的工作表
-  %(prog)s --input-dir ./custom_input   指定输入目录
-        """
+        description="通用表格变更工具 - 根据 YAML 操作配置生成并应用单元格变更计划"
     )
-    
     parser.add_argument(
-        '--config', '-c',
+        "--config",
+        "-c",
         type=Path,
-        default=Path('config/filling_rules.yaml'),
-        help='YAML 配置文件路径 (默认：config/filling_rules.yaml)'
+        default=Path("config/filling_rules.yaml"),
+        help="操作配置文件（默认：config/filling_rules.yaml）",
     )
-    
     parser.add_argument(
-        '--input-dir', '-i',
+        "--input-dir",
+        "-i",
         type=Path,
-        default=None,
-        help='输入目录 (默认：config.yaml 中定义的 input_dir)'
+        help="输入目录（默认使用 config.yaml 中的 input_dir）",
     )
-    
     parser.add_argument(
-        '--sheets', '-s',
-        type=str,
-        default=None,
-        help='要处理的工作表名称，多个用逗号分隔 (默认：所有工作表)'
+        "--sheets",
+        "-s",
+        help="只处理指定工作表，多个名称使用逗号分隔",
     )
-    
-    parser.add_argument(
-        '--dry-run', '-d',
-        action='store_true',
-        help='只预览不执行（仅显示将要进行的修改）'
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", "-d", action="store_true", help="只生成变更计划，不写入 Excel")
+    mode.add_argument(
+        "--apply",
+        action="store_true",
+        help="显式执行写入；不带 --dry-run 时本来就会写入，用于命令可读性",
     )
-    
-    return parser.parse_args()
+    parser.add_argument("--report", type=Path, help="JSON 变更报告路径")
+    parser.add_argument("--no-report", action="store_true", help="不生成 JSON 变更报告")
+    parser.add_argument("--verbose", "-v", action="store_true", help="显示每个计划变更")
+    return parser
 
 
-def main():
-    """主函数"""
-    args = parse_args()
-    
+def default_report_path(dry_run: bool) -> Path:
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    mode = "preview" if dry_run else "apply"
+    return PROJECT_ROOT / "logs" / "table_transform" / f"{timestamp}-{mode}.json"
+
+
+def write_report(path: Path, config_path: Path, dry_run: bool, results) -> None:
+    summary = summarize_results(results)
+    payload = {
+        "config": str(config_path.resolve()),
+        "mode": "dry-run" if dry_run else "apply",
+        "summary": summary,
+        "results": [result.to_dict() for result in results],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = build_parser().parse_args(argv)
+    dry_run = args.dry_run
+
     try:
-        logger.info("=" * 60)
-        logger.info("智能参数填充工具")
-        logger.info("=" * 60)
-        
-        # 加载应用配置
-        config_path = Path("config.yaml")
-        if config_path.exists():
-            config = AppConfig.from_file(config_path)
-            logger.info(f"从 {config_path} 加载配置")
-        else:
-            logger.warning("config.yaml 不存在，使用默认配置")
-            config = AppConfig.create_default("naninovel")
-        
-        # 确定输入目录
-        input_dir = args.input_dir or config.paths.input_dir
-        if not input_dir.exists():
-            logger.error(f"输入目录不存在：{input_dir}")
-            return False
-        
-        logger.info(f"输入目录：{input_dir}")
-        
-        # 解析工作表列表
-        sheet_names = None
-        if args.sheets:
-            sheet_names = [s.strip() for s in args.sheets.split(',')]
-            logger.info(f"指定工作表：{sheet_names}")
-        
-        # 检查配置文件
-        if not args.config.exists():
-            logger.warning(f"配置文件不存在：{args.config}")
-            logger.info("将使用内置的默认规则")
-            filler_config_path = None
-        else:
-            filler_config_path = args.config
-            logger.info(f"配置文件：{filler_config_path}")
-        
-        # 创建智能填写器
-        filler = SmartParameterFiller(filler_config_path)
-        
-        # 验证规则
-        if filler.rule_engine.rules:
-            valid = filler.rule_engine.validate_rules()
-            if not valid:
-                logger.warning("部分规则无效，请检查配置文件")
-            
-            logger.info(f"加载了 {len(filler.rule_engine.rules)} 条填充规则")
-            for i, rule in enumerate(filler.rule_engine.rules, 1):
-                logger.info(f"  {i}. {rule.name} -> {rule.strategy_name}")
-        
-        # 发现文件
-        files = filler.discover_files(input_dir)
-        if not files:
-            logger.warning(f"在 {input_dir} 中没有找到 Excel 文件")
-            return False
-        
-        logger.info(f"找到 {len(files)} 个 Excel 文件")
-        
-        # 干运行模式
-        if args.dry_run:
-            logger.info("\n=== 干运行模式（不会实际修改文件）===")
-            for file_path in files:
-                sheets = filler.discover_sheets(file_path)
-                logger.info(f"\n文件：{file_path.name}")
-                for sheet in sheets:
-                    if sheet_names and sheet not in sheet_names:
-                        continue
-                    
-                    df = filler.excel_manager.get_sheet(file_path, sheet)
-                    params = filler.extract_parameters(df, sheet)
-                    
-                    if params:
-                        logger.info(f"  工作表：{sheet}")
-                        for column, cells in params.items():
-                            logger.info(f"    列 {column}: {len(cells)} 个单元格需要填充")
-            return True
-        
-        # 执行填充
-        logger.info("\n开始处理文件...")
-        results = filler.process_directory(input_dir, sheet_names)
-        
-        # 统计结果
-        success_count = sum(1 for v in results.values() if v)
-        total_count = len(results)
-        
-        logger.info("\n" + "=" * 60)
-        logger.info("处理结果统计")
-        logger.info("=" * 60)
-        logger.info(f"总文件数：{total_count}")
-        logger.info(f"成功：{success_count}")
-        logger.info(f"失败：{total_count - success_count}")
-        
-        if success_count < total_count:
-            logger.warning("\n以下文件处理失败:")
-            for file_path, success in results.items():
-                if not success:
-                    logger.warning(f"  - {file_path.name}")
-        
-        logger.info("\n处理完成!")
-        return success_count > 0
-        
+        app_config_path = PROJECT_ROOT / "config.yaml"
+        app_config = (
+            AppConfig.from_file(app_config_path)
+            if app_config_path.exists()
+            else AppConfig.create_default("naninovel")
+        )
+        input_dir = args.input_dir or app_config.paths.input_dir
+        if not input_dir.is_absolute():
+            input_dir = PROJECT_ROOT / input_dir
+        config_path = args.config
+        if not config_path.is_absolute():
+            config_path = PROJECT_ROOT / config_path
+        sheet_names = (
+            [name.strip() for name in args.sheets.split(",") if name.strip()]
+            if args.sheets
+            else None
+        )
+
+        engine = TableTransformEngine.from_config(config_path)
+        results = engine.process_directory(
+            input_dir=input_dir,
+            dry_run=dry_run,
+            sheet_names=sheet_names,
+        )
+        summary = summarize_results(results)
+
+        for result in results:
+            if not result.success:
+                logger.error(f"表格处理失败: {result.file_path.name} - {result.error}")
+            elif result.plan.changes:
+                action = "计划修改" if dry_run else "已修改"
+                logger.info(f"{action}: {result.file_path.name} ({len(result.plan.changes)} 处)")
+                if args.verbose:
+                    for change in result.plan.changes:
+                        logger.info(
+                            f"  {change.sheet}!{change.column}{change.row}: "
+                            f"{change.original_value!r} -> {change.new_value!r} [{change.operation}]"
+                        )
+            else:
+                logger.info(f"无变化: {result.file_path.name}")
+
+        report_path = args.report
+        if not args.no_report:
+            report_path = report_path or default_report_path(dry_run)
+            if not report_path.is_absolute():
+                report_path = PROJECT_ROOT / report_path
+            write_report(report_path, config_path, dry_run, results)
+            logger.info(f"变更报告: {report_path.resolve()}")
+
+        logger.info(
+            "处理完成: "
+            f"文件 {summary['files']}, 成功 {summary['success']}, "
+            f"失败 {summary['failed']}, 变更 {summary['changes']}"
+        )
+        if summary["files"] == 0:
+            logger.warning(f"输入目录中没有可处理的 Excel 文件: {input_dir}")
+            return 1
+        return 0 if summary["failed"] == 0 else 1
     except KeyboardInterrupt:
-        logger.warning("\n用户中断操作")
-        return False
-    except Exception as e:
-        logger.critical(f"程序执行失败：{e}", exc_info=True)
-        return False
+        logger.warning("用户中断操作")
+        return 130
+    except Exception as exc:
+        logger.critical(f"表格变更失败: {exc}", exc_info=True)
+        return 2
 
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    raise SystemExit(main())

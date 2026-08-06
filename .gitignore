@@ -41,6 +41,8 @@ MANIFEST
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
+logs/workflows/
+logs/table_transform/
 
 # Unit test / coverage reports
 htmlcov/

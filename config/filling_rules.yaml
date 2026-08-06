@@ -1,0 +1,47 @@
+version: 1
+conflict_policy: error
+
+# 每项操作只描述三件事：修改哪一列、什么情况下修改、如何得到新值。
+# target 可以提供多个候选列名，执行器会使用工作表中第一个实际存在的列。
+operations:
+  - id: narrator-default
+    op: set_default
+    target: [Name, Speaker, 角色]
+    value: 旁白
+    when:
+      nonempty_any: [Text, 台词, 对话]
+
+  - id: volume-default
+    op: set_default
+    target: [Volume, 音量]
+    value: "100"
+
+  - id: inherit-background
+    op: copy_nearest
+    target: [Background, 场景背景]
+    options:
+      direction: upward
+
+  - id: inherit-position
+    op: copy_nearest
+    target: [Position, 位置]
+    options:
+      direction: upward
+
+  - id: generate-voice-id
+    op: template
+    target: [Voice, voice]
+    value: "{speaker}_{counter:03d}.wav"
+    when:
+      all:
+        - nonempty_any: [Name, Speaker, 角色]
+        - nonempty_any: [Text, 台词, 对话]
+    options:
+      counter_scope: file
+      counter_by: [speaker]
+      variables:
+        speaker: [Name, Speaker, 角色]
+
+# 可选的项目级 Python 操作：
+# plugins:
+#   - project_operations.module:CustomOperation

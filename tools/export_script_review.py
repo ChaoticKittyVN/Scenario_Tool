@@ -3,8 +3,14 @@
 从演出表格中提取 Index、Name、Text 列，输出为 txt 文件供 AI 进行剧本文本问题筛查
 """
 import argparse
+import sys
 from pathlib import Path
 from typing import Optional
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import pandas as pd
 
 from core.logger import get_logger

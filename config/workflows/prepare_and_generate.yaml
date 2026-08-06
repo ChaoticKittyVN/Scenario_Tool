@@ -1,0 +1,40 @@
+version: 1
+name: prepare-and-generate
+
+variables:
+  input_dir: input
+  filling_rules: config/filling_rules.yaml
+
+steps:
+  - id: fill-index
+    script: tools/fill_scenario_index.py
+    args:
+      - --input
+      - "{input_dir}"
+    dry_run_args:
+      - --dry-run
+    apply_args:
+      - --yes
+
+  - id: smart-fill
+    module: tools.smart_fill
+    args:
+      - --config
+      - "{filling_rules}"
+      - --input-dir
+      - "{input_dir}"
+    dry_run_args:
+      - --dry-run
+
+  - id: update-parameter-sheet
+    script: update_param.py
+    args:
+      - --parameter-sheet-only
+    dry_run_args:
+      - --dry-run
+    apply_args:
+      - --apply
+
+  - id: generate-scenario
+    script: generate_scenario.py
+    preview: skip

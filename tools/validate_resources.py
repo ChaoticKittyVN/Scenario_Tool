@@ -4,9 +4,15 @@
 """
 import pandas as pd
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Dict
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from core.config_manager import AppConfig
 from core.param_process.param_translator import ParamTranslator
 from core.resource_extractor import ResourceExtractor

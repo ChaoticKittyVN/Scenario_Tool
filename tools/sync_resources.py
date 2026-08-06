@@ -3,8 +3,14 @@
 从资源库同步缺失的资源到项目库
 """
 import json
+import sys
 from pathlib import Path
 from typing import Dict, Optional
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from core.config_manager import AppConfig
 from core.resource_syncer import ResourceSyncer
 from core.logger import get_logger

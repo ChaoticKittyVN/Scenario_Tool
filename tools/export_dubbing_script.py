@@ -3,9 +3,15 @@
 从 Excel 剧本中提取所有对话，按角色整合并输出表格
 """
 import argparse
+import sys
 from pathlib import Path
 import re
 from typing import List, Optional
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import pandas as pd
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter

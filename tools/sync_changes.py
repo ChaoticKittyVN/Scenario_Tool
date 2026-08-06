@@ -5,6 +5,11 @@
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Callable, Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import pandas as pd
 from core.logger import get_logger
 from core.param_filler.scenario_param_filler import BaseParamTool, ChangeRecord
@@ -446,9 +451,9 @@ def main():
                        help='干跑模式（只预览，不修改）')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='详细输出')
-    parser.add_argument('--locators', nargs='+',default= ["ExcelFilename", "SheetName", "Index", "Idx", "Text"],
+    parser.add_argument('--locators', nargs='+',default= ["ExcelFilename", "SheetName", "Index", "Idx"],
                        help='自定义定位列列表')
-    parser.add_argument('--data-columns', nargs='+', dest='data_columns',default=["Voice"],
+    parser.add_argument('--data-columns', nargs='+', dest='data_columns',default=["Text"],
                        help='自定义数据列列表')
 
     args = parser.parse_args()

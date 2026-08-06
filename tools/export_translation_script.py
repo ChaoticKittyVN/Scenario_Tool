@@ -3,8 +3,13 @@
 从 Excel 剧本中提取角色名和文本，生成供翻译填写的表格
 """
 import argparse
+import sys
 from pathlib import Path
 from typing import Optional
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import pandas as pd
 from openpyxl.styles import Alignment
