@@ -22,6 +22,9 @@ class SpecialName(str, Enum):
     CHOICE_COMMAND = "choice"
     JUMP_COMMAND = "jump"
 
+    TEXT_COMMAND = "text"
+    NVL_COMMAND = "nvl"
+
 class AutoBlockTransition(str, Enum):
     """自动缩进转场类型"""
     NEW_SCENE = "新场景"

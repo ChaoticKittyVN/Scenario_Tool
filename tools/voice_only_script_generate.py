@@ -23,7 +23,7 @@ from core.engine_loader import load_engine
 from core.logger import get_logger
 from core.exceptions import ExcelParseError, GeneratorError
 from core.constants import SheetName, ColumnName, Marker, TEMP_FILE_PREFIX
-from core.word_counter import BasicWordCounter
+from core.word_statistics import calculate_dataframe_word_statistics
 
 from core.excel_management import (
     ExcelManagerError,
@@ -280,27 +280,13 @@ def calculate_word_statistics(
         df_processor: DataFrame处理器
         sheet: 工作表名称
     """
-    word_counter = BasicWordCounter()
+    statistics = calculate_dataframe_word_statistics(valid_rows_df)
+    logger.info(f"工作表 {sheet} 总字数: {statistics.total}")
 
-    # 使用专用方法提取统计列
-    stat_columns = df_processor.extract_columns_for_statistics(
-        valid_rows_df, [ColumnName.NAME.value, ColumnName.TEXT.value]
-    )
-
-    name_series = stat_columns.get(ColumnName.NAME.value, pd.Series(dtype=object))
-    text_series = stat_columns.get(ColumnName.TEXT.value, pd.Series(dtype=object))
-
-    # 统计总字数
-    total_words = word_counter.count(text_series.tolist())
-    logger.info(f"工作表 {sheet} 总字数: {total_words}")
-
-    # 按说话者统计字数
-    total_words_by_chara_name = word_counter.count_by(list(zip(
-        name_series,
-        text_series
-    )))
-    for chara_name, count in total_words_by_chara_name.items():
+    for chara_name, count in statistics.by_speaker.items():
         logger.info(f"  说话者 '{chara_name}' 字数: {count}")
+
+    return statistics
 
 
 def output_sheet_file(
@@ -408,14 +394,20 @@ def process_sheet(
         # 对于其他格式：文件名.rpy/.nani
         scenario_name = config.engine.get_output_filename(sheet)
 
+    # 与主生成流程使用相同的 END 和 Ignore 规则，避免统计模板尾行。
+    valid_rows_df = df_processor.extract_valid_rows(sheet_df, sheet)
+    if valid_rows_df.empty:
+        logger.warning(f"工作表 {sheet} 没有有效数据")
+        return
+
     # 处理行数据
     output_list = process_sheet_rows(
-        processor, sheet_df, df_processor,
+        processor, valid_rows_df, df_processor,
         file_basename, sheet, translator, config
     )
 
     # 计算字数统计
-    calculate_word_statistics(sheet_df, df_processor, sheet)
+    calculate_word_statistics(valid_rows_df, df_processor, sheet)
 
     # 确保输出目录存在
     config.paths.output_dir.mkdir(parents=True, exist_ok=True)
@@ -522,20 +514,12 @@ def process_dialogue_file(
         )
         
         # 计算字数统计（使用配音台本的列名）
-        word_counter = BasicWordCounter()
-        
         # 检查是否有 Name 和 Text 列
         if ColumnName.NAME.value in dialogue_df.columns and ColumnName.TEXT.value in dialogue_df.columns:
-            total_words = word_counter.count(dialogue_df[ColumnName.TEXT.value].tolist())
-            logger.info(f"配音台本总字数：{total_words}")
-            
-            # 按说话者统计字数
-            name_text_pairs = list(zip(
-                dialogue_df[ColumnName.NAME.value],
-                dialogue_df[ColumnName.TEXT.value]
-            ))
-            total_words_by_chara_name = word_counter.count_by(name_text_pairs)
-            for chara_name, count in total_words_by_chara_name.items():
+            statistics = calculate_dataframe_word_statistics(dialogue_df)
+            logger.info(f"配音台本总字数：{statistics.total}")
+
+            for chara_name, count in statistics.by_speaker.items():
                 logger.info(f"  说话者 '{chara_name}' 字数：{count}")
         else:
             logger.warning("配音台本缺少 Name 或 Text 列，跳过字数统计")

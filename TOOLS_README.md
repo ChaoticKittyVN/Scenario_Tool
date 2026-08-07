@@ -35,6 +35,41 @@ python -m tools.voice_only_script_generate
 - ✅ 可以直接传递参数
 - ✅ 适合快速测试
 
+## 字数统计工具
+
+`tools/count_words.py` 直接读取指定演出表格，使用与脚本生成相同的 `END` 和 Ignore 规则，并按文件、工作表、角色输出明细。统计时始终保持 `Name` 和 `Text` 的原始行对应关系。GUI 工具箱中可通过文件选择器指定表格。
+
+```powershell
+# 直接统计一个表格
+python tools/count_words.py --input input/chapter01.xlsx
+
+# 统计指定工作表
+python tools/count_words.py --input input/chapter01.xlsx --sheet Scene01 --sheet Scene02
+
+# 排除角色，或只看部分角色
+python tools/count_words.py --input input/chapter01.xlsx --exclude-name 系统
+python tools/count_words.py --input input/chapter01.xlsx --only-name 主角 --only-name 女主角
+
+# 特殊名称默认不计；按需纳入部分或全部特殊名称
+python tools/count_words.py --input input/chapter01.xlsx --include-special-name text
+python tools/count_words.py --input input/chapter01.xlsx --include-all-special-names
+
+# 查看可用特殊名称
+python tools/count_words.py --list-special-names
+
+# 批量统计目录；完全省略输入时仍使用 config.yaml 的 input_dir
+python tools/count_words.py --input-dir input/chapter02
+python tools/count_words.py
+
+# 同时保存便于比较的 JSON 报告
+python tools/count_words.py --output output/word_count.json
+
+# 审查 END 后或 Ignore 行中是否存在额外文本
+python tools/count_words.py --all-rows
+```
+
+默认行范围与正式生成一致；`--all-rows` 仅用于排查表尾残留或忽略行，不代表正式脚本字数。特殊名称来自 `core.constants.SpecialName`，默认排除；`--exclude-name` 的优先级高于其他名称选项。
+
 ---
 
 ## 🎙️ 配音台本导出工具

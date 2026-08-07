@@ -15,7 +15,7 @@ from core.engine_loader import load_engine
 from core.logger import get_logger
 from core.exceptions import ExcelParseError, GeneratorError
 from core.constants import SheetName, ColumnName, Marker, TEMP_FILE_PREFIX
-from core.word_counter import BasicWordCounter
+from core.word_statistics import calculate_dataframe_word_statistics
 
 from core.excel_management import (
     ExcelManagerError,
@@ -179,27 +179,13 @@ def calculate_word_statistics(
         df_processor: DataFrame处理器
         sheet: 工作表名称
     """
-    word_counter = BasicWordCounter()
+    statistics = calculate_dataframe_word_statistics(valid_rows_df)
+    logger.info(f"工作表 {sheet} 总字数: {statistics.total}")
 
-    # 使用专用方法提取统计列
-    stat_columns = df_processor.extract_columns_for_statistics(
-        valid_rows_df, [ColumnName.NAME.value, ColumnName.TEXT.value]
-    )
-
-    name_series = stat_columns.get(ColumnName.NAME.value, pd.Series(dtype=object))
-    text_series = stat_columns.get(ColumnName.TEXT.value, pd.Series(dtype=object))
-
-    # 统计总字数
-    total_words = word_counter.count(text_series.tolist())
-    logger.info(f"工作表 {sheet} 总字数: {total_words}")
-
-    # 按说话者统计字数
-    total_words_by_chara_name = word_counter.count_by(list(zip(
-        name_series,
-        text_series
-    )))
-    for chara_name, count in total_words_by_chara_name.items():
+    for chara_name, count in statistics.by_speaker.items():
         logger.info(f"  说话者 '{chara_name}' 字数: {count}")
+
+    return statistics
 
 
 def output_sheet_file(
