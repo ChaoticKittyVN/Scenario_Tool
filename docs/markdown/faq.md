@@ -266,7 +266,7 @@ pytest --cov=. --cov-report=html
 
 ### Q: 支持哪些 Python 版本？
 
-**A**: 推荐使用 Python 3.11 或更高版本。
+**A**: 支持 Python 3.10.2 或更高版本。0.10.0 的完整测试已在 Python 3.10.2 上通过。
 
 ### Q: 支持哪些操作系统？
 

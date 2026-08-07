@@ -4,7 +4,9 @@
 
 ## 测试概述
 
-Scenario Tool 使用 pytest 作为测试框架，当前测试覆盖率为 **92%**（250 个测试）。
+Scenario Tool 使用 pytest 作为测试框架。0.10.0 发布前在 Python 3.10.2 上执行完整测试，结果为 **392 passed**。
+
+测试数量会随功能变化；覆盖率必须通过当前代码重新生成，不在文档中保留容易过期的固定百分比。
 
 ---
 
@@ -83,20 +85,9 @@ start htmlcov/index.html
 open htmlcov/index.html
 ```
 
-### 当前覆盖率状况
+### 发布前记录覆盖率
 
-✅ **总体覆盖率：92%**（250 个测试）
-
-**核心模块覆盖率**：
-- ✅ `core/config_manager.py` - 100% 覆盖（31 个测试）
-- ✅ `core/constants.py` - 100% 覆盖（42 个测试）
-- ✅ `core/engine_processor.py` - 100% 覆盖（19 个测试）
-- ✅ `core/engine_registry.py` - 100% 覆盖（19 个测试）
-- ✅ `core/exceptions.py` - 100% 覆盖
-- ✅ `core/base_sentence_generator.py` - 97% 覆盖（44 个测试）
-- ✅ `core/param_translator.py` - 85% 覆盖（19 个测试）
-- ✅ `core/sentence_generator_manager.py` - 82% 覆盖（23 个测试）
-- ✅ `update_param.py` - 89% 覆盖（34 个测试）
+发布前安装 `requirements-dev.txt`，重新运行覆盖率命令，并以生成报告为准。不要沿用旧版本的测试数量或覆盖率数字。
 
 ---
 
@@ -104,22 +95,13 @@ open htmlcov/index.html
 
 ```
 tests/
-├── __init__.py
-├── conftest.py                              # 全局 fixtures
-├── core/                                    # 核心模块测试
-│   ├── __init__.py
-│   ├── test_base_sentence_generator.py      # 基础生成器测试
-│   ├── test_config_manager.py               # 配置管理测试
-│   ├── test_constants.py                    # 常量定义测试
-│   ├── test_engine_processor.py             # 引擎处理器测试
-│   ├── test_engine_registry.py              # 引擎注册表测试
-│   ├── test_param_translator.py             # 参数翻译器测试
-│   └── test_sentence_generator_manager.py   # 生成器管理器测试
-├── engines/                                 # 引擎模块测试（待扩展）
-│   └── __init__.py
-├── gui/                                     # GUI 模块测试（待扩展）
-│   └── __init__.py
-└── test_param_updater.py                    # 参数更新器测试
+├── core/                         # 配置、引擎加载、生成与统计测试
+├── engines/                      # 引擎测试扩展位置
+├── gui/                          # GUI 控制器、样式和工具箱测试
+├── test_param_updater.py         # 参数更新与参数表同步测试
+├── test_variant_agent_export.py  # Agent 差分文档测试
+├── test_table_transform.py       # 通用表格变更测试
+└── test_workflow_runner.py       # 批量工作流测试
 ```
 
 ---
@@ -321,7 +303,7 @@ def test_with_special_characters(self):
 - [ ] `tests/test_resource_syncer.py` - 资源同步测试
 - [ ] `tests/engines/renpy/` - Ren'Py 引擎生成器测试
 - [ ] `tests/engines/naninovel/` - Naninovel 引擎生成器测试
-- [ ] `tests/gui/` - GUI 模块测试
+- [ ] `tests/engines/utage/` - Utage 引擎输出与专用流程测试
 
 ---
 

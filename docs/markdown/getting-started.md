@@ -2,6 +2,8 @@
 
 本指南将帮助你快速上手 Scenario Tool。
 
+建议使用 Python 3.10.2 或更高版本，并始终从仓库根目录执行命令。
+
 ## 安装依赖
 
 ### 生产环境
@@ -38,7 +40,7 @@ py run_gui.py
 
 ### GUI 功能
 
-GUI 提供四个功能标签页：
+GUI 提供五个功能标签页：
 
 1. **脚本生成**
    - 选择 Excel 文件
@@ -46,16 +48,22 @@ GUI 提供四个功能标签页：
    - 一键生成引擎脚本
 
 2. **参数映射**
-   - 更新参数映射配置
-   - 自动同步到演出表格
+   - 完整更新参数映射并同步参数表
+   - 独立生成基础映射、普通差分映射或 Agent 差分文档
+   - 独立同步演出表格中的参数表
 
 3. **资源管理**
    - 验证资源文件完整性
    - 同步缺失的资源文件
 
 4. **默认配置**
-   - 修改全局配置
+   - 修改项目配置
    - 切换引擎类型
+
+5. **工具箱**
+   - 动态读取 `tools/` 中的命令行工具
+   - 使用表单填写参数并在独立进程中执行
+   - 设置只保存在本机的工具执行 Python
 
 ---
 
@@ -69,7 +77,11 @@ GUI 提供四个功能标签页：
 
 ```yaml
 engine:
-  engine_type: "renpy"  # 或 "naninovel"
+  engine_type: "renpy"  # 或 "naninovel"、"utage"
+
+# 可选：项目只保留部分引擎目录时限制可用引擎
+engines:
+  enabled: ["renpy"]
 ```
 
 ### 2. 准备数据
@@ -90,6 +102,7 @@ py generate_scenario.py
 生成的脚本保存在 `output/` 目录：
 - Ren'Py: `.rpy` 文件
 - Naninovel: `.nani` 文件
+- Utage: `.xlsx` 文件
 
 ---
 
@@ -121,7 +134,8 @@ py generate_scenario.py
 
 - [配置说明](configuration.md) - 了解详细的配置选项
 - [参数映射](param-mapping.md) - 自定义参数映射
-- [Excel 格式](configuration.md#excel-格式要求) - 详细的 Excel 格式说明
+- [工具脚本](../../TOOLS_README.md) - 使用字数统计、智能填充和批量工作流
+- [演出表要求](configuration.md#演出表要求) - 了解通用列和参数表行为
 
 ---
 

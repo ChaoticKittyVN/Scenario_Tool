@@ -1,4 +1,4 @@
-# Scenario Tool 0.9.2
+# Scenario Tool 0.10.0
 
 视觉小说脚本生成工具，支持从 Excel 表格生成 Ren'Py、Naninovel 和 Utage 引擎脚本。
 
@@ -10,6 +10,9 @@
 - 📊 **Excel 驱动** - 使用熟悉的 Excel 编写脚本
 - 🎨 **GUI 界面** - 提供友好的图形界面
 - 🔧 **参数映射** - 灵活的参数翻译系统
+- 🧩 **差分文档** - 从动态差分列导出供 Agent 使用的结构化 JSON
+- 🧰 **动态工具箱** - GUI 自动读取 `tools/` 脚本及其命令行参数
+- 📈 **字数统计** - 按文件、工作表和角色统计演出文本
 - 📦 **资源管理** - 自动验证和同步资源文件
 - ⚠️ **类型安全** - 避免类型错误
 - 🔨 **模块化架构** - 按核心处理、引擎实现和辅助工具拆分，便于扩展与维护
@@ -60,6 +63,8 @@ py generate_scenario.py
 - [快速开始](docs/markdown/getting-started.md) - 安装和基本使用
 - [配置说明](docs/markdown/configuration.md) - 引擎配置和路径设置
 - [参数映射](docs/markdown/param-mapping.md) - 参数映射管理
+- [工具脚本](TOOLS_README.md) - 工具箱、字数统计和批量工作流
+- [更新日志](CHANGELOG.md) - 版本变更记录
 - [资源管理](docs/markdown/resource-management.md) - 资源验证和同步
 - [常见问题](docs/markdown/faq.md) - 常见问题解答
 
@@ -93,7 +98,7 @@ scenario_tool/
 ```mermaid
 graph LR
     A[在input文件夹中放入需要的演出表格] --> B
-    B[更新参数配置表格：编辑param_config中的param_data_引擎类型] --> C
+    B[编辑 param_config 中的 param_data 与可选 variant_data] --> C
     C[执行update_param] --> D
     D[在演出表格中确认数据验证后进行演出参数填写] --> E
     E[执行generate_scenario] --> F
@@ -112,10 +117,10 @@ graph LR
 
 ```bash
 # 先预览，不修改文件
-python fill_scenario_index.py --input ./input --dry-run
+python tools/fill_scenario_index.py --input ./input --dry-run
 
 # 确认预览结果后正式执行
-python fill_scenario_index.py --input ./input
+python tools/fill_scenario_index.py --input ./input
 ```
 
 正式执行会原地修改 Excel 文件。当前脚本不支持 `--run` 参数。
@@ -135,13 +140,13 @@ python -m tools.smart_fill --config ./config/filling_rules.yaml --input-dir ./in
 
 ```bash
 # 导出配音台本；当前版本建议显式指定实际列名进行排序
-python export_dubbing_script.py --sort Name Idx
+python tools/export_dubbing_script.py --sort Name Idx
 
 # 合并导出翻译表格
-python export_translation_script.py --merge
+python tools/export_translation_script.py --merge
 
 # 导出供人工或 AI 审查的纯文本
-python export_script_review.py
+python tools/export_script_review.py
 ```
 
 默认输出目录分别为：
@@ -156,10 +161,10 @@ python export_script_review.py
 
 ```bash
 # 文本改动预览
-python sync_changes.py --input ./input --changes ./input/sync/review.xlsx --dry-run
+python tools/sync_changes.py --input ./input --changes ./input/sync/review.xlsx --dry-run
 
 # 语音改动预览
-python sync_voice_changes.py --input ./input --changes ./input/sync/voice.xlsx --dry-run
+python tools/sync_voice_changes.py --input ./input --changes ./input/sync/voice.xlsx --dry-run
 ```
 
 同步工具正式运行时会原地修改 Excel 文件。导出表用于同步前，需要将定位列整理为 `ExcelFilename`、`SheetName` 和 `Index`。
@@ -168,10 +173,10 @@ python sync_voice_changes.py --input ./input --changes ./input/sync/voice.xlsx -
 
 ```bash
 # 检查演出表格引用的资源是否存在
-python validate_resources.py
+python tools/validate_resources.py
 
 # 根据验证报告同步缺失资源
-python sync_resources.py
+python tools/sync_resources.py
 ```
 
 验证报告保存在 `output/validation_reports/`。资源同步为交互式操作，建议先选择干跑模式预览复制计划。
@@ -185,6 +190,18 @@ python -m tools.voice_only_script_generate --input ./input/voice --output ./outp
 ```
 
 配音台本通常需要包含 `Name`、`Text`、`Voice` 和 `Index` 列。
+
+### 字数统计与批量工作流
+
+```bash
+# 按正式生成规则统计 input 中的演出文本
+python tools/count_words.py
+
+# 预览一套批量工作流
+python tools/run_workflow.py --workflow config/workflows/prepare_and_generate.yaml
+```
+
+工具参数、GUI 工具箱和工作流 YAML 的完整说明见 [TOOLS_README.md](TOOLS_README.md)。
 
 ---
 

@@ -18,8 +18,9 @@ processing:
   ignore_words:
   - 忽略
   - ''
-# 项目键 chapter_a 对应 param_config/param_data_chapter_a.xlsx；
-# 识别文本用于匹配演出表文件名，例如：chapter_a: 第一篇
+# 单项目模式配置一个项目时，优先读取 param_data_<引擎>_<项目>.xlsx，
+# 其次兼容 param_data_<项目>.xlsx；多项目模式使用后者并按识别文本匹配演出表文件名。
+# 例如 chapter_a: 第一篇
 projects: {}
 # Agent 差分文档保留 variant_data 的所有自定义列，并建立情绪和适用情绪索引。
 # enabled 只控制完整 update_param 流程是否附带导出；CLI 和 GUI 可单独执行。

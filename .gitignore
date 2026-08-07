@@ -13,6 +13,7 @@ output/
 
 # Distribution / packaging
 .Python
+ScenarioTool.exe
 build/
 develop-eggs/
 dist/

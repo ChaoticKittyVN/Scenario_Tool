@@ -1,199 +1,165 @@
 # 配置说明
 
-本文档详细说明 Scenario Tool 的配置选项。
+Scenario Tool 的项目配置位于仓库根目录 `config.yaml`。路径默认相对于仓库根目录解析。
 
-## 配置文件
-
-配置文件为 `config.yaml`，位于项目根目录。
-
----
+GUI 的工具执行 Python、窗口尺寸等本机设置由 Qt 单独保存，不写入 `config.yaml`。点击“保存项目配置”时，GUI 只更新自己管理的字段，并保留其他已存在配置。
 
 ## 引擎配置
 
-### 切换引擎
-
-只需修改 `engine_type` 即可切换引擎：
-
-```yaml
-# Ren'Py 引擎
-engine:
-  engine_type: "renpy"
-
-# Naninovel 引擎
-engine:
-  engine_type: "naninovel"
-```
-
-### Ren'Py 引擎配置
+`engine.engine_type` 选择当前生成使用的引擎：
 
 ```yaml
 engine:
-  engine_type: "renpy"
-  indent_size: 4                      # 缩进大小（默认：4）
-  default_transition: "dissolve"      # 默认转场效果
-  file_extension: ".rpy"              # 输出文件扩展名
+  engine_type: renpy  # renpy、naninovel 或 utage
 ```
 
-### Naninovel 引擎配置
+`engines.enabled` 是可选引擎白名单：
 
 ```yaml
-engine:
-  engine_type: "naninovel"
-  indent_size: 4                      # 缩进大小（默认：4）
-  file_extension: ".nani"             # 输出文件扩展名
+engines:
+  enabled:
+    - renpy
 ```
 
----
+- 空列表表示使用 `engines/` 中实际存在的全部引擎。
+- 非空列表只展示并加载指定且实际存在的引擎。
+- 项目可以删除不需要的引擎目录，但 `engine.engine_type` 必须指向仍存在且已启用的引擎。
+
+引擎专属字段仍写在 `engine` 下，例如缩进、扩展名或转场默认值。切换引擎时，GUI 会重建该段，避免旧引擎字段残留。
 
 ## 路径配置
 
-配置输入输出目录：
-
 ```yaml
 paths:
-  input_dir: "./input"                # Excel 输入目录
-  output_dir: "./output"              # 脚本输出目录
-  param_config_dir: "./param_config"  # 参数映射目录
+  input_dir: input
+  output_dir: output
+  param_config_dir: param_config
+  log_dir: logs
+  input_voice_dir: input/voice
 ```
 
-**说明**：
-- `input_dir`: 存放 Excel 演出表格的目录
-- `output_dir`: 生成的引擎脚本保存目录
-- `param_config_dir`: 参数映射配置文件目录
+| 字段 | 用途 |
+|------|------|
+| `input_dir` | 演出 Excel 输入目录 |
+| `output_dir` | 生成脚本和报告输出目录 |
+| `param_config_dir` | `param_data`、`variant_data` 和生成映射所在目录 |
+| `log_dir` | 日志目录 |
+| `input_voice_dir` | 语音输入目录 |
 
----
+建议使用相对路径，便于项目整体移动。
 
 ## 处理配置
 
-控制脚本生成行为：
-
 ```yaml
 processing:
-  ignore_mode: true                   # 启用忽略模式
-  ignore_words: ["忽略", ""]          # 忽略标记词
-  enable_progress_bar: true           # 显示进度条
+  batch_size: 100
+  enable_progress_bar: true
+  ignore_mode: false
+  ignore_words:
+    - 忽略
+    - ""
+  multi_project_mode: false
 ```
 
-**说明**：
-- `ignore_mode`: 启用后，会跳过 `Ignore` 列标记的行
-- `ignore_words`: 当 `Ignore` 列包含这些词时，该行会被忽略
-- `enable_progress_bar`: 是否显示处理进度条
+- `batch_size`：批处理大小。
+- `enable_progress_bar`：命令行是否显示进度条。
+- `ignore_mode`：是否按照 `Ignore` 列过滤行。
+- `ignore_words`：触发忽略的内容。
+- `multi_project_mode`：是否按演出表文件名为不同篇章合并专用参数。
 
----
+## 项目与篇章参数
 
-## Excel 格式要求
-
-### 必需列
-
-| 列名 | 说明 | 必需 |
-|------|------|------|
-| `Note` | 注释列，必须包含 "END" 标记表示数据结束 | ✅ |
-| `Ignore` | 忽略标记列 | ❌ |
-
-### Ren'Py 支持的列
-
-| 列名 | 说明 | 示例 |
-|------|------|------|
-| `Speaker` | 说话人 | "角色A" |
-| `Text` | 对话文本 | "你好！" |
-| `Character` | 角色名称 | "alice" |
-| `Sprite` | 角色立绘 | "happy" |
-| `Background` | 背景图片 | "bg_room" |
-| `Music` | 背景音乐 | "bgm_main" |
-| `Sound` | 音效 | "sfx_door" |
-| `Voice` | 语音 | "voice_001" |
-| `Transition` | 转场效果 | "dissolve" |
-| `Window` | 对话框显示/隐藏 | "显示" / "隐藏" |
-| `Pause` | 暂停时间（秒） | "2.0" |
-
-### Naninovel 支持的列
-
-| 列名 | 说明 | 示例 |
-|------|------|------|
-| `Speaker` | 说话人 | "角色A" |
-| `Text` | 对话文本 | "你好！" |
-| `Char` | 角色 | "Alice" |
-| `Background` | 背景 | "Room" |
-| `Music` | 背景音乐 | "MainTheme" |
-| `Sound` | 音效 | "DoorOpen" |
-| `Camera` | 镜头控制 | "zoom:1.5" |
-| `Effect` | 特效 | "Rain" |
-| `Movie` | 视频 | "opening" |
-| `Wait` | 等待时间（秒） | "2.0" |
-
-### 特殊工作表
-
-- **`参数表`**: 此工作表会被自动跳过，不生成脚本
-  - 用于存储参数验证数据
-  - 由 `update_param.py` 自动维护
-
----
-
-## Excel 示例
-
-### 基础对话示例
-
-| Note | Speaker | Text | Background |
-|------|---------|------|------------|
-| 场景1 | 旁白 | 故事开始了 | bg_room |
-| 场景2 | 角色A | 你好！ | bg_room |
-| 场景3 | 角色B | 很高兴见到你 | bg_room |
-| END | | | |
-
-### 完整示例（Ren'Py）
-
-| Note | Speaker | Text | Character | Sprite | Background | Music | Transition |
-|------|---------|------|-----------|--------|------------|-------|------------|
-| 开场 | | | | | bg_title | bgm_title | fade |
-| 场景1 | 旁白 | 这是一个美好的早晨 | | | bg_room | bgm_main | dissolve |
-| 场景2 | 爱丽丝 | 早上好！ | alice | happy | | | |
-| 场景3 | 鲍勃 | 早上好，爱丽丝 | bob | normal | | | |
-| END | | | | | | | |
-
----
-
-## 配置最佳实践
-
-### 1. 使用相对路径
+`projects` 的键是项目或篇章标识，值是用于匹配演出表文件名的文本：
 
 ```yaml
-paths:
-  input_dir: "./input"      # ✅ 推荐
-  output_dir: "./output"    # ✅ 推荐
+projects:
+  chapter_a: 第一篇
+  chapter_b: 第二篇
 ```
 
-避免使用绝对路径，以便项目可移植。
+### 单项目模式
 
-### 2. 合理设置忽略词
+当 `multi_project_mode: false` 且 `projects` 只有一个有效项目时，基础参数文件按以下顺序选择：
+
+1. `param_data_<engine>_<project>.xlsx`
+2. `param_data_<project>.xlsx`，用于兼容旧项目
+3. `param_data_<engine>.xlsx`
+
+例如当前引擎为 Ren'Py、项目键为 `chapter_a`，优先读取 `param_data_renpy_chapter_a.xlsx`。
+
+### 多项目模式
+
+当 `multi_project_mode: true` 时：
+
+- 基础参数仍来自 `param_data_<engine>.xlsx`。
+- 每个项目使用 `param_data_<project>.xlsx`。
+- `update_param.py` 根据 `projects` 的识别文本匹配演出表文件名，再把对应项目参数合并到该工作簿的参数表。
+- 文件名匹配不到项目时只使用基础参数；匹配到多个项目时记录警告并使用第一个。
+
+## Agent 差分文档
+
+`variant_agent_export` 控制从 `variant_data.xlsx` 导出的 Agent 专用 JSON：
 
 ```yaml
-processing:
-  ignore_words: ["忽略", "跳过", ""]  # 支持多个标记词
+variant_agent_export:
+  enabled: false
+  output_file: variant_agent_data.json
+  group_columns:
+    - 情绪
+  item_key_column: 序号
+  alias_columns:
+    - 适用情绪
+  parameter_template: "{情绪}{序号}"
+  sheet_profiles: {}
 ```
 
-### 3. 引擎特定配置
+- `enabled`：完整执行 `update_param.py` 时是否附带生成 Agent 文档。
+- `output_file`：输出文件；相对路径以 `param_config_dir` 为基准。
+- `group_columns`：建立选择目录的分组列，可配置多个层级。
+- `item_key_column`：组内用于列举差分的键。
+- `alias_columns`：额外适用情绪或别名列，支持逗号、顿号、竖线和分号分隔。
+- `parameter_template`：当 `ScenarioParam` 为空时用于拼接参数；引用列不存在或值为空会中止导出。
+- `sheet_profiles`：使用 `"*"` 设置所有工作表，或按工作表名覆盖上述字段。
 
-不同引擎可能需要不同的配置，建议为每个引擎创建独立的配置文件：
+Agent 文档保留除 `ExcelParam`、`ScenarioParam` 外的全部自定义列，并输出 `selection_index`、`applicability_index` 和逐表警告。
+
+无论 `enabled` 是否开启，都可以单独执行：
 
 ```bash
-config_renpy.yaml
-config_naninovel.yaml
+python update_param.py --agent-variant-doc-only
 ```
 
-使用时指定配置文件（如果工具支持）。
+## 资源配置
 
----
+```yaml
+resources:
+  project_root: project
+  source_root: resource_library
+  extensions:
+    图片: [.png, .jpg, .jpeg, .webp]
+    音频: [.ogg, .mp3, .wav, .m4a]
+    视频: [.mp4, .webm, .ogv]
+```
 
-## 下一步
+`project_root` 是引擎项目资源目录，`source_root` 是待同步资源库。`extensions` 按类型声明允许识别的扩展名。
 
-- [参数映射](param-mapping.md) - 自定义参数翻译
-- [快速开始](getting-started.md) - 开始使用工具
-- [常见问题](faq.md) - 配置相关问题
+## 演出表要求
 
----
+常规工作表通常包含：
 
-## 相关文件
+| 列名 | 说明 |
+|------|------|
+| `Note` | 注释和流程标记；`END` 表示有效数据结束 |
+| `Ignore` | 可选忽略标记 |
+| `Name` | 说话人或特殊命令类型 |
+| `Text` | 文本内容 |
+| `Index` | 稳定行标识，用于导出和同步 |
 
-- `config.yaml` - 主配置文件
-- `param_config/param_data_renpy.xlsx` - Ren'Py 参数映射
-- `param_config/param_data_naninovel.xlsx` - Naninovel 参数映射
+其他演出列由当前引擎的生成器 `param_config` 决定。工作表中的“参数表”由 `update_param.py` 维护，不参与脚本生成；缺少时会创建，内容完全一致时跳过保存。
+
+## 相关文档
+
+- [参数映射](param-mapping.md)
+- [快速开始](getting-started.md)
+- [工具脚本](../../TOOLS_README.md)
+- [常见问题](faq.md)
