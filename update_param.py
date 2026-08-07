@@ -5,6 +5,7 @@ from pathlib import Path
 
 from core.config_manager import AppConfig, _create_engine_config
 from core.logger import get_logger
+from core.engine_loader import discover_engine_names
 from core.param_update import ParamUpdater
 
 
@@ -18,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default="config.yaml", help="配置文件路径。")
     parser.add_argument(
         "--engine",
-        choices=["renpy", "naninovel", "utage"],
+        choices=discover_engine_names(),
         help="覆盖 config.yaml 中的 engine_type。",
     )
     parser.add_argument(
@@ -48,6 +49,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="只从 param_data/variant_data 同步参数表，不重新生成映射模块。",
     )
+    scope.add_argument(
+        "--variant-mappings-only",
+        action="store_true",
+        help="只从 variant_data.xlsx 生成普通 variant_mappings.py。",
+    )
+    scope.add_argument(
+        "--agent-variant-doc-only",
+        action="store_true",
+        help="只从 variant_data.xlsx 生成供 Agent 使用的差分 JSON 文档。",
+    )
     return parser.parse_args()
 
 
@@ -61,6 +72,12 @@ def main() -> int:
 
         config = AppConfig.from_file(config_path)
         if args.engine:
+            if config.engines.enabled and args.engine not in config.engines.enabled:
+                logger.error(
+                    f"引擎 '{args.engine}' 未包含在 engines.enabled 中: "
+                    f"{', '.join(config.engines.enabled)}"
+                )
+                return 2
             config.engine = _create_engine_config(args.engine)
 
         workbooks = (
@@ -68,17 +85,22 @@ def main() -> int:
             if args.workbook
             else None
         )
-        generate_mapping_files = not args.parameter_sheet_only
-        update_parameter_sheets = not args.mappings_only
-        if args.mappings_only and workbooks:
-            logger.warning("--mappings-only 模式不会使用 --workbook 参数")
-
-        success = ParamUpdater(config).update_mappings(
-            workbooks,
-            generate_mapping_files=generate_mapping_files,
-            update_parameter_sheets=update_parameter_sheets,
-            dry_run=args.dry_run,
-        )
+        updater = ParamUpdater(config)
+        if args.variant_mappings_only:
+            success, _ = updater.generate_variant_mappings(args.dry_run)
+        elif args.agent_variant_doc_only:
+            success = updater.export_agent_variant_document(args.dry_run)
+        else:
+            generate_mapping_files = not args.parameter_sheet_only
+            update_parameter_sheets = not args.mappings_only
+            success = updater.update_mappings(
+                workbooks,
+                generate_mapping_files=generate_mapping_files,
+                update_parameter_sheets=update_parameter_sheets,
+                dry_run=args.dry_run,
+            )
+        if (args.mappings_only or args.variant_mappings_only or args.agent_variant_doc_only) and workbooks:
+            logger.warning("当前模式不会使用 --workbook 参数")
         if success:
             return 0
         logger.error("参数映射更新失败")

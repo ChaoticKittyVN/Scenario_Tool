@@ -27,9 +27,9 @@ def test_imports():
         from core.sentence_generator_manager import SentenceGeneratorManager
         from core.engine_processor import EngineProcessor
 
-        # 引擎模块
-        import engines.renpy
-        import engines.naninovel
+        from core.engine_loader import discover_engines
+
+        discover_engines()
 
         print("[OK] 所有核心模块导入成功")
         return True
@@ -77,9 +77,11 @@ def test_config():
         print(f"    输入目录: {config.paths.input_dir}")
         print(f"    输出目录: {config.paths.output_dir}")
 
-        # 测试引擎切换
+        from core.engine_loader import discover_engine_names
+
+        # 测试实际安装的引擎配置
         print("\n测试引擎配置:")
-        for engine_type in ["renpy", "naninovel"]:
+        for engine_type in discover_engine_names():
             test_config = AppConfig.from_dict({
                 "engine": {"engine_type": engine_type}
             })
@@ -97,14 +99,10 @@ def test_engine_registry():
     print_section("测试 4: 引擎注册表")
 
     try:
+        from core.engine_loader import discover_engines
         from core.engine_registry import EngineRegistry
 
-        # 导入引擎模块以触发注册
-        import engines.renpy
-        import engines.naninovel
-
-        # 列出所有注册的引擎
-        engines = EngineRegistry.list_engines()
+        engines = discover_engines()
         print(f"[OK] 已注册的引擎: {', '.join(engines)}")
 
         # 测试获取引擎信息
@@ -193,12 +191,12 @@ def test_constants():
 
     try:
         from core.constants import (
-            WindowMode, SpecialSpeaker, SheetName, Marker
+            WindowMode, SpecialName, SheetName, Marker
         )
 
         print("[OK] 常量枚举类:")
         print(f"    - WindowMode: {[m.value for m in WindowMode]}")
-        print(f"    - SpecialSpeaker: {[s.value for s in SpecialSpeaker]}")
+        print(f"    - SpecialName: {[s.value for s in SpecialName]}")
         print(f"    - SheetName: {[s.value for s in SheetName]}")
         print(f"    - Marker: {[m.value for m in Marker]}")
 

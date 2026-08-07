@@ -19,9 +19,7 @@ from core.config_manager import (
     PathConfig,
     ProcessingConfig,
     EngineConfig,
-    RenpyConfig,
-    NaninovelConfig,
-    UtageConfig
+    EngineDiscoveryConfig,
 )
 from core.engine_registry import EngineRegistry, register_engine
 from core.param_process.param_translator import ParamTranslator
@@ -45,9 +43,7 @@ __all__ = [
     'PathConfig',
     'ProcessingConfig',
     'EngineConfig',
-    'RenpyConfig',
-    'NaninovelConfig',
-    'UtageConfig',
+    'EngineDiscoveryConfig',
     'EngineRegistry',
     'register_engine',
     'ParamTranslator',
@@ -55,3 +51,12 @@ __all__ = [
     'SentenceGeneratorManager',
     'EngineProcessor',
 ]
+
+
+def __getattr__(name):
+    """Keep explicit legacy config imports lazy and optional."""
+    if name in {"RenpyConfig", "NaninovelConfig", "UtageConfig"}:
+        from core import config_manager
+
+        return getattr(config_manager, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

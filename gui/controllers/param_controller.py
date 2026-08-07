@@ -21,16 +21,29 @@ class ParamUpdateWorker(QThread):
         config: AppConfig,
         generate_mapping_files: bool = True,
         update_parameter_sheets: bool = True,
+        operation: str = "update",
     ):
         super().__init__()
-        if not generate_mapping_files and not update_parameter_sheets:
+        valid_operations = {"update", "variant_mapping", "agent_variant_document"}
+        if operation not in valid_operations:
+            raise ValueError(f"不支持的参数操作: {operation}")
+        if (
+            operation == "update"
+            and not generate_mapping_files
+            and not update_parameter_sheets
+        ):
             raise ValueError("至少需要选择一项参数更新操作")
         self.config = config
         self.generate_mapping_files = generate_mapping_files
         self.update_parameter_sheets = update_parameter_sheets
+        self.operation = operation
 
     @property
     def operation_name(self) -> str:
+        if self.operation == "variant_mapping":
+            return "生成普通差分映射"
+        if self.operation == "agent_variant_document":
+            return "生成 Agent 差分文档"
         if self.generate_mapping_files and self.update_parameter_sheets:
             return "更新映射并同步参数表"
         if self.generate_mapping_files:
@@ -39,12 +52,16 @@ class ParamUpdateWorker(QThread):
 
     @property
     def success_message(self) -> str:
+        if self.operation != "update":
+            return f"{self.operation_name}成功"
         if self.generate_mapping_files and self.update_parameter_sheets:
             return "参数映射与演出表格参数表更新成功"
         return f"{self.operation_name}成功"
 
     @property
     def failure_message(self) -> str:
+        if self.operation != "update":
+            return f"{self.operation_name}失败"
         if self.generate_mapping_files and self.update_parameter_sheets:
             return "参数映射或参数表更新失败"
         return f"{self.operation_name}失败"
@@ -57,11 +74,16 @@ class ParamUpdateWorker(QThread):
             self.progress.emit(f"开始{self.operation_name}...")
 
             updater = ParamUpdater(self.config)
-            success = updater.update_mappings(
-                generate_mapping_files=self.generate_mapping_files,
-                update_parameter_sheets=self.update_parameter_sheets,
-                dry_run=False,
-            )
+            if self.operation == "variant_mapping":
+                success, _ = updater.generate_variant_mappings(dry_run=False)
+            elif self.operation == "agent_variant_document":
+                success = updater.export_agent_variant_document(dry_run=False)
+            else:
+                success = updater.update_mappings(
+                    generate_mapping_files=self.generate_mapping_files,
+                    update_parameter_sheets=self.update_parameter_sheets,
+                    dry_run=False,
+                )
 
             if success:
                 self.finished.emit(True, self.success_message)
@@ -91,6 +113,7 @@ class ParamController(QObject):
         config=None,
         generate_mapping_files: bool = True,
         update_parameter_sheets: bool = True,
+        operation: str = "update",
     ):
         """更新参数映射"""
         if self.worker and self.worker.isRunning():
@@ -104,6 +127,7 @@ class ParamController(QObject):
             config or self.config,
             generate_mapping_files=generate_mapping_files,
             update_parameter_sheets=update_parameter_sheets,
+            operation=operation,
         )
         self.worker.progress.connect(self._on_progress)
         self.worker.finished.connect(self._on_finished)

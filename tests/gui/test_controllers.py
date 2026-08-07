@@ -88,3 +88,35 @@ def test_param_worker_can_sync_sheets_without_generating_mappings():
         dry_run=False,
     )
     assert finished == [(True, "同步演出表参数表成功")]
+
+
+def test_param_worker_can_generate_only_normal_variant_mapping():
+    config = AppConfig(engine=RenpyConfig())
+    worker = ParamUpdateWorker(config, operation="variant_mapping")
+    finished = []
+    worker.finished.connect(lambda success, message: finished.append((success, message)))
+    updater = Mock()
+    updater.generate_variant_mappings.return_value = (True, None)
+
+    with patch("update_param.ParamUpdater", return_value=updater):
+        worker.run()
+
+    updater.generate_variant_mappings.assert_called_once_with(dry_run=False)
+    updater.update_mappings.assert_not_called()
+    assert finished == [(True, "生成普通差分映射成功")]
+
+
+def test_param_worker_can_generate_agent_variant_document():
+    config = AppConfig(engine=RenpyConfig())
+    worker = ParamUpdateWorker(config, operation="agent_variant_document")
+    finished = []
+    worker.finished.connect(lambda success, message: finished.append((success, message)))
+    updater = Mock()
+    updater.export_agent_variant_document.return_value = True
+
+    with patch("update_param.ParamUpdater", return_value=updater):
+        worker.run()
+
+    updater.export_agent_variant_document.assert_called_once_with(dry_run=False)
+    updater.update_mappings.assert_not_called()
+    assert finished == [(True, "生成 Agent 差分文档成功")]

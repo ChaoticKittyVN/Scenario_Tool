@@ -11,6 +11,7 @@ from tqdm import tqdm
 from core.config_manager import AppConfig
 from core.param_process.param_translator import ParamTranslator
 from core.engine_registry import EngineRegistry
+from core.engine_loader import load_engine
 from core.logger import get_logger
 from core.exceptions import ExcelParseError, GeneratorError
 from core.constants import SheetName, ColumnName, Marker, TEMP_FILE_PREFIX
@@ -63,32 +64,8 @@ def is_excel_output(engine_config) -> bool:
 
 
 def import_engine_module(engine_type: str):
-    """
-    根据引擎类型动态导入引擎模块以触发注册
-
-    Args:
-        engine_type: 引擎类型（renpy, naninovel, utage）
-
-    Raises:
-        ImportError: 无法导入引擎模块
-        ValueError: 不支持的引擎类型
-    """
-    engine_module_map = {
-        "renpy": "engines.renpy",
-        "naninovel": "engines.naninovel",
-        "utage": "engines.utage"
-    }
-
-    if engine_type not in engine_module_map:
-        raise ValueError(f"不支持的引擎类型: {engine_type}")
-
-    module_name = engine_module_map[engine_type]
-    try:
-        __import__(module_name)
-        logger.debug(f"已导入引擎模块: {module_name}")
-    except ImportError as e:
-        logger.error(f"无法导入引擎模块 {module_name}: {e}")
-        raise
+    """按需加载一个实际安装的引擎模块。"""
+    return load_engine(engine_type)
 
 
 def create_processor(config: AppConfig, translator: ParamTranslator):

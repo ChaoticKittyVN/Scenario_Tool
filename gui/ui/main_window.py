@@ -193,6 +193,24 @@ class MainWindowUI:
         btn_layout.addWidget(self.param_update_btn)
         layout.addLayout(btn_layout)
 
+        variant_btn_layout = QHBoxLayout()
+        self.param_variant_mapping_btn = QPushButton("生成普通差分映射")
+        self.param_variant_mapping_btn.setObjectName("secondaryButton")
+        self.param_variant_mapping_btn.setToolTip(
+            "只从 variant_data.xlsx 生成运行时使用的 variant_mappings.py"
+        )
+        self.param_variant_mapping_btn.setMinimumHeight(40)
+        variant_btn_layout.addWidget(self.param_variant_mapping_btn)
+
+        self.param_agent_variant_btn = QPushButton("生成 Agent 差分文档")
+        self.param_agent_variant_btn.setObjectName("secondaryButton")
+        self.param_agent_variant_btn.setToolTip(
+            "保留差分表中的自定义列，并生成情绪、序号和适用情绪索引"
+        )
+        self.param_agent_variant_btn.setMinimumHeight(40)
+        variant_btn_layout.addWidget(self.param_agent_variant_btn)
+        layout.addLayout(variant_btn_layout)
+
         # 进度条
         progress_layout = QHBoxLayout()
         progress_layout.addWidget(QLabel("进度:"))

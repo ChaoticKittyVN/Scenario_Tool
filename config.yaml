@@ -1,5 +1,8 @@
 engine:
   engine_type: renpy
+# 空列表表示启用 engines 目录中实际存在的全部引擎；也可只填写当前项目需要的引擎。
+engines:
+  enabled: []
 paths:
   input_dir: input
   log_dir: logs
@@ -18,6 +21,20 @@ processing:
 # 项目键 chapter_a 对应 param_config/param_data_chapter_a.xlsx；
 # 识别文本用于匹配演出表文件名，例如：chapter_a: 第一篇
 projects: {}
+# Agent 差分文档保留 variant_data 的所有自定义列，并建立情绪和适用情绪索引。
+# enabled 只控制完整 update_param 流程是否附带导出；CLI 和 GUI 可单独执行。
+variant_agent_export:
+  enabled: false
+  # 相对路径以 param_config_dir 为基准。
+  output_file: variant_agent_data.json
+  group_columns:
+  - 情绪
+  item_key_column: 序号
+  alias_columns:
+  - 适用情绪
+  parameter_template: '{情绪}{序号}'
+  # 可用 '*' 设置所有工作表，也可按工作表名称覆盖以上字段。
+  sheet_profiles: {}
 resources:
   extensions:
     图片:

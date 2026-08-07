@@ -149,5 +149,6 @@ def register_engine(
             description=description
         )
         EngineRegistry.register(metadata)
+        setattr(processor_factory, "__engine_metadata__", metadata)
         return processor_factory
     return decorator

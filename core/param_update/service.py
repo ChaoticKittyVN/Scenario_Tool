@@ -10,6 +10,7 @@ from core.param_update.mapping_export import MappingExportMixin
 from core.param_update.project_scope import ProjectScopeMixin
 from core.param_update.sheet_sync import ParameterSheetSyncMixin
 from core.param_update.sources import ParamSourceMixin
+from core.param_update.variant_export import VariantAgentExportMixin
 
 
 logger = get_logger()
@@ -19,6 +20,7 @@ class ParamUpdater(
     ProjectScopeMixin,
     ParamSourceMixin,
     MappingExportMixin,
+    VariantAgentExportMixin,
     ParameterSheetSyncMixin,
 ):
     """Public facade for all parameter update operations."""
@@ -59,6 +61,13 @@ class ParamUpdater(
             if not self.generate_param_mappings(dry_run):
                 return False
             _, variant_file_path = self.generate_variant_mappings(dry_run)
+            agent_export_config = getattr(self.config, "variant_agent_export", None)
+            if (
+                agent_export_config is not None
+                and agent_export_config.enabled is True
+            ):
+                if not self.export_agent_variant_document(dry_run):
+                    return False
 
         if update_parameter_sheets:
             if generate_mapping_files:

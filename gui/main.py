@@ -24,6 +24,7 @@ from gui.controllers.tool_controller import (
     resolve_python_executable,
 )
 from core.config_manager import AppConfig
+from core.engine_loader import discover_engines
 from core.logger import get_logger
 import logging
 
@@ -119,11 +120,13 @@ class MainWindow(QMainWindow):
         self.resource_log_handler.setFormatter(formatter)
         self.resource_log_handler.log_signal.connect(self.ui.resource_log.append)
 
+    def _available_engines(self):
+        """返回当前项目允许且实际可加载的引擎。"""
+        return discover_engines(self.config.engines.enabled)
+
     def _init_ui_state(self):
         """初始化 UI 状态"""
-        # 初始化引擎下拉框（从注册表获取）
-        from core.engine_registry import EngineRegistry
-        engines = EngineRegistry.list_engines()
+        engines = self._available_engines()
         engine_names = [meta.display_name for meta in engines.values()]
         for combo in (
             self.ui.scenario_engine_combo,
@@ -215,6 +218,16 @@ class MainWindow(QMainWindow):
                 update_parameter_sheets=True,
             )
         )
+        self.ui.param_variant_mapping_btn.clicked.connect(
+            lambda _checked=False: self._on_update_param(
+                operation="variant_mapping",
+            )
+        )
+        self.ui.param_agent_variant_btn.clicked.connect(
+            lambda _checked=False: self._on_update_param(
+                operation="agent_variant_document",
+            )
+        )
 
         # 控制器信号
         self.param_controller.worker_progress.connect(self._on_param_progress)
@@ -268,9 +281,7 @@ class MainWindow(QMainWindow):
     # === 脚本生成相关方法 ===
     def _on_reset_scenario(self):
         """恢复脚本生成选项卡的默认配置"""
-        from core.engine_registry import EngineRegistry
-
-        engines = EngineRegistry.list_engines()
+        engines = self._available_engines()
         for name, meta in engines.items():
             if name == self.config.engine.engine_type:
                 self.ui.scenario_engine_combo.setCurrentText(meta.display_name)
@@ -296,7 +307,6 @@ class MainWindow(QMainWindow):
 
     def _on_generate_scenario(self):
         """生成脚本"""
-        from core.engine_registry import EngineRegistry
         from copy import deepcopy
 
         # 创建配置副本
@@ -304,7 +314,7 @@ class MainWindow(QMainWindow):
 
         # 更新临时配置的引擎
         engine_display_name = self.ui.scenario_engine_combo.currentText()
-        engines = EngineRegistry.list_engines()
+        engines = self._available_engines()
         for name, meta in engines.items():
             if meta.display_name == engine_display_name:
                 temp_config.engine = meta.config_class(engine_type=name)
@@ -349,9 +359,7 @@ class MainWindow(QMainWindow):
     # === 参数映射相关方法 ===
     def _on_reset_param(self):
         """恢复参数映射选项卡的默认配置"""
-        from core.engine_registry import EngineRegistry
-
-        engines = EngineRegistry.list_engines()
+        engines = self._available_engines()
         for name, meta in engines.items():
             if name == self.config.engine.engine_type:
                 self.ui.param_engine_combo.setCurrentText(meta.display_name)
@@ -367,14 +375,12 @@ class MainWindow(QMainWindow):
 
     def _update_param_file_labels(self):
         """实时更新参数文件和差分文件的label"""
-        from core.engine_registry import EngineRegistry
-
         # 获取当前引擎和参数配置目录
         engine_display_name = self.ui.param_engine_combo.currentText()
         param_dir = self.ui.param_config_dir_edit.text()
 
         # 从注册表查找引擎名称
-        engines = EngineRegistry.list_engines()
+        engines = self._available_engines()
         engine_name = None
         for name, meta in engines.items():
             if meta.display_name == engine_display_name:
@@ -395,9 +401,9 @@ class MainWindow(QMainWindow):
         self,
         generate_mapping_files: bool = True,
         update_parameter_sheets: bool = True,
+        operation: str = "update",
     ):
         """更新参数映射"""
-        from core.engine_registry import EngineRegistry
         from copy import deepcopy
 
         # 创建配置副本
@@ -408,7 +414,7 @@ class MainWindow(QMainWindow):
 
         # 更新引擎配置（从display_name转换为engine_name）
         engine_display_name = self.ui.param_engine_combo.currentText()
-        engines = EngineRegistry.list_engines()
+        engines = self._available_engines()
         for name, meta in engines.items():
             if meta.display_name == engine_display_name:
                 temp_config.engine = meta.config_class(engine_type=name)
@@ -426,6 +432,7 @@ class MainWindow(QMainWindow):
             temp_config,
             generate_mapping_files=generate_mapping_files,
             update_parameter_sheets=update_parameter_sheets,
+            operation=operation,
         )
 
     def _set_param_buttons_enabled(self, enabled: bool):
@@ -433,6 +440,8 @@ class MainWindow(QMainWindow):
             self.ui.param_mappings_btn,
             self.ui.param_sheet_btn,
             self.ui.param_update_btn,
+            self.ui.param_variant_mapping_btn,
+            self.ui.param_agent_variant_btn,
         ):
             button.setEnabled(enabled)
 
@@ -562,8 +571,7 @@ class MainWindow(QMainWindow):
         self.ui.config_ignore_check.setChecked(self.config.processing.ignore_mode)
         self.ui.config_ignore_edit.setText(", ".join(self.config.processing.ignore_words))
 
-        from core.engine_registry import EngineRegistry
-        engines = EngineRegistry.list_engines()
+        engines = self._available_engines()
         for name, meta in engines.items():
             if name == self.config.engine.engine_type:
                 self.ui.config_engine_combo.setCurrentText(meta.display_name)
@@ -665,21 +673,19 @@ class MainWindow(QMainWindow):
     def _on_save_config(self):
         """保存可随项目共享的配置。"""
         try:
-            from core.engine_registry import EngineRegistry
-
             # 从UI读取配置
             engine_display_name = self.ui.config_engine_combo.currentText()
             ignore_words = [w.strip() for w in self.ui.config_ignore_edit.text().split(",")]
 
             # 从display_name转换为engine_name
-            engines = EngineRegistry.list_engines()
+            engines = self._available_engines()
             engine_name = None
             for name, meta in engines.items():
                 if meta.display_name == engine_display_name:
                     engine_name = name
                     break
 
-            selected_engine = engine_name if engine_name else "renpy"
+            selected_engine = engine_name or self.config.engine.engine_type
             config_updates = {
                 "paths": {
                     "input_dir": self.ui.config_input_edit.text(),

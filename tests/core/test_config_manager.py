@@ -8,6 +8,8 @@ from pathlib import Path
 from core.config_manager import (
     PathConfig,
     ProcessingConfig,
+    VariantAgentExportConfig,
+    EngineDiscoveryConfig,
     EngineConfig,
     RenpyConfig,
     NaninovelConfig,
@@ -152,6 +154,50 @@ class TestAppConfig:
         assert isinstance(config.paths, PathConfig)
         assert isinstance(config.processing, ProcessingConfig)
         assert isinstance(config.engine, RenpyConfig)
+        assert isinstance(config.variant_agent_export, VariantAgentExportConfig)
+
+    def test_variant_agent_export_config_roundtrip(self, tmp_path):
+        config = AppConfig.from_dict({
+            "variant_agent_export": {
+                "enabled": True,
+                "output_file": "agent/variants.json",
+                "group_columns": ["服装", "情绪"],
+                "item_key_column": "编号",
+                "alias_columns": ["适用情绪", "适用场景"],
+                "parameter_template": "{情绪}{编号}",
+                "sheet_profiles": {
+                    "角色A": {"group_columns": ["表情分类"]},
+                },
+            },
+        })
+        config_file = tmp_path / "config.yaml"
+
+        config.to_file(config_file)
+        loaded = AppConfig.from_file(config_file)
+
+        assert loaded.variant_agent_export.enabled is True
+        assert loaded.variant_agent_export.group_columns == ["服装", "情绪"]
+        assert loaded.variant_agent_export.sheet_profiles["角色A"] == {
+            "group_columns": ["表情分类"]
+        }
+
+    def test_engine_allowlist_selects_available_default(self, monkeypatch):
+        monkeypatch.setattr(
+            "core.engine_loader.discover_engine_names",
+            lambda: ["naninovel"],
+        )
+
+        config = AppConfig.from_dict({"engines": {"enabled": ["naninovel"]}})
+
+        assert isinstance(config.engines, EngineDiscoveryConfig)
+        assert config.engine.engine_type == "naninovel"
+
+    def test_selected_engine_must_be_enabled(self):
+        with pytest.raises(ValueError, match="未包含在 engines.enabled"):
+            AppConfig.from_dict({
+                "engines": {"enabled": ["naninovel"]},
+                "engine": {"engine_type": "renpy"},
+            })
 
     def test_create_default_naninovel(self):
         """测试创建默认 Naninovel 配置"""

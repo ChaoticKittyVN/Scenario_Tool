@@ -39,15 +39,16 @@ class ExcelScenarioWriter(IOutputWriter):
                 
                 if is_sheet_dict:
                     # 多sheet写入
-                    from engines.utage.formatter import UtageFormatter
-                    formatter = UtageFormatter()
-                    
                     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
                         sheet_written = False
                         for sheet_name, sheet_data in data.items():
                             try:
-                                # 格式化数据
-                                df = formatter.format_output(sheet_data, config.engine_config)
+                                df = (
+                                    sheet_data.copy()
+                                    if isinstance(sheet_data, pd.DataFrame)
+                                    else self._list_to_dataframe(sheet_data)
+                                )
+                                df = self._apply_engine_formatting(df, config)
                                 
                                 # 检查DataFrame是否为空
                                 if df.empty:

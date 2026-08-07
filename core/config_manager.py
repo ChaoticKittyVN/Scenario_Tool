@@ -97,6 +97,33 @@ class ProcessingConfig:
 
 
 @dataclass
+class VariantAgentExportConfig:
+    """Agent 差分文档导出配置。"""
+
+    enabled: bool = False
+    output_file: str = "variant_agent_data.json"
+    group_columns: List[str] = field(default_factory=lambda: ["情绪"])
+    item_key_column: str = "序号"
+    alias_columns: List[str] = field(default_factory=lambda: ["适用情绪"])
+    parameter_template: Optional[str] = "{情绪}{序号}"
+    sheet_profiles: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+
+
+@dataclass
+class EngineDiscoveryConfig:
+    """控制项目允许使用的可选引擎。空列表表示使用全部已安装引擎。"""
+
+    enabled: List[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        if self.enabled is None:
+            self.enabled = []
+        if isinstance(self.enabled, str):
+            self.enabled = [self.enabled]
+        self.enabled = list(dict.fromkeys(str(name) for name in self.enabled))
+
+
+@dataclass
 class EngineConfig:
     """引擎配置基类"""
     engine_type: str
@@ -131,26 +158,10 @@ def _create_engine_config(engine_type: str, engine_data: Optional[Dict[str, Any]
     Raises:
         ValueError: 引擎未注册或无法创建配置
     """
-    # 延迟导入以避免循环导入
-    from core.engine_registry import EngineRegistry
-    
-    # 如果引擎未注册，尝试动态导入
-    if not EngineRegistry.is_registered(engine_type):
-        # 尝试动态导入引擎模块
-        engine_module_map = {
-            "renpy": "engines.renpy",
-            "naninovel": "engines.naninovel",
-            "utage": "engines.utage"
-        }
-        if engine_type in engine_module_map:
-            try:
-                __import__(engine_module_map[engine_type])
-            except ImportError as e:
-                logger.warning(f"无法导入引擎模块 {engine_module_map[engine_type]}: {e}")
+    from core.engine_loader import load_engine
 
-    # 从注册表获取引擎元数据
     try:
-        engine_meta = EngineRegistry.get(engine_type)
+        engine_meta = load_engine(engine_type)
     except Exception as e:
         raise ValueError(f"无法获取引擎 '{engine_type}' 的配置类: {e}")
 
@@ -167,6 +178,14 @@ def _create_engine_config(engine_type: str, engine_data: Optional[Dict[str, Any]
         engine = config_class()
 
     return engine
+
+
+def _create_default_engine_config(
+    enabled: Optional[List[str]] = None,
+) -> EngineConfig:
+    from core.engine_loader import select_default_engine_name
+
+    return _create_engine_config(select_default_engine_name(enabled))
 
 @dataclass
 class ResourceConfig:
@@ -190,8 +209,12 @@ class AppConfig:
     """应用总配置"""
     paths: PathConfig = field(default_factory=PathConfig)
     processing: ProcessingConfig = field(default_factory=ProcessingConfig)
-    engine: EngineConfig = field(default_factory=lambda: _create_engine_config("renpy"))
+    engine: EngineConfig = field(default_factory=_create_default_engine_config)
+    engines: EngineDiscoveryConfig = field(default_factory=EngineDiscoveryConfig)
     resources: ResourceConfig = field(default_factory=ResourceConfig)
+    variant_agent_export: VariantAgentExportConfig = field(
+        default_factory=VariantAgentExportConfig
+    )
     projects: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -229,8 +252,20 @@ class AppConfig:
         processing = ProcessingConfig(
             **_known_dataclass_values(ProcessingConfig, data.get('processing', {}))
         )
+        engines = EngineDiscoveryConfig(
+            **_known_dataclass_values(
+                EngineDiscoveryConfig,
+                data.get('engines', {}),
+            )
+        )
         resources = ResourceConfig(
             **_known_dataclass_values(ResourceConfig, data.get('resources', {}))
+        )
+        variant_agent_export = VariantAgentExportConfig(
+            **_known_dataclass_values(
+                VariantAgentExportConfig,
+                data.get('variant_agent_export', {}),
+            )
         )
         projects_data = data.get('projects', {}) or {}
         if not isinstance(projects_data, dict):
@@ -245,7 +280,17 @@ class AppConfig:
             engine_type = engine_data
             engine_data = {}
         else:
-            engine_type = engine_data.get('engine_type', 'renpy')
+            engine_type = engine_data.get('engine_type')
+
+        if not engine_type:
+            from core.engine_loader import select_default_engine_name
+
+            engine_type = select_default_engine_name(engines.enabled)
+        if engines.enabled and engine_type not in engines.enabled:
+            raise ValueError(
+                f"当前引擎 '{engine_type}' 未包含在 engines.enabled 中: "
+                f"{', '.join(engines.enabled)}"
+            )
 
         # 通过引擎注册表动态创建配置实例
         engine = _create_engine_config(engine_type, engine_data)
@@ -254,7 +299,9 @@ class AppConfig:
             paths=paths,
             processing=processing,
             engine=engine,
+            engines=engines,
             resources=resources,
+            variant_agent_export=variant_agent_export,
             projects=projects,
         )
 
@@ -278,10 +325,22 @@ class AppConfig:
             'engine': {
                 'engine_type': self.engine.engine_type,
             },
+            'engines': {
+                'enabled': self.engines.enabled,
+            },
             'resources': {
                 'project_root': str(self.resources.project_root),
                 'source_root': str(self.resources.source_root),
                 'extensions': self.resources.extensions,
+            },
+            'variant_agent_export': {
+                'enabled': self.variant_agent_export.enabled,
+                'output_file': self.variant_agent_export.output_file,
+                'group_columns': self.variant_agent_export.group_columns,
+                'item_key_column': self.variant_agent_export.item_key_column,
+                'alias_columns': self.variant_agent_export.alias_columns,
+                'parameter_template': self.variant_agent_export.parameter_template,
+                'sheet_profiles': self.variant_agent_export.sheet_profiles,
             },
             'projects': self.projects,
         }
@@ -328,7 +387,7 @@ class AppConfig:
         return cls.from_dict(data)
 
     @classmethod
-    def create_default(cls, engine_type: str = "renpy") -> 'AppConfig':
+    def create_default(cls, engine_type: Optional[str] = None) -> 'AppConfig':
         """
         创建默认配置
 
@@ -338,13 +397,18 @@ class AppConfig:
         Returns:
             AppConfig: 默认配置对象
         """
-        engine = _create_engine_config(engine_type)
+        if engine_type is None:
+            engine = _create_default_engine_config()
+        else:
+            engine = _create_engine_config(engine_type)
 
         return cls(
             paths=PathConfig(),
             processing=ProcessingConfig(),
             engine=engine,
-            resources=ResourceConfig()
+            engines=EngineDiscoveryConfig(),
+            resources=ResourceConfig(),
+            variant_agent_export=VariantAgentExportConfig(),
         )
 
 

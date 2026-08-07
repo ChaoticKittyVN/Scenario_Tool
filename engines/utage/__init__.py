@@ -4,8 +4,8 @@ Utage Engine Module
 Utage 引擎实现
 """
 from core.engine_registry import register_engine
-from core.config_manager import UtageConfig
 from core.engine_processor import EngineProcessor
+from .config import UtageConfig
 
 
 @register_engine(

@@ -741,6 +741,38 @@ class TestUpdateMappingsMethod:
         assert result is True
         assert calls == ["param", "variant", "sync"]
 
+    def test_update_mappings_exports_agent_document_when_enabled(self, updater):
+        updater._default_param_file().touch()
+        updater.config.variant_agent_export = Mock(enabled=True)
+        calls = []
+
+        with (
+            patch.object(
+                updater,
+                "generate_param_mappings",
+                side_effect=lambda dry_run=False: calls.append("param") or True,
+            ),
+            patch.object(
+                updater,
+                "generate_variant_mappings",
+                side_effect=lambda dry_run=False: calls.append("variant") or (True, None),
+            ),
+            patch.object(
+                updater,
+                "export_agent_variant_document",
+                side_effect=lambda dry_run=False: calls.append("agent") or True,
+            ),
+            patch.object(
+                updater,
+                "sync_parameter_sheets",
+                side_effect=lambda scenario_workbooks=None, dry_run=False: calls.append("sync") or True,
+            ),
+        ):
+            result = updater.update_mappings()
+
+        assert result is True
+        assert calls == ["param", "variant", "agent", "sync"]
+
     def test_update_mappings_success_without_variant(self, updater, tmp_path):
         """测试成功更新映射（没有差分文件）"""
         # 创建参数文件
@@ -921,6 +953,22 @@ class TestParamUpdaterCli:
         assert args.apply is False
         assert args.mappings_only is False
         assert args.parameter_sheet_only is False
+        assert args.variant_mappings_only is False
+        assert args.agent_variant_doc_only is False
+
+    @pytest.mark.parametrize(
+        ("option", "attribute"),
+        [
+            ("--variant-mappings-only", "variant_mappings_only"),
+            ("--agent-variant-doc-only", "agent_variant_doc_only"),
+        ],
+    )
+    def test_variant_cli_modes(self, monkeypatch, option, attribute):
+        monkeypatch.setattr("sys.argv", ["update_param.py", option])
+
+        args = parse_args()
+
+        assert getattr(args, attribute) is True
 
     def test_cli_modes(self, monkeypatch):
         monkeypatch.setattr(
