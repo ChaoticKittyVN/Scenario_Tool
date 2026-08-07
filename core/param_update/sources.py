@@ -17,10 +17,24 @@ class ParamSourceMixin:
 
     def _default_param_file(self) -> Path:
         """Return the base parameter workbook for the current engine."""
-        return (
-            Path(self.config.paths.param_config_dir)
-            / f"param_data_{self.engine_type}.xlsx"
+        param_dir = Path(self.config.paths.param_config_dir)
+        default_file = param_dir / f"param_data_{self.engine_type}.xlsx"
+        if self.multi_project_mode or len(self.projects) != 1:
+            return default_file
+
+        project_key = next(iter(self.projects))
+        project_candidates = (
+            param_dir / f"param_data_{self.engine_type}_{project_key}.xlsx",
+            param_dir / f"param_data_{project_key}.xlsx",
         )
+        for project_file in project_candidates:
+            if project_file.exists():
+                logger.info(
+                    f"单项目模式使用项目参数文件: {project_file.name} "
+                    f"(项目: {project_key})"
+                )
+                return project_file
+        return default_file
 
     def _variant_data_file(self) -> Path:
         """Return the configured variant parameter workbook."""

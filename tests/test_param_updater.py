@@ -1041,6 +1041,52 @@ class TestMultiProjectParamUpdater:
             "BaseMusic": "basemusic"
         }
 
+    def test_single_project_mode_prefers_engine_project_file(self, updater):
+        param_dir = updater.config.paths.param_config_dir
+        base_file = param_dir / "param_data_renpy.xlsx"
+        project_file = param_dir / "param_data_renpy_chapter_a.xlsx"
+        self._write_param_file(base_file, ["BaseMusic"])
+        self._write_param_file(project_file, ["ProjectMusic"])
+        updater.config.processing.multi_project_mode = False
+        updater.config.projects = {"chapter_a": "第一章"}
+
+        assert updater._default_param_file() == project_file
+        assert updater.update_mappings(update_parameter_sheets=False) is True
+
+        namespace = {}
+        exec((param_dir / "param_mappings.py").read_text(encoding="utf-8"), namespace)
+        assert namespace["PARAM_MAPPINGS"]["Music"] == {
+            "ProjectMusic": "projectmusic"
+        }
+
+    def test_single_project_mode_supports_legacy_project_filename(self, updater):
+        param_dir = updater.config.paths.param_config_dir
+        project_file = param_dir / "param_data_chapter_a.xlsx"
+        self._write_param_file(project_file, ["ProjectMusic"])
+        updater.config.processing.multi_project_mode = False
+        updater.config.projects = {"chapter_a": "第一章"}
+
+        assert updater._default_param_file() == project_file
+
+    def test_single_project_mode_falls_back_to_engine_file(self, updater):
+        param_dir = updater.config.paths.param_config_dir
+        base_file = param_dir / "param_data_renpy.xlsx"
+        self._write_param_file(base_file, ["BaseMusic"])
+        updater.config.processing.multi_project_mode = False
+        updater.config.projects = {"chapter_a": "第一章"}
+
+        assert updater._default_param_file() == base_file
+
+    def test_single_project_mode_does_not_choose_from_multiple_projects(self, updater):
+        param_dir = updater.config.paths.param_config_dir
+        base_file = param_dir / "param_data_renpy.xlsx"
+        project_file = param_dir / "param_data_renpy_chapter_a.xlsx"
+        self._write_param_file(base_file, ["BaseMusic"])
+        self._write_param_file(project_file, ["ProjectMusic"])
+        updater.config.processing.multi_project_mode = False
+
+        assert updater._default_param_file() == base_file
+
     def test_enabled_mode_merges_project_mapping_files(self, updater):
         param_dir = updater.config.paths.param_config_dir
         self._write_param_file(param_dir / "param_data_renpy.xlsx", ["BaseMusic"])
