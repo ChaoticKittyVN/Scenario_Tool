@@ -54,3 +54,5 @@ resources:
     - .m4a
   project_root: project
   source_root: resource_library
+  validate_source: true
+  filename_normalization: {}

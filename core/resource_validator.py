@@ -1,111 +1,104 @@
-"""
-资源验证器模块
-验证资源文件是否存在于项目库和资源库中
-"""
-from typing import Dict, Set, List
-from pathlib import Path
-from collections import defaultdict
+"""Validate resource references against project and source libraries."""
 import os
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
+
 from core.logger import get_logger
+from core.resource_resolution import ResourceResolution, ResourceResolver
+
 
 logger = get_logger()
 
 
 class ResourceValidator:
-    """资源验证器 - 验证资源文件是否存在"""
+    """Validate resource files and delegate engine-specific lookups."""
 
     def __init__(
         self,
         project_root: Path,
         source_root: Path,
-        extensions: Dict[str, List[str]]
+        extensions: Dict[str, List[str]],
+        validate_source: bool = True,
+        filename_normalization: Optional[Dict[str, List[str]]] = None,
+        resource_resolvers: Optional[List[ResourceResolver]] = None,
     ):
-        """
-        初始化资源验证器
-
-        Args:
-            project_root: 项目资源根目录
-            source_root: 资源库根目录
-            extensions: 文件扩展名配置 {"图片": [".png", ".jpg"], "音频": [".ogg", ".mp3"]}
-        """
         self.project_root = Path(project_root)
         self.source_root = Path(source_root)
         self.extensions = extensions
+        self.validate_source = validate_source
+        self.filename_normalization = filename_normalization or {}
+        self.resource_resolvers = resource_resolvers or []
 
     def validate_resources(
         self,
         resources: Dict[str, Dict[str, Set[str]]],
-        resource_folders: Dict[str, str]
+        resource_folders: Dict[str, str],
     ) -> Dict:
-        """
-        验证资源文件是否存在
-
-        Args:
-            resources: 资源字典 {资源类别: {资源类型: {资源名集合}}}
-            resource_folders: 资源文件夹映射 {资源类型: 文件夹路径}
-
-        Returns:
-            Dict: 验证结果
-        """
         results = {
-            "project": {},  # 项目库验证结果
-            "source": {},   # 资源库验证结果
-            "comparison": {}  # 对比结果
+            "project": {},
+            "source": {},
+            "comparison": {},
+            "source_enabled": self.validate_source,
         }
 
         for category, types in resources.items():
             for resource_type, resource_names in types.items():
                 folder = resource_folders.get(resource_type, "")
                 if not folder:
-                    logger.warning(f"未找到资源类型 {resource_type} 的文件夹配置")
+                    logger.warning(
+                        f"未找到资源类型 {resource_type} 的文件夹配置"
+                    )
                     continue
 
-                # 规范化 folder 路径（去除首尾斜杠，避免路径构建问题）
-                folder_normalized = folder.strip().strip('/\\')
-                
+                folder_normalized = folder.strip().strip("/\\")
                 try:
-                    # 构建项目库路径并验证
-                    project_folder = self.project_root / folder_normalized
-                    project_results = self._validate_in_library(
-                        project_folder,
+                    project_results, project_matches = self._validate_in_library(
+                        self.project_root / folder_normalized,
                         resource_names,
-                        self.extensions.get(category, [])
+                        self.extensions.get(category, []),
+                        category,
+                        resource_type,
+                        use_resolvers=True,
                     )
-                except Exception as e:
+                except Exception as exc:
                     logger.error(
                         f"验证项目库资源失败: resource_type={resource_type}, "
-                        f"project_root={self.project_root}, folder={folder}, error={e}",
-                        exc_info=True
+                        f"project_root={self.project_root}, folder={folder}, "
+                        f"error={exc}",
+                        exc_info=True,
                     )
                     project_results = {name: "" for name in resource_names}
+                    project_matches = []
 
-                try:
-                    # 构建资源库路径并验证
-                    source_folder = self.source_root / folder_normalized
-                    source_results = self._validate_in_library(
-                        source_folder,
-                        resource_names,
-                        self.extensions.get(category, [])
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"验证资源库资源失败: resource_type={resource_type}, "
-                        f"source_root={self.source_root}, folder={folder}, error={e}",
-                        exc_info=True
-                    )
-                    source_results = {name: "" for name in resource_names}
+                source_results = {}
+                if self.validate_source:
+                    try:
+                        source_results, _ = self._validate_in_library(
+                            self.source_root / folder_normalized,
+                            resource_names,
+                            self.extensions.get(category, []),
+                            category,
+                            resource_type,
+                            use_resolvers=False,
+                        )
+                    except Exception as exc:
+                        logger.error(
+                            f"验证资源库资源失败: resource_type={resource_type}, "
+                            f"source_root={self.source_root}, folder={folder}, "
+                            f"error={exc}",
+                            exc_info=True,
+                        )
+                        source_results = {name: "" for name in resource_names}
 
-                # 保存结果
                 results["project"][resource_type] = project_results
                 results["source"][resource_type] = source_results
-
-                # 对比结果
-                comparison = self._compare_results(
+                results["comparison"][resource_type] = self._compare_results(
                     resource_names,
                     project_results,
-                    source_results
+                    source_results,
+                    self.validate_source,
+                    project_matches,
                 )
-                results["comparison"][resource_type] = comparison
 
         return results
 
@@ -113,139 +106,157 @@ class ResourceValidator:
         self,
         folder: Path,
         resource_names: Set[str],
-        extensions: List[str]
-    ) -> Dict[str, str]:
-        """
-        在指定文件夹中验证资源
-
-        Args:
-            folder: 文件夹路径
-            resource_names: 资源名集合
-            extensions: 文件扩展名列表
-
-        Returns:
-            Dict[str, str]: {资源名: 找到的文件名}，未找到则值为空字符串
-        """
+        extensions: List[str],
+        category: str = "",
+        resource_type: str = "",
+        use_resolvers: bool = False,
+    ) -> Tuple[Dict[str, str], List[Dict[str, str]]]:
         results = {}
+        alternate_matches = []
 
         try:
-            # 检查是否是根路径（可能导致问题）
             if self._is_root_path(folder):
                 logger.warning(f"文件夹路径是根路径，可能导致问题: {folder}")
-                for name in resource_names:
-                    results[name] = ""
-                return results
+                return (
+                    {name: "" for name in resource_names},
+                    alternate_matches,
+                )
 
             if not folder.exists():
                 logger.warning(f"文件夹不存在: {folder}")
-                for name in resource_names:
-                    results[name] = ""
-                return results
+                return (
+                    {name: "" for name in resource_names},
+                    alternate_matches,
+                )
 
             for resource_name in resource_names:
                 try:
-                    found_file = self._find_file(folder, resource_name, extensions)
-                    results[resource_name] = found_file
-                except Exception as e:
+                    resolution = self._find_file(
+                        folder, resource_name, extensions, category
+                    )
+                    if resolution is None and use_resolvers:
+                        resolution = self._resolve_with_extensions(
+                            folder, resource_name, resource_type
+                        )
+
+                    results[resource_name] = (
+                        resolution.found_file if resolution else ""
+                    )
+                    if resolution and resolution.match_type != "exact":
+                        alternate_matches.append({
+                            "resource_name": resource_name,
+                            "found_file": resolution.found_file,
+                            "match_type": resolution.match_type,
+                            "match_label": resolution.match_label,
+                        })
+                except Exception as exc:
                     logger.debug(
-                        f"查找文件失败: folder={folder}, resource_name={resource_name}, error={e}"
+                        f"查找文件失败: folder={folder}, "
+                        f"resource_name={resource_name}, error={exc}"
                     )
                     results[resource_name] = ""
-
-        except Exception as e:
+        except Exception as exc:
             logger.error(
-                f"验证资源库失败: folder={folder}, error={e}",
-                exc_info=True
+                f"验证资源库失败: folder={folder}, error={exc}",
+                exc_info=True,
             )
-            # 返回空结果
-            for name in resource_names:
-                results[name] = ""
+            results = {name: "" for name in resource_names}
 
-        return results
+        return results, alternate_matches
 
     def _is_root_path(self, folder: Path) -> bool:
-        """
-        检查路径是否是根路径
-
-        Args:
-            folder: 要检查的路径
-
-        Returns:
-            bool: 是否是根路径
-        """
-        folder_str = str(folder).rstrip('/\\')
+        folder_str = str(folder).rstrip("/\\")
         return (
-            folder_str == '' or
-            folder_str.endswith(':') or  # Windows 驱动器根: D:
-            (len(folder.parts) == 1 and folder.parts[0] in ('/', '\\')) or  # Unix 根
-            folder.parent == folder  # 根路径的 parent 等于自身
+            folder_str == ""
+            or folder_str.endswith(":")
+            or (len(folder.parts) == 1 and folder.parts[0] in ("/", "\\"))
+            or folder.parent == folder
         )
 
     def _find_file(
         self,
         folder: Path,
         resource_name: str,
-        extensions: List[str]
+        extensions: List[str],
+        category: str = "",
+    ) -> Optional[ResourceResolution]:
+        normalized_name = resource_name.replace("\\", "/")
+        candidates = [ResourceResolution(normalized_name)]
+
+        rules = self.filename_normalization.get(category, [])
+        if "spaces_to_underscores" in rules:
+            underscored_name = normalized_name.replace(" ", "_")
+            if underscored_name != normalized_name:
+                candidates.append(ResourceResolution(
+                    underscored_name,
+                    match_type="filename_normalization",
+                    match_label="空格转下划线",
+                ))
+
+        for candidate in candidates:
+            found_file = self._find_candidate(
+                folder, candidate.found_file, extensions
+            )
+            if found_file:
+                return ResourceResolution(
+                    found_file,
+                    match_type=candidate.match_type,
+                    match_label=candidate.match_label,
+                )
+        return None
+
+    def _resolve_with_extensions(
+        self,
+        folder: Path,
+        resource_name: str,
+        resource_type: str,
+    ) -> Optional[ResourceResolution]:
+        for resolver in self.resource_resolvers:
+            resolution = resolver.resolve(folder, resource_name, resource_type)
+            if resolution is not None:
+                return resolution
+        return None
+
+    def _find_candidate(
+        self,
+        folder: Path,
+        resource_name: str,
+        extensions: List[str],
     ) -> str:
-        """
-        在文件夹中查找文件（支持子文件夹路径）
-
-        Args:
-            folder: 文件夹路径
-            resource_name: 资源名（可能包含路径，如 "alice/happy" 或 "alice\\happy"）
-            extensions: 文件扩展名列表
-
-        Returns:
-            str: 找到的文件路径（相对路径，如 "alice/happy.png"），未找到返回空字符串
-        """
-        # 规范化路径分隔符（统一使用正斜杠，Path 对象会自动处理）
-        resource_name_normalized = resource_name.replace('\\', '/')
-        
-        for ext in extensions:
+        for extension in extensions:
             try:
-                # 如果资源名称包含路径分隔符，构建完整路径
-                if '/' in resource_name_normalized:
-                    # 使用 Path 对象构建路径，然后添加扩展名
-                    # 例如：folder / "alice/happy" -> folder/alice/happy，然后添加 .png
-                    # 先构建路径，再添加扩展名，避免路径构建错误
-                    base_path = folder / resource_name_normalized
-                    file_path = base_path.with_suffix(ext)
+                if "/" in resource_name:
+                    file_path = (folder / resource_name).with_suffix(extension)
                 else:
-                    # 否则在根文件夹下查找
-                    file_path = folder / f"{resource_name_normalized}{ext}"
-            except Exception as e:
+                    file_path = folder / f"{resource_name}{extension}"
+            except Exception as exc:
                 logger.debug(
-                    f"构建文件路径失败: folder={folder}, resource_name={resource_name_normalized}, "
-                    f"ext={ext}, error={e}"
+                    f"构建文件路径失败: folder={folder}, "
+                    f"resource_name={resource_name}, ext={extension}, error={exc}"
                 )
                 continue
-            
-            if file_path.exists():
-                # 返回相对路径（相对于 folder）
-                # 如果包含子文件夹，返回完整相对路径；否则只返回文件名
-                if '/' in resource_name_normalized:
-                    # 检查是否是根路径，如果是则直接返回资源名称
-                    if self._is_root_path(folder):
-                        return f"{resource_name_normalized}{ext}"
-                    
-                    try:
-                        # 尝试使用 relative_to 计算相对路径
-                        relative_path = file_path.relative_to(folder)
-                        return str(relative_path).replace('\\', '/')
-                    except (ValueError, AttributeError):
-                        # 如果 relative_to 失败，使用 os.path.relpath 作为备选
-                        try:
-                            relative_path = os.path.relpath(str(file_path), str(folder))
-                            return relative_path.replace('\\', '/')
-                        except (ValueError, AttributeError):
-                            # 如果还是失败，直接返回资源名称加上扩展名
-                            logger.debug(
-                                f"无法计算相对路径: file_path={file_path}, folder={folder}, "
-                                f"使用资源名称: {resource_name_normalized}{ext}"
-                            )
-                            return f"{resource_name_normalized}{ext}"
-                else:
-                    return file_path.name
+
+            if not file_path.exists():
+                continue
+            if "/" not in resource_name:
+                return file_path.name
+            if self._is_root_path(folder):
+                return f"{resource_name}{extension}"
+
+            try:
+                return str(file_path.relative_to(folder)).replace("\\", "/")
+            except (ValueError, AttributeError):
+                try:
+                    return os.path.relpath(
+                        str(file_path), str(folder)
+                    ).replace("\\", "/")
+                except (ValueError, AttributeError):
+                    logger.debug(
+                        f"无法计算相对路径: file_path={file_path}, "
+                        f"folder={folder}, 使用资源名称: "
+                        f"{resource_name}{extension}"
+                    )
+                    return f"{resource_name}{extension}"
 
         return ""
 
@@ -253,32 +264,41 @@ class ResourceValidator:
         self,
         resource_names: Set[str],
         project_results: Dict[str, str],
-        source_results: Dict[str, str]
+        source_results: Dict[str, str],
+        source_enabled: bool = True,
+        project_matches: Optional[List[Dict[str, str]]] = None,
     ) -> Dict:
-        """
-        对比项目库和资源库的验证结果
-
-        Returns:
-            Dict: {
-                "project_found": [...],
-                "project_missing": [...],
-                "source_found": [...],
-                "source_missing": [...],
-                "missing_in_project_but_in_source": [...],
-                "missing_in_both": [...]
-            }
-        """
-        project_found = [name for name in resource_names if project_results.get(name)]
-        project_missing = [name for name in resource_names if not project_results.get(name)]
-        source_found = [name for name in resource_names if source_results.get(name)]
-        source_missing = [name for name in resource_names if not source_results.get(name)]
-
-        missing_in_project_but_in_source = [
-            name for name in project_missing if name in source_found
+        project_found = [
+            name for name in resource_names if project_results.get(name)
         ]
+        project_missing = [
+            name for name in resource_names if not project_results.get(name)
+        ]
+        source_found = (
+            [name for name in resource_names if source_results.get(name)]
+            if source_enabled else []
+        )
+        source_missing = (
+            [name for name in resource_names if not source_results.get(name)]
+            if source_enabled else []
+        )
+        missing_in_project_but_in_source = (
+            [name for name in project_missing if name in source_found]
+            if source_enabled else []
+        )
+        missing_in_both = (
+            [name for name in project_missing if name in source_missing]
+            if source_enabled else []
+        )
 
-        missing_in_both = [
-            name for name in project_missing if name in source_missing
+        project_matches = project_matches or []
+        normalized_matches = [
+            match for match in project_matches
+            if match["match_type"] == "filename_normalization"
+        ]
+        resolver_matches = [
+            match for match in project_matches
+            if match["match_type"] != "filename_normalization"
         ]
 
         return {
@@ -287,5 +307,7 @@ class ResourceValidator:
             "source_found": source_found,
             "source_missing": source_missing,
             "missing_in_project_but_in_source": missing_in_project_but_in_source,
-            "missing_in_both": missing_in_both
+            "missing_in_both": missing_in_both,
+            "project_normalized_matches": normalized_matches,
+            "project_resolver_matches": resolver_matches,
         }

@@ -192,6 +192,8 @@ class ResourceConfig:
     """资源配置"""
     project_root: Path = Path("./project")
     source_root: Path = Path("./resource_library")
+    validate_source: bool = True
+    filename_normalization: Dict[str, List[str]] = field(default_factory=dict)
     extensions: Dict[str, List[str]] = field(default_factory=lambda: {
         "图片": [".png", ".jpg", ".jpeg", ".webp"],
         "音频": [".ogg", ".mp3", ".wav", ".m4a"],
@@ -331,6 +333,8 @@ class AppConfig:
             'resources': {
                 'project_root': str(self.resources.project_root),
                 'source_root': str(self.resources.source_root),
+                'validate_source': self.resources.validate_source,
+                'filename_normalization': self.resources.filename_normalization,
                 'extensions': self.resources.extensions,
             },
             'variant_agent_export': {

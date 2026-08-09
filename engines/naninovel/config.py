@@ -1,7 +1,8 @@
 """
 Naninovel 引擎配置
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Dict
 from core.config_manager import EngineConfig
 
 
@@ -13,3 +14,4 @@ class NaninovelConfig(EngineConfig):
     command_prefix: str = "@"
 
     use_macro: bool = False
+    declaration_files: Dict[str, Dict[str, str]] = field(default_factory=dict)

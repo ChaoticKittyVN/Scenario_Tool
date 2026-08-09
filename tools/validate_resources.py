@@ -14,6 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.config_manager import AppConfig
+from core.engine_loader import load_engine
 from core.param_process.param_translator import ParamTranslator
 from core.resource_extractor import ResourceExtractor
 from core.resource_validator import ResourceValidator
@@ -48,6 +49,18 @@ def get_resource_folders(extractor: ResourceExtractor) -> Dict[str, str]:
     return folders
 
 
+def get_resource_resolvers(config: AppConfig):
+    """Create optional resource resolvers registered by the active engine."""
+    engine_metadata = load_engine(config.engine.engine_type)
+    if engine_metadata.validator_factory is None:
+        return []
+    resolver = engine_metadata.validator_factory(
+        config.resources.project_root,
+        config.engine,
+    )
+    return [resolver] if resolver is not None else []
+
+
 def generate_report(
     resources: Dict,
     validation_results: Dict,
@@ -66,6 +79,7 @@ def generate_report(
     lines.append("")
 
     comparison = validation_results.get("comparison", {})
+    source_enabled = validation_results.get("source_enabled", True)
 
     total_files = 0
     total_project_found = 0
@@ -90,13 +104,19 @@ def generate_report(
             lines.append(f"  {resource_type}:")
             lines.append(f"    总计: {len(resource_names)}")
             lines.append(f"    项目库: 找到 {project_found} / 缺失 {project_missing}")
-            lines.append(f"    资源库: 找到 {source_found} / 缺失 {source_missing}")
+            if source_enabled:
+                lines.append(f"    资源库: 找到 {source_found} / 缺失 {source_missing}")
 
             # 显示缺失文件
-            missing_in_both = comp_data.get("missing_in_both", [])
-            if missing_in_both:
-                lines.append(f"    两个库都缺失 ({len(missing_in_both)}):")
-                for name in sorted(missing_in_both):
+            missing_resources = (
+                comp_data.get("missing_in_both", [])
+                if source_enabled
+                else comp_data.get("project_missing", [])
+            )
+            if missing_resources:
+                label = "两个库都缺失" if source_enabled else "项目库缺失"
+                lines.append(f"    {label} ({len(missing_resources)}):")
+                for name in sorted(missing_resources):
                     lines.append(f"      - {name}")
 
             missing_in_project = comp_data.get("missing_in_project_but_in_source", [])
@@ -104,6 +124,30 @@ def generate_report(
                 lines.append(f"    项目库缺失但资源库存在 ({len(missing_in_project)}):")
                 for name in sorted(missing_in_project):
                     lines.append(f"      - {name}")
+
+            normalized_matches = comp_data.get("project_normalized_matches", [])
+            if normalized_matches:
+                lines.append(f"    文件名归一化命中 ({len(normalized_matches)}):")
+                for item in sorted(
+                    normalized_matches,
+                    key=lambda value: value["resource_name"],
+                ):
+                    lines.append(
+                        f"      - {item['resource_name']} -> {item['found_file']}"
+                    )
+
+            resolver_matches = comp_data.get("project_resolver_matches", [])
+            if resolver_matches:
+                lines.append(f"    扩展验证命中 ({len(resolver_matches)}):")
+                for item in sorted(
+                    resolver_matches,
+                    key=lambda value: value["resource_name"],
+                ):
+                    match_label = item.get("match_label") or item["match_type"]
+                    lines.append(
+                        f"      - [{match_label}] {item['resource_name']} -> "
+                        f"{item['found_file']}"
+                    )
 
         lines.append("")
 
@@ -114,12 +158,58 @@ def generate_report(
     lines.append(f"  项目库: 找到 {total_project_found} / 缺失 {total_files - total_project_found}")
     if total_files > 0:
         lines.append(f"  项目库完成率: {(total_project_found / total_files * 100):.1f}%")
-    lines.append(f"  资源库: 找到 {total_source_found} / 缺失 {total_files - total_source_found}")
-    if total_files > 0:
-        lines.append(f"  资源库完成率: {(total_source_found / total_files * 100):.1f}%")
+    if source_enabled:
+        lines.append(f"  资源库: 找到 {total_source_found} / 缺失 {total_files - total_source_found}")
+        if total_files > 0:
+            lines.append(f"  资源库完成率: {(total_source_found / total_files * 100):.1f}%")
     lines.append("=" * 60)
 
     return "\n".join(lines)
+
+
+def merge_resources(target: Dict, resources: Dict) -> None:
+    """Merge extracted resources into a combined de-duplicated mapping."""
+    for category, types in resources.items():
+        category_target = target.setdefault(category, {})
+        for resource_type, names in types.items():
+            category_target.setdefault(resource_type, set()).update(names)
+
+
+def save_report(
+    report_dir: Path,
+    report_stem: str,
+    excel_name: str,
+    resources: Dict,
+    validation_results: Dict,
+    resource_folders: Dict,
+    project_root: Path,
+) -> None:
+    """Write the human-readable and machine-readable validation reports."""
+    report_text = generate_report(resources, validation_results, excel_name)
+    text_report_file = report_dir / f"{report_stem}_validation.txt"
+    text_report_file.write_text(report_text, encoding="utf-8")
+
+    json_report_file = report_dir / f"{report_stem}_validation.json"
+    json_data = {
+        "timestamp": time.time(),
+        "excel_name": excel_name,
+        "project_root": str(project_root),
+        "resources": {
+            category: {
+                resource_type: sorted(names)
+                for resource_type, names in types.items()
+            }
+            for category, types in resources.items()
+        },
+        "validation_results": validation_results,
+        "resource_folders": resource_folders,
+    }
+    json_report_file.write_text(
+        json.dumps(json_data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    logger.info(f"文本报告已保存: {text_report_file}")
+    logger.info(f"JSON 报告已保存: {json_report_file}")
 
 
 def main():
@@ -159,7 +249,10 @@ def main():
         validator = ResourceValidator(
             config.resources.project_root,
             config.resources.source_root,
-            config.resources.extensions
+            config.resources.extensions,
+            validate_source=config.resources.validate_source,
+            filename_normalization=config.resources.filename_normalization,
+            resource_resolvers=get_resource_resolvers(config),
         )
 
         # 获取所有 Excel 文件
@@ -180,6 +273,9 @@ def main():
 
         # 创建Excel文件管理器
         excel_manager = ExcelFileManager(cache_enabled=True)
+        combined_resources = {}
+        report_dir = config.paths.output_dir / "validation_reports"
+        report_dir.mkdir(parents=True, exist_ok=True)
 
         # 处理每个文件
         for excel_file in excel_files:
@@ -213,6 +309,7 @@ def main():
             # 显示提取的资源统计
             total_resources = sum(len(names) for types in resources.values() for names in types.values())
             logger.info(f"提取到 {total_resources} 个资源引用")
+            merge_resources(combined_resources, resources)
 
             # 验证资源
             try:
@@ -221,44 +318,33 @@ def main():
                 logger.error(f"验证资源失败，跳过: {excel_file} - {e}")
                 continue
 
-            # 生成文本报告
-            report_text = generate_report(resources, validation_results, excel_file.name)
-            print(report_text)
-
-            # 保存报告到文件
-            report_dir = config.paths.output_dir / "validation_reports"
-            report_dir.mkdir(parents=True, exist_ok=True)
-
             try:
-                # 保存文本报告（供用户查看）
-                text_report_file = report_dir / f"{excel_file.stem}_validation.txt"
-                with open(text_report_file, "w", encoding="utf-8") as f:
-                    f.write(report_text)
-                logger.info(f"文本报告已保存: {text_report_file}")
-                
-                # 保存 JSON 报告（供程序读取）
-                json_report_file = report_dir / f"{excel_file.stem}_validation.json"
-                json_data = {
-                    "timestamp": time.time(),
-                    "excel_file": str(excel_file),
-                    "excel_name": excel_file.name,
-                    "resources": {
-                        category: {
-                            rtype: list(names)  # 转换 Set 为 List
-                            for rtype, names in types.items()
-                        }
-                        for category, types in resources.items()
-                    },
-                    "validation_results": validation_results,
-                    "resource_folders": resource_folders
-                }
-
-                with open(json_report_file, "w", encoding="utf-8") as f:
-                    json.dump(json_data, f, indent=2, ensure_ascii=False)
-                logger.info(f"JSON 报告已保存: {json_report_file}")
-                
+                save_report(
+                    report_dir,
+                    excel_file.stem,
+                    excel_file.name,
+                    resources,
+                    validation_results,
+                    resource_folders,
+                    config.resources.project_root,
+                )
             except Exception as e:
                 logger.error(f"保存报告失败: {excel_file} - {e}")
+
+        if combined_resources:
+            combined_results = validator.validate_resources(
+                combined_resources,
+                resource_folders,
+            )
+            save_report(
+                report_dir,
+                "all_workbooks",
+                "全部演出表格",
+                combined_resources,
+                combined_results,
+                resource_folders,
+                config.resources.project_root,
+            )
 
         logger.info("所有文件验证完成")
 

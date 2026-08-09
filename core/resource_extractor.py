@@ -142,6 +142,10 @@ class ResourceExtractor:
         # 确保是字符串类型
         main_value = str(main_value).strip()
 
+        ignored_values = {str(value) for value in config.get("ignore_values", [])}
+        if main_value in ignored_values:
+            return ""
+
         # 翻译主参数 - 使用 param_config 中的 translate_type
         translate_type = None
         if generator and hasattr(generator, 'param_config'):
@@ -156,6 +160,9 @@ class ResourceExtractor:
             # 回退到使用 resource_type（向后兼容）
             if self.translator.has_mapping(config["resource_type"], main_value):
                 main_value = self.translator.translate(config["resource_type"], main_value)
+
+        if str(main_value) in ignored_values:
+            return ""
 
         result = str(main_value)
         separator = config.get("separator", " ")
