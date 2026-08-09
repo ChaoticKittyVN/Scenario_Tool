@@ -140,6 +140,30 @@ def test_declared_resource_requires_prefab_and_exact_member(tmp_path):
     }]
 
 
+def test_resource_path_cannot_escape_configured_folder(tmp_path):
+    project_root = tmp_path / "project"
+    resource_folder = project_root / "audio"
+    resource_folder.mkdir(parents=True)
+    outside_file = tmp_path / "outside.ogg"
+    outside_file.write_text("outside", encoding="utf-8")
+
+    validator = ResourceValidator(
+        project_root,
+        tmp_path / "source",
+        {"音频": [".ogg"]},
+        validate_source=False,
+    )
+    results = validator.validate_resources(
+        {"音频": {"Music": {"../../outside"}}},
+        {"Music": "audio"},
+    )
+
+    assert results["project"]["Music"]["../../outside"] == ""
+    assert results["comparison"]["Music"]["project_missing"] == [
+        "../../outside"
+    ]
+
+
 def test_reference_samples_include_index_and_preserve_excel_row_after_ignore():
     class MusicGenerator:
         resource_config = {

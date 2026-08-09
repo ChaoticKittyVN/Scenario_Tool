@@ -443,21 +443,22 @@ def main():
             except Exception as e:
                 logger.error(f"保存报告失败: {excel_file} - {e}")
 
-        if combined_resources:
-            combined_results = validator.validate_resources(
-                combined_resources,
-                resource_folders,
-            )
-            save_report(
-                report_dir,
-                "all_workbooks",
-                "全部演出表格",
-                combined_resources,
-                combined_results,
-                resource_folders,
-                config.resources.project_root,
-                combined_references,
-            )
+        # Always refresh the aggregate report so an empty run cannot leave
+        # stale validation data for the sync tool.
+        combined_results = validator.validate_resources(
+            combined_resources,
+            resource_folders,
+        )
+        save_report(
+            report_dir,
+            "all_workbooks",
+            "全部演出表格",
+            combined_resources,
+            combined_results,
+            resource_folders,
+            config.resources.project_root,
+            combined_references,
+        )
 
         logger.info("所有文件验证完成")
 

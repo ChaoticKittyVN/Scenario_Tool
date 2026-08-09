@@ -236,6 +236,13 @@ class ResourceValidator:
                 )
                 continue
 
+            if not self._is_within_folder(file_path, folder):
+                logger.warning(
+                    "忽略超出资源目录的路径: "
+                    f"folder={folder}, resource_name={resource_name}"
+                )
+                continue
+
             if not file_path.exists():
                 continue
             if "/" not in resource_name:
@@ -259,6 +266,14 @@ class ResourceValidator:
                     return f"{resource_name}{extension}"
 
         return ""
+
+    @staticmethod
+    def _is_within_folder(candidate: Path, folder: Path) -> bool:
+        try:
+            candidate.resolve().relative_to(folder.resolve())
+            return True
+        except (OSError, RuntimeError, ValueError):
+            return False
 
     def _compare_results(
         self,

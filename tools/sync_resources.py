@@ -18,6 +18,14 @@ from core.logger import get_logger
 logger = get_logger()
 
 
+def discover_validation_reports(report_dir: Path):
+    """Prefer the aggregate report, with legacy per-workbook fallback."""
+    aggregate_report = report_dir / "all_workbooks_validation.json"
+    if aggregate_report.exists():
+        return [aggregate_report]
+    return sorted(report_dir.glob("*_validation.json"))
+
+
 def load_validation_report(report_dir: Path, excel_name: str) -> Optional[Dict]:
     """
     从 JSON 文件加载验证报告
@@ -86,7 +94,7 @@ def main():
             return
 
         # 获取所有 JSON 验证报告
-        json_reports = list(report_dir.glob("*_validation.json"))
+        json_reports = discover_validation_reports(report_dir)
         if not json_reports:
             logger.error("未找到任何验证报告")
             logger.error("请先运行 validate_resources.py 进行资源验证")
