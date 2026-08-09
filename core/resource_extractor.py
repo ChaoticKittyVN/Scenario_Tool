@@ -2,7 +2,7 @@
 资源提取器模块
 从 Excel 数据中提取资源引用
 """
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 from collections import defaultdict
 from core.sentence_generator_manager import SentenceGeneratorManager
 from core.param_process.param_translator import ParamTranslator
@@ -12,6 +12,8 @@ from core.logger import get_logger
 from core.excel_management.dataframe_processor import DataFrameProcessor
 
 logger = get_logger()
+
+SOURCE_EXCEL_ROW_KEY = "__scenario_excel_row__"
 
 
 class ResourceExtractor:
@@ -56,19 +58,56 @@ class ResourceExtractor:
             例如: {"Character": {"alice happy smile"}, "Music": {"bgm01"}}
         """
         resources = defaultdict(set)
-
-        for generator in self.generators:
-            # 获取所有 resource_config
-            configs = self.get_resource_configs(generator)
-
-            for config in configs:
-                # 传递生成器实例以便访问 param_config
-                resource_name = self._build_resource_name(row_data, config, generator)
-                if resource_name:
-                    resource_type = config["resource_type"]
-                    resources[resource_type].add(resource_name)
+        for resource_type, resource_name, _ in self._extract_resource_entries(
+            row_data
+        ):
+            resources[resource_type].add(resource_name)
 
         return dict(resources)
+
+    def _extract_resource_entries(
+        self,
+        row_data: Dict,
+    ) -> List[Tuple[str, str, Dict[str, str]]]:
+        """Extract de-duplicated resources and their raw contributing params."""
+        entries = {}
+        for generator in self.generators:
+            for config in self.get_resource_configs(generator):
+                resource_name = self._build_resource_name(
+                    row_data, config, generator
+                )
+                if not resource_name:
+                    continue
+
+                resource_type = config["resource_type"]
+                param_names = [config["main_param"], *config.get("part_params", [])]
+                raw_params = {
+                    param_name: self._format_reference_value(
+                        row_data.get(param_name, "")
+                    )
+                    for param_name in param_names
+                }
+                key = (resource_type, resource_name)
+                if key in entries:
+                    entries[key].update(raw_params)
+                else:
+                    entries[key] = raw_params
+
+        return [
+            (resource_type, resource_name, raw_params)
+            for (resource_type, resource_name), raw_params in entries.items()
+        ]
+
+    @staticmethod
+    def _format_reference_value(value: Any) -> str:
+        if value is None:
+            return ""
+        try:
+            if value != value:
+                return ""
+        except Exception:
+            pass
+        return str(value).strip()
 
     def get_resource_configs(self, generator) -> List[Dict]:
         """
@@ -206,9 +245,35 @@ class ResourceExtractor:
         Returns:
             Dict[str, Dict[str, Set[str]]]: {资源类别: {资源类型: {资源名集合}}}
         """
-        from core.constants import SheetName
-        
+        resources, _ = self._extract_from_excel_data(excel_data, config=config)
+        return resources
+
+    def extract_from_excel_with_references(
+        self,
+        excel_data: Dict,
+        workbook_name: str,
+        config=None,
+        sample_limit: int = 8,
+    ) -> Tuple[Dict[str, Dict[str, Set[str]]], Dict]:
+        """Extract resources with bounded source-location summaries."""
+        return self._extract_from_excel_data(
+            excel_data,
+            config=config,
+            workbook_name=workbook_name,
+            sample_limit=max(0, int(sample_limit)),
+        )
+
+    def _extract_from_excel_data(
+        self,
+        excel_data: Dict,
+        config=None,
+        workbook_name: Optional[str] = None,
+        sample_limit: int = 0,
+    ) -> Tuple[Dict[str, Dict[str, Set[str]]], Dict]:
+        from core.constants import ColumnName, SheetName
+
         all_resources = defaultdict(lambda: defaultdict(set))
+        references = defaultdict(lambda: defaultdict(dict))
 
         # 创建DataFrame处理器
         df_processor = DataFrameProcessor(config)
@@ -218,8 +283,14 @@ class ResourceExtractor:
             if sheet_name == SheetName.PARAM_SHEET.value:
                 continue
 
-            # 提取有效行
-            valid_df = df_processor.extract_valid_rows(sheet_data, sheet_name)
+            # Keep the physical Excel row before ignore filtering changes the index.
+            located_sheet_data = sheet_data.copy()
+            located_sheet_data[SOURCE_EXCEL_ROW_KEY] = range(
+                2, len(located_sheet_data) + 2
+            )
+            valid_df = df_processor.extract_valid_rows(
+                located_sheet_data, sheet_name
+            )
 
             if valid_df.empty:
                 continue
@@ -227,22 +298,51 @@ class ResourceExtractor:
             # 遍历有效行
             for _, row in valid_df.iterrows():
                 row_dict = row.to_dict()
-                
-                # 提取这一行的资源
-                row_resources = self.extract_from_row(row_dict)
-                
-                # 按资源类别分类
-                for resource_type, resource_names in row_resources.items():
+
+                for resource_type, resource_name, raw_params in (
+                    self._extract_resource_entries(row_dict)
+                ):
                     category = self._get_resource_category(resource_type)
-                    if category:
-                        all_resources[category][resource_type].update(resource_names)
-        
+                    if not category:
+                        continue
+                    all_resources[category][resource_type].add(resource_name)
+
+                    if workbook_name is None:
+                        continue
+                    type_references = references[category][resource_type]
+                    summary = type_references.setdefault(resource_name, {
+                        "reference_count": 0,
+                        "locations": [],
+                        "locations_truncated": False,
+                    })
+                    summary["reference_count"] += 1
+                    if len(summary["locations"]) < sample_limit:
+                        summary["locations"].append({
+                            "workbook": str(workbook_name),
+                            "sheet": str(sheet_name),
+                            "excel_row": int(row_dict[SOURCE_EXCEL_ROW_KEY]),
+                            "index": self._format_reference_value(
+                                row_dict.get(ColumnName.INDEX.value, "")
+                            ),
+                            "params": raw_params,
+                        })
+                    summary["locations_truncated"] = (
+                        summary["reference_count"] > len(summary["locations"])
+                    )
+
         # 转换为普通字典
         result = {}
         for category, types in all_resources.items():
             result[category] = {k: v for k, v in types.items()}
-        
-        return result
+
+        reference_result = {
+            category: {
+                resource_type: dict(resource_summaries)
+                for resource_type, resource_summaries in types.items()
+            }
+            for category, types in references.items()
+        }
+        return result, reference_result
 
     def _get_resource_category(self, resource_type: str) -> str:
         """

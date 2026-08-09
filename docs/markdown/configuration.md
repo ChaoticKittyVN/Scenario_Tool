@@ -138,6 +138,7 @@ resources:
   validate_source: true
   filename_normalization:
     音频: [spaces_to_underscores]
+  reference_sample_limit: 8
   extensions:
     图片: [.png, .jpg, .jpeg, .webp]
     音频: [.ogg, .mp3, .wav, .m4a]
@@ -147,6 +148,8 @@ resources:
 `project_root` 是引擎项目资源目录，`source_root` 是待同步资源库。没有独立资源库时可将 `validate_source` 设为 `false`，报告只统计项目库。
 
 `filename_normalization` 按资源类别声明文件名查找规则；`spaces_to_underscores` 会在直接查找失败后尝试将空格替换为下划线。`extensions` 按类别声明允许识别的扩展名。
+
+`reference_sample_limit` 控制每个资源在验证报告中最多保留多少个引用位置。引用总次数始终准确统计；位置样本包含工作簿、工作表、Excel 行号、`Index` 值和构建资源名所用的原始参数。设为 `0` 时只统计次数，不保存位置样本。
 
 Naninovel 项目可在引擎配置中声明 prefab 成员的控制器文件：
 

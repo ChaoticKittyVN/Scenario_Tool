@@ -64,7 +64,8 @@ def get_resource_resolvers(config: AppConfig):
 def generate_report(
     resources: Dict,
     validation_results: Dict,
-    excel_name: str
+    excel_name: str,
+    references: Dict = None,
 ) -> str:
     """
     生成验证报告
@@ -80,6 +81,7 @@ def generate_report(
 
     comparison = validation_results.get("comparison", {})
     source_enabled = validation_results.get("source_enabled", True)
+    references = references or {}
 
     total_files = 0
     total_project_found = 0
@@ -118,12 +120,18 @@ def generate_report(
                 lines.append(f"    {label} ({len(missing_resources)}):")
                 for name in sorted(missing_resources):
                     lines.append(f"      - {name}")
+                    append_reference_locations(
+                        lines, references, category, resource_type, name
+                    )
 
             missing_in_project = comp_data.get("missing_in_project_but_in_source", [])
             if missing_in_project:
                 lines.append(f"    项目库缺失但资源库存在 ({len(missing_in_project)}):")
                 for name in sorted(missing_in_project):
                     lines.append(f"      - {name}")
+                    append_reference_locations(
+                        lines, references, category, resource_type, name
+                    )
 
             normalized_matches = comp_data.get("project_normalized_matches", [])
             if normalized_matches:
@@ -167,12 +175,97 @@ def generate_report(
     return "\n".join(lines)
 
 
+def append_reference_locations(
+    lines: list,
+    references: Dict,
+    category: str,
+    resource_type: str,
+    resource_name: str,
+) -> None:
+    summary = (
+        references.get(category, {})
+        .get(resource_type, {})
+        .get(resource_name)
+    )
+    if not summary:
+        return
+
+    reference_count = summary.get("reference_count", 0)
+    locations = summary.get("locations", [])
+    lines.append(
+        f"        引用 {reference_count} 次，显示 {len(locations)} 处："
+    )
+    for location in locations:
+        index_value = location.get("index", "")
+        index_text = f" / Index={index_value}" if index_value else ""
+        lines.append(
+            f"        - {location.get('workbook', '')} / "
+            f"{location.get('sheet', '')} / "
+            f"Excel 第 {location.get('excel_row', '')} 行{index_text}"
+        )
+        params = location.get("params", {})
+        if params:
+            param_text = ", ".join(
+                f"{key}={value}" for key, value in params.items()
+            )
+            lines.append(f"          {param_text}")
+    hidden_count = max(0, reference_count - len(locations))
+    if hidden_count:
+        lines.append(f"        - ...其余 {hidden_count} 处未显示")
+
+
 def merge_resources(target: Dict, resources: Dict) -> None:
     """Merge extracted resources into a combined de-duplicated mapping."""
     for category, types in resources.items():
         category_target = target.setdefault(category, {})
         for resource_type, names in types.items():
             category_target.setdefault(resource_type, set()).update(names)
+
+
+def merge_references(target: Dict, references: Dict, sample_limit: int) -> None:
+    """Merge exact counts while retaining only bounded location samples."""
+    sample_limit = max(0, int(sample_limit))
+    for category, types in references.items():
+        category_target = target.setdefault(category, {})
+        for resource_type, resource_summaries in types.items():
+            type_target = category_target.setdefault(resource_type, {})
+            for resource_name, source_summary in resource_summaries.items():
+                target_summary = type_target.setdefault(resource_name, {
+                    "reference_count": 0,
+                    "locations": [],
+                    "locations_truncated": False,
+                })
+                target_summary["reference_count"] += source_summary.get(
+                    "reference_count", 0
+                )
+                for location in source_summary.get("locations", []):
+                    if len(target_summary["locations"]) >= sample_limit:
+                        break
+                    if location not in target_summary["locations"]:
+                        target_summary["locations"].append(location)
+                target_summary["locations_truncated"] = (
+                    target_summary["reference_count"]
+                    > len(target_summary["locations"])
+                )
+
+
+def get_missing_references(references: Dict, validation_results: Dict) -> Dict:
+    """Return only reference summaries for resources missing in the project."""
+    missing_references = {}
+    comparison = validation_results.get("comparison", {})
+    for category, types in references.items():
+        for resource_type, resource_summaries in types.items():
+            missing_names = set(
+                comparison.get(resource_type, {}).get("project_missing", [])
+            )
+            selected = {
+                name: summary
+                for name, summary in resource_summaries.items()
+                if name in missing_names
+            }
+            if selected:
+                missing_references.setdefault(category, {})[resource_type] = selected
+    return missing_references
 
 
 def save_report(
@@ -183,9 +276,13 @@ def save_report(
     validation_results: Dict,
     resource_folders: Dict,
     project_root: Path,
+    references: Dict = None,
 ) -> None:
     """Write the human-readable and machine-readable validation reports."""
-    report_text = generate_report(resources, validation_results, excel_name)
+    references = references or {}
+    report_text = generate_report(
+        resources, validation_results, excel_name, references
+    )
     text_report_file = report_dir / f"{report_stem}_validation.txt"
     text_report_file.write_text(report_text, encoding="utf-8")
 
@@ -202,6 +299,9 @@ def save_report(
             for category, types in resources.items()
         },
         "validation_results": validation_results,
+        "missing_references": get_missing_references(
+            references, validation_results
+        ),
         "resource_folders": resource_folders,
     }
     json_report_file.write_text(
@@ -274,6 +374,7 @@ def main():
         # 创建Excel文件管理器
         excel_manager = ExcelFileManager(cache_enabled=True)
         combined_resources = {}
+        combined_references = {}
         report_dir = config.paths.output_dir / "validation_reports"
         report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -297,7 +398,12 @@ def main():
 
             # 提取资源
             try:
-                resources = extractor.extract_from_excel(excel_data)
+                resources, references = extractor.extract_from_excel_with_references(
+                    excel_data,
+                    excel_file.name,
+                    config=config,
+                    sample_limit=config.resources.reference_sample_limit,
+                )
             except Exception as e:
                 logger.error(f"提取资源失败，跳过: {excel_file} - {e}")
                 continue
@@ -310,6 +416,11 @@ def main():
             total_resources = sum(len(names) for types in resources.values() for names in types.values())
             logger.info(f"提取到 {total_resources} 个资源引用")
             merge_resources(combined_resources, resources)
+            merge_references(
+                combined_references,
+                references,
+                config.resources.reference_sample_limit,
+            )
 
             # 验证资源
             try:
@@ -327,6 +438,7 @@ def main():
                     validation_results,
                     resource_folders,
                     config.resources.project_root,
+                    references,
                 )
             except Exception as e:
                 logger.error(f"保存报告失败: {excel_file} - {e}")
@@ -344,6 +456,7 @@ def main():
                 combined_results,
                 resource_folders,
                 config.resources.project_root,
+                combined_references,
             )
 
         logger.info("所有文件验证完成")

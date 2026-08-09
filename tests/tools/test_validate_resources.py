@@ -2,6 +2,8 @@ from core.config_manager import AppConfig
 from tools.validate_resources import (
     generate_report,
     get_resource_resolvers,
+    get_missing_references,
+    merge_references,
     merge_resources,
     save_report,
 )
@@ -75,3 +77,68 @@ def test_resource_resolvers_are_created_from_engine_registration():
     assert resolvers[0].declaration_files == {
         "Character": {"Hero": "declarations/hero.txt"},
     }
+
+
+def test_reference_reports_keep_exact_count_and_bounded_samples():
+    references = {
+        "音频": {
+            "Music": {
+                "Missing track": {
+                    "reference_count": 3,
+                    "locations": [{
+                        "workbook": "chapter1.xlsx",
+                        "sheet": "演出表",
+                        "excel_row": 12,
+                        "index": "A010",
+                        "params": {"Music": "Missing track"},
+                    }],
+                    "locations_truncated": True,
+                },
+            },
+        },
+    }
+    more_references = {
+        "音频": {
+            "Music": {
+                "Missing track": {
+                    "reference_count": 2,
+                    "locations": [{
+                        "workbook": "chapter2.xlsx",
+                        "sheet": "Scene02",
+                        "excel_row": 8,
+                        "index": "B004",
+                        "params": {"Music": "Missing track"},
+                    }],
+                    "locations_truncated": True,
+                },
+            },
+        },
+    }
+    merge_references(references, more_references, sample_limit=1)
+    summary = references["音频"]["Music"]["Missing track"]
+    assert summary["reference_count"] == 5
+    assert len(summary["locations"]) == 1
+    assert summary["locations_truncated"] is True
+
+    validation_results = {
+        "source_enabled": False,
+        "comparison": {
+            "Music": {
+                "project_found": [],
+                "project_missing": ["Missing track"],
+                "source_found": [],
+                "source_missing": [],
+            },
+        },
+    }
+    report = generate_report(
+        {"音频": {"Music": {"Missing track"}}},
+        validation_results,
+        "全部演出表格",
+        references,
+    )
+
+    assert "引用 5 次，显示 1 处" in report
+    assert "Excel 第 12 行 / Index=A010" in report
+    assert "其余 4 处未显示" in report
+    assert get_missing_references(references, validation_results) == references

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pandas as pd
+
 from core.config_manager import AppConfig
 from core.resource_extractor import ResourceExtractor
 from core.resource_validator import ResourceValidator
@@ -38,6 +40,7 @@ def test_resource_config_roundtrip(tmp_path):
             "filename_normalization": {
                 "音频": ["spaces_to_underscores"],
             },
+            "reference_sample_limit": 5,
         },
     })
     config_path = tmp_path / "config.yaml"
@@ -49,6 +52,7 @@ def test_resource_config_roundtrip(tmp_path):
     assert loaded.resources.filename_normalization == {
         "音频": ["spaces_to_underscores"],
     }
+    assert loaded.resources.reference_sample_limit == 5
     assert loaded.engine.declaration_files == {
         "Character": {"Hero": "declarations/hero.txt"},
     }
@@ -133,4 +137,51 @@ def test_declared_resource_requires_prefab_and_exact_member(tmp_path):
         "found_file": "Hero.prefab|hero.txt#smile",
         "match_type": "naninovel_declaration",
         "match_label": "Naninovel 声明",
+    }]
+
+
+def test_reference_samples_include_index_and_preserve_excel_row_after_ignore():
+    class MusicGenerator:
+        resource_config = {
+            "resource_type": "Music",
+            "resource_category": "音频",
+            "main_param": "Music",
+            "part_params": [],
+        }
+        param_config = {"Music": {}}
+
+    extractor = make_extractor()
+    extractor.generators = [MusicGenerator()]
+    config = AppConfig.from_dict({
+        "processing": {
+            "ignore_mode": True,
+            "ignore_words": ["忽略"],
+        },
+    })
+    excel_data = {
+        "演出表": pd.DataFrame({
+            "Index": ["I000", "I001", "I002", ""],
+            "Note": ["", "", "", "END"],
+            "Ignore": ["忽略", "", "", ""],
+            "Music": ["Repeated track", "Repeated track", "Repeated track", ""],
+        }),
+    }
+
+    resources, references = extractor.extract_from_excel_with_references(
+        excel_data,
+        "chapter.xlsx",
+        config=config,
+        sample_limit=1,
+    )
+
+    assert resources == {"音频": {"Music": {"Repeated track"}}}
+    summary = references["音频"]["Music"]["Repeated track"]
+    assert summary["reference_count"] == 2
+    assert summary["locations_truncated"] is True
+    assert summary["locations"] == [{
+        "workbook": "chapter.xlsx",
+        "sheet": "演出表",
+        "excel_row": 3,
+        "index": "I001",
+        "params": {"Music": "Repeated track"},
     }]
