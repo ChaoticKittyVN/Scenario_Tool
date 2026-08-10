@@ -2,10 +2,13 @@
 日志管理模块
 提供统一的日志记录功能
 """
+import copy
 import logging
 import sys
 from pathlib import Path
 from typing import Optional
+
+from concurrent_log_handler import ConcurrentRotatingFileHandler
 
 
 class ColoredFormatter(logging.Formatter):
@@ -23,24 +26,25 @@ class ColoredFormatter(logging.Formatter):
     BOLD = '\033[1m'
 
     def format(self, record):
+        record = copy.copy(record)
+
         # 获取日志级别对应的颜色
-        original_levelname = record.levelname
-        color = self.COLORS.get(original_levelname, self.RESET)
+        levelname = record.levelname
+        color = self.COLORS.get(levelname, self.RESET)
 
         # 给日志级别添加颜色和加粗
-        record.levelname = f"{self.BOLD}{color}{original_levelname}{self.RESET}"
-
-        try:
-            return super().format(record)
-        finally:
-            # 同一条记录还会交给文件处理器，不能把 ANSI 颜色泄漏到日志文件。
-            record.levelname = original_levelname
+        record.levelname = f"{self.BOLD}{color}{levelname}{self.RESET}"
+        return super().format(record)
 
 
 class ScenarioToolLogger:
     """统一的日志管理器（单例模式）"""
 
     _instance: Optional[logging.Logger] = None
+    LOG_DIR = Path("logs")
+    LOG_FILE_NAME = "scenario_tool.log"
+    MAX_BYTES = 10 * 1024 * 1024
+    BACKUP_COUNT = 5
 
     @classmethod
     def get_logger(cls, name: str = "scenario_tool") -> logging.Logger:
@@ -85,13 +89,12 @@ class ScenarioToolLogger:
         console_handler.setFormatter(console_formatter)
 
         # 文件处理器（使用轮转，最大 10MB，保留 5 个备份）
-        log_dir = Path("logs")
+        log_dir = cls.LOG_DIR
         log_dir.mkdir(exist_ok=True)
-        from logging.handlers import RotatingFileHandler
-        file_handler = RotatingFileHandler(
-            log_dir / "scenario_tool.log",
-            maxBytes=10*1024*1024,  # 10MB
-            backupCount=5,
+        file_handler = ConcurrentRotatingFileHandler(
+            log_dir / cls.LOG_FILE_NAME,
+            maxBytes=cls.MAX_BYTES,
+            backupCount=cls.BACKUP_COUNT,
             encoding='utf-8'
         )
         file_handler.setLevel(logging.DEBUG)
@@ -108,11 +111,19 @@ class ScenarioToolLogger:
     @classmethod
     def reset(cls):
         """重置日志器（主要用于测试）"""
-        if cls._instance:
-            for handler in cls._instance.handlers[:]:
-                handler.close()
-                cls._instance.removeHandler(handler)
-            cls._instance = None
+        logger = cls._instance
+        cls._instance = None
+        if logger:
+            for handler in logger.handlers[:]:
+                logger.removeHandler(handler)
+                try:
+                    handler.flush()
+                except Exception:
+                    pass
+                try:
+                    handler.close()
+                except Exception:
+                    pass
 
 
 # 便捷函数

@@ -12,3 +12,6 @@ PySide6>=6.0.0
 
 # 命令行进度条
 tqdm>=4.67.1
+
+# 多进程安全日志轮转
+concurrent-log-handler>=0.9.29
