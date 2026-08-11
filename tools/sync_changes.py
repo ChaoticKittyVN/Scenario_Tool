@@ -18,6 +18,18 @@ from core.excel_management.excel_editor import CellUpdate
 
 logger = get_logger()
 
+APPROVED_DECISIONS = {
+    "approve", "approved", "accept", "accepted", "yes", "y", "true", "1", "edited",
+    "批准", "通过", "接受", "已批准", "已通过", "已编辑",
+}
+
+
+def _is_approved_decision(value: Any) -> bool:
+    return (
+        not ChangeSyncStrategy.is_blank(value)
+        and str(value).strip().lower() in APPROVED_DECISIONS
+    )
+
 
 class ChangeSyncTool(BaseParamTool):
     """
@@ -86,13 +98,7 @@ class ChangeSyncTool(BaseParamTool):
         else:
             raise ValueError(f"不支持的文件格式：{file_path.suffix}")
         
-        # 验证必需的定位列
-        required_locators = ['ExcelFilename', 'SheetName', 'Index']
-        missing_columns = [col for col in required_locators 
-                          if col not in df.columns]
-        
-        if missing_columns:
-            raise ValueError(f"改动表格缺少必需列：{missing_columns}")
+        df = self._prepare_changes_dataframe(df)
         
         logger.info(f"改动表格加载完成，共 {len(df)} 条记录")
         return df
@@ -127,13 +133,10 @@ class ChangeSyncTool(BaseParamTool):
             try:
                 df = pd.read_excel(file_path)
                 
-                # 验证必需的定位列
-                required_locators = ['ExcelFilename', 'SheetName', 'Index']
-                missing_columns = [col for col in required_locators 
-                                  if col not in df.columns]
-                
-                if missing_columns:
-                    logger.warning(f"文件 {file_path.name} 缺少必需列：{missing_columns}，跳过")
+                try:
+                    df = self._normalize_and_validate_changes(df)
+                except ValueError as error:
+                    logger.warning(f"文件 {file_path.name} 无法作为同步表加载：{error}，跳过")
                     continue
                 
                 # 添加来源文件标记
@@ -149,10 +152,34 @@ class ChangeSyncTool(BaseParamTool):
             raise ValueError("没有成功加载任何改动表格文件")
         
         # 合并所有 DataFrame
-        merged_df = pd.concat(all_dfs, ignore_index=True)
+        merged_df = self._prepare_changes_dataframe(
+            pd.concat(all_dfs, ignore_index=True)
+        )
         
         logger.info(f"成功加载 {len(merged_df)} 条改动记录（来自 {len(all_dfs)} 个文件）")
         return merged_df
+
+    def _normalize_and_validate_changes(self, df: pd.DataFrame) -> pd.DataFrame:
+        normalized = ChangeSyncStrategy.normalize_changes_dataframe(
+            df,
+            required_columns=ChangeSyncStrategy.REQUIRED_LOCATOR_COLUMNS,
+        )
+        review_columns = {'OriginalText', 'ProposedText', 'Decision'}
+        present_review_columns = review_columns.intersection(normalized.columns)
+        if present_review_columns and present_review_columns != review_columns:
+            missing = sorted(review_columns - present_review_columns)
+            raise ValueError(f"审核格式缺少必需列：{missing}")
+        return normalized
+
+    def _prepare_changes_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        return self._normalize_and_validate_changes(df).reset_index(drop=True)
+
+    @staticmethod
+    def _is_review_record(record: pd.Series) -> bool:
+        return any(
+            not ChangeSyncStrategy.is_blank(record.get(column_name))
+            for column_name in ('OriginalText', 'ProposedText', 'Decision')
+        )
     
     def process_directory(self, input_dir: Path, dry_run: bool = True, 
                          changes_file: Optional[Path] = None,
@@ -237,86 +264,76 @@ class ChangeSyncTool(BaseParamTool):
         
         # 检查该工作表是否有改动记录
         # 使用 file_path.stem 去掉扩展名，与改动表格中的 ExcelFilename 匹配
-        filename = file_path.stem
-        sheet_changes = self.changes_df[
-            (self.changes_df['SheetName'] == sheet_name) &
-            (self.changes_df['ExcelFilename'] == filename)
-        ]
-        
-        if sheet_changes.empty:
-            logger.debug(f"工作表 {sheet_name} 没有改动记录，跳过")
-            return
-        
-        logger.debug(f"工作表 {sheet_name} 有 {len(sheet_changes)} 条改动记录")
-        
         # 获取策略对象
         strategy: Optional[ChangeSyncStrategy] = self.filler.strategy_manager.get("change_sync")  # type: ignore
         if not strategy:
             logger.error("策略未找到")
             return
+
+        sheet_changes = strategy.get_changes_for_sheet(file_path.stem, sheet_name)
+        if sheet_changes.empty:
+            logger.debug(f"工作表 {sheet_name} 没有改动记录，跳过")
+            return
+
+        logger.debug(f"工作表 {sheet_name} 有 {len(sheet_changes)} 条改动记录")
         
-        # 构建改动索引缓存：{行索引：改动记录}
-        row_changes_cache: Dict[int, Dict[str, Any]] = {}
-        
+        candidates: Dict[int, List[tuple[pd.Series, Dict[str, Any]]]] = {}
         for _, record in sheet_changes.iterrows():
-            # 优先使用 Idx 匹配（真正的行号）
-            idx_val = record.get('Idx')
-            if pd.notna(idx_val):
-                excel_row = int(idx_val)
-                df_row = excel_row - 2  # DataFrame 行索引 = Excel 行号 - 2
-                if 0 <= df_row < len(df):
-                    row_changes_cache[df_row] = record.to_dict()  # type: ignore
+            review_record = self._is_review_record(record)
+            if review_record and not _is_approved_decision(record.get('Decision')):
+                logger.debug(f"审核记录未批准，跳过：Index={record.get('Index')}")
+                continue
+
+            locator = strategy.locate_record(df, record.to_dict())
+            if locator.position is None:
+                logger.warning(
+                    f"同步记录定位失败：status={locator.status}, "
+                    f"Index={record.get('Index')}, Idx={record.get('Idx')}"
+                )
+                continue
+
+            position = locator.position
+
+            if review_record:
+                if 'Text' not in df.columns:
+                    logger.warning("演出表格缺少列：Text")
                     continue
-            
-            # 其次使用 Index 列匹配（普通数据列，通过值来定位行）
-            index_val = record.get('Index')
-            if pd.notna(index_val):
-                # 在 DataFrame 的 Index 列中查找匹配的值
-                if 'Index' in df.columns:
-                    matching_rows = df[df['Index'] == index_val]
-                    if not matching_rows.empty:
-                        df_row = matching_rows.index[0]
-                        if df_row not in row_changes_cache:
-                            row_changes_cache[df_row] = record.to_dict()  # type: ignore
-                            logger.debug(f"通过 Index 列匹配到行 {df_row}: '{index_val}'")
-                        continue
-            
-            # 最后使用 Text 列匹配行内容来定位
-            text_val = record.get('Text')
-            if pd.notna(text_val) and str(text_val).strip():
-                # 在 DataFrame 中查找包含该文本的行
-                for df_idx, row in df.iterrows():
-                    # 在所有文本列中搜索匹配的文本
-                    for col in ['台词', '对话', 'text', 'dialogue', '备注']:
-                        if col in row and pd.notna(row[col]) and str(row[col]).strip() == str(text_val).strip():
-                            if df_idx not in row_changes_cache:
-                                row_changes_cache[df_idx] = record.to_dict()  # type: ignore
-                                logger.debug(f"通过 Text 匹配到行 {df_idx}: '{text_val}'")
-                            break
-                    else:
-                        continue
-                    break
-            
-            # 如果还是没有匹配到，输出警告
-            if pd.isna(idx_val) and pd.isna(index_val) and (pd.isna(text_val) or not str(text_val).strip()):
-                logger.warning(f"跳过记录：缺少 Idx、Index 和 Text 列，无法定位行。记录：{record.to_dict()}")  # type: ignore
-        
-        # 遍历有改动的行 (而不是所有行)
-        for row_idx, record in row_changes_cache.items():
-            # 遍历所有数据列，记录改动
-            for column_name in strategy.data_columns:
+                current_text = df.iloc[position].get('Text')
+                if not strategy.values_equal(current_text, record.get('OriginalText')):
+                    logger.warning(
+                        f"OriginalText 校验失败，跳过：Index={record.get('Index')}"
+                    )
+                    continue
+                proposed_text = record.get('ProposedText')
+                if strategy.is_blank(proposed_text):
+                    logger.warning(f"ProposedText 为空，跳过：Index={record.get('Index')}")
+                    continue
+                sync_values = {'Text': proposed_text}
+            else:
+                sync_values = {
+                    column_name: record.get(column_name)
+                    for column_name in strategy.data_columns
+                    if not strategy.is_blank(record.get(column_name))
+                }
+
+            if not sync_values:
+                continue
+            candidates.setdefault(position, []).append((record, sync_values))
+
+        for position, records in candidates.items():
+            if len(records) > 1:
+                logger.warning(f"同一目标行存在多条文本同步记录：Excel 行 {position + 2}")
+                continue
+
+            record, sync_values = records[0]
+            excel_row = position + 2
+            for column_name, new_value in sync_values.items():
                 if column_name not in df.columns:
                     logger.warning(f"演出表格缺少列：{column_name}")
                     continue
-                
-                new_value = record.get(column_name)
-                if pd.isna(new_value):
-                    continue  # 空值表示不变
-                
-                old_value = df.at[row_idx, column_name]
-                excel_row = row_idx + 2  # Excel 行号
-                
-                # 记录改动
+                old_value = df.iloc[position].get(column_name)
+                if strategy.values_equal(old_value, new_value):
+                    continue
                 self.reporter.add_change(
                     file=str(file_path),
                     sheet=sheet_name,
@@ -327,12 +344,11 @@ class ChangeSyncTool(BaseParamTool):
                     locator_info={
                         'Index': record.get('Index'),
                         'Idx': record.get('Idx'),
-                        'Text': record.get('Text')
+                        'Text': record.get('Text'),
+                        'OriginalText': record.get('OriginalText'),
+                        'Decision': record.get('Decision'),
                     }
                 )
-                
-                logger.debug(f"准备同步：{sheet_name} 行{excel_row} "
-                           f"{column_name}: '{old_value}' -> '{new_value}'")
     
     def _apply_changes(self, file_path: Path) -> bool:
         """

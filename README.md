@@ -139,8 +139,14 @@ python -m tools.smart_fill --config ./config/filling_rules.yaml --input-dir ./in
 ### 配音、翻译与审查导出
 
 ```bash
-# 导出配音台本；当前版本建议显式指定实际列名进行排序
+# 导出配音台本；默认直接抓取演出表格的 Voice 列
 python tools/export_dubbing_script.py --sort Name Idx
+
+# 按原有自动预设规则生成 Voice 文件名
+python tools/export_dubbing_script.py --voice-mode auto-preset --sort Name Idx
+
+# 限定角色和工作表，并输出同步工具可直接使用的定位列
+python tools/export_dubbing_script.py --characters 主角 --sheets Scene01 --sync-ready
 
 # 合并导出翻译表格
 python tools/export_translation_script.py --merge
@@ -167,7 +173,9 @@ python tools/sync_changes.py --input ./input --changes ./input/sync/review.xlsx 
 python tools/sync_voice_changes.py --input ./input --changes ./input/sync/voice.xlsx --dry-run
 ```
 
-同步工具正式运行时会原地修改 Excel 文件。导出表用于同步前，需要将定位列整理为 `ExcelFilename`、`SheetName` 和 `Index`。
+同步工具正式运行时仍会原地修改 Excel 文件。语音同步以 `Index` 为主要定位值，`Idx` 只辅助校验；导出时可使用 `--sync-ready` 直接生成 `ExcelFilename`、`SheetName`，语音同步工具也兼容默认的 `Filename`、`Sheet`。
+
+文本同步同时支持原有 `Text` 新值格式，以及包含 `OriginalText`、`ProposedText`、`Decision` 的 AI/ASR 审核计划格式。审核格式只处理已批准记录，并在写入前确认原文未发生变化。
 
 ### 资源验证与同步
 

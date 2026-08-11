@@ -5,11 +5,20 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Callable, Type, Tuple
 from pathlib import Path
+from dataclasses import dataclass
 import pandas as pd
 import re
 from core.logger import get_logger
 
 logger = get_logger()
+
+
+@dataclass(frozen=True)
+class SyncLocatorResult:
+    """Result of locating one synchronization record in a scenario sheet."""
+
+    position: Optional[int]
+    status: str
 
 
 class FillingStrategy(ABC):
@@ -430,11 +439,20 @@ class ChangeSyncStrategy(FillingStrategy):
     从改动表格中读取修改信息并同步到演出表格
     
     改动表格格式:
-    - 定位列：ExcelFilename, SheetName, Idx, Index, OldText (5 列用于定位行)
+    - 主定位列：ExcelFilename, SheetName, Index
+    - 辅助校验列：Idx，以及具体同步工具定义的 Text、Name 等字段
     - 数据列：其他所有列，与演出表格表头一致 (需要修改的数据)
     """
     
-    DEFAULT_LOCATOR_COLUMNS = ['ExcelFilename', 'SheetName', 'Idx', 'Index', 'OldText']
+    DEFAULT_LOCATOR_COLUMNS = [
+        'ExcelFilename', 'SheetName', 'Index', 'Idx', 'OldText',
+        'Text', 'Name', 'OriginalText', 'ProposedText', 'Decision',
+    ]
+    REQUIRED_LOCATOR_COLUMNS = ['ExcelFilename', 'SheetName', 'Index']
+    LOCATOR_ALIASES = {
+        'Filename': 'ExcelFilename',
+        'Sheet': 'SheetName',
+    }
     
     def __init__(self):
         super().__init__("change_sync")
@@ -454,7 +472,7 @@ class ChangeSyncStrategy(FillingStrategy):
             locator_columns: 定位列列表 (可选)
             data_columns: 数据列列表 (可选，默认自动识别)
         """
-        self.changes_df = changes_df
+        self.changes_df = self.normalize_changes_dataframe(changes_df)
         
         if locator_columns:
             self.locator_columns = locator_columns
@@ -463,15 +481,110 @@ class ChangeSyncStrategy(FillingStrategy):
         if data_columns:
             self.data_columns = data_columns
         else:
-            all_columns = changes_df.columns.tolist()
+            all_columns = self.changes_df.columns.tolist()
             self.data_columns = [col for col in all_columns if col not in self.locator_columns]
         
         logger.debug(f"设置改动表格：{len(changes_df)} 条记录，数据列：{self.data_columns}")
         
         # 清空缓存
         self._changes_cache.clear()
+
+    @staticmethod
+    def is_blank(value: Any) -> bool:
+        if value is None:
+            return True
+        try:
+            if pd.isna(value):
+                return True
+        except (TypeError, ValueError):
+            pass
+        return isinstance(value, str) and not value.strip()
+
+    @classmethod
+    def normalize_scalar(cls, value: Any) -> Optional[str]:
+        if cls.is_blank(value):
+            return None
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return str(value).strip()
+
+    @classmethod
+    def values_equal(cls, left: Any, right: Any) -> bool:
+        return cls.normalize_scalar(left) == cls.normalize_scalar(right)
+
+    @classmethod
+    def normalize_changes_dataframe(
+        cls,
+        changes_df: pd.DataFrame,
+        required_columns: Optional[List[str]] = None,
+    ) -> pd.DataFrame:
+        """Normalize exporter locator aliases and workbook names for syncing."""
+        normalized = changes_df.copy()
+        for alias, canonical in cls.LOCATOR_ALIASES.items():
+            if canonical not in normalized.columns and alias in normalized.columns:
+                normalized = normalized.rename(columns={alias: canonical})
+            elif canonical in normalized.columns and alias in normalized.columns:
+                canonical_values = normalized[canonical]
+                fill_mask = (
+                    canonical_values.isna()
+                    | canonical_values.astype(str).str.strip().eq('')
+                )
+                normalized.loc[fill_mask, canonical] = normalized.loc[fill_mask, alias]
+
+        if 'ExcelFilename' in normalized.columns:
+            normalized['ExcelFilename'] = normalized['ExcelFilename'].map(
+                lambda value: Path(str(value).strip()).stem
+                if not cls.is_blank(value)
+                else value
+            )
+
+        required = required_columns or []
+        missing = [column for column in required if column not in normalized.columns]
+        if missing:
+            raise ValueError(f"改动表格缺少必需列：{missing}")
+        return normalized
+
+    @classmethod
+    def find_index_positions(cls, df: pd.DataFrame, index_value: Any) -> List[int]:
+        if 'Index' not in df.columns or cls.is_blank(index_value):
+            return []
+        expected = cls.normalize_scalar(index_value)
+        return [
+            position
+            for position, value in enumerate(df['Index'].tolist())
+            if cls.normalize_scalar(value) == expected
+        ]
+
+    @classmethod
+    def locate_record(
+        cls,
+        df: pd.DataFrame,
+        change_record: Dict[str, Any],
+    ) -> SyncLocatorResult:
+        """Locate by scenario Index and use Idx only to validate the result."""
+        index_value = change_record.get('Index')
+        if cls.is_blank(index_value):
+            return SyncLocatorResult(None, 'missing_index')
+
+        positions = cls.find_index_positions(df, index_value)
+        if not positions:
+            return SyncLocatorResult(None, 'index_not_found')
+        if len(positions) > 1:
+            return SyncLocatorResult(None, 'index_ambiguous')
+
+        position = positions[0]
+        idx_value = change_record.get('Idx')
+        if not cls.is_blank(idx_value):
+            try:
+                idx_matches = int(float(str(idx_value).strip())) == position + 2
+            except (TypeError, ValueError):
+                idx_matches = False
+            if not idx_matches:
+                return SyncLocatorResult(None, 'idx_mismatch')
+
+        return SyncLocatorResult(position, 'matched')
     
-    def _get_changes_for_sheet(self, filename: str, sheet_name: str) -> pd.DataFrame:
+    def get_changes_for_sheet(self, filename: str, sheet_name: str) -> pd.DataFrame:
         """
         获取指定工作表的改动记录
         
@@ -482,6 +595,7 @@ class ChangeSyncStrategy(FillingStrategy):
         Returns:
             pd.DataFrame: 该工作表的改动记录
         """
+        filename = Path(str(filename).strip()).stem
         cache_key = (filename, sheet_name)
         
         if cache_key not in self._changes_cache and self.changes_df is not None:
@@ -493,10 +607,14 @@ class ChangeSyncStrategy(FillingStrategy):
             self._changes_cache[cache_key] = self.changes_df[mask].copy()
         
         return self._changes_cache.get(cache_key, pd.DataFrame())
+
+    def _get_changes_for_sheet(self, filename: str, sheet_name: str) -> pd.DataFrame:
+        """Backward-compatible wrapper for older strategy callers."""
+        return self.get_changes_for_sheet(filename, sheet_name)
     
     def _find_row_by_locator(self, df: pd.DataFrame, change_record: Dict[str, Any]) -> Optional[int]:
         """
-        根据定位信息查找对应的行索引
+        根据同步契约查找对应的行位置
         
         Args:
             df: 演出表格 DataFrame
@@ -505,45 +623,12 @@ class ChangeSyncStrategy(FillingStrategy):
         Returns:
             Optional[int]: 匹配的行索引，找不到返回 None
         """
-        # 优先级 1: Index 列（Excel 行号）
-        index_val = change_record.get('Index')
-        if pd.notna(index_val):
-            try:
-                excel_row = int(index_val)
-                df_row = excel_row - 2  # Excel 行号转 DataFrame 索引（减 2 因为标题占 2 行）
-                if 0 <= df_row < len(df):
-                    logger.debug(f"通过 Index={excel_row} 定位到第{df_row}行")
-                    return df_row
-            except (ValueError, TypeError):
-                pass
-        
-        # 优先级 2: Idx 列
-        idx_val = change_record.get('Idx')
-        if pd.notna(idx_val):
-            try:
-                excel_row = int(idx_val)
-                df_row = excel_row - 2
-                if 0 <= df_row < len(df):
-                    logger.debug(f"通过 Idx={excel_row} 定位到第{df_row}行")
-                    return df_row
-            except (ValueError, TypeError):
-                pass
-        
-        # 优先级 3: OldText 列（原文匹配）
-        old_text = change_record.get('OldText')
-        if pd.notna(old_text) and str(old_text).strip():
-            text_columns = ['台词', 'text', '对话', 'dialogue']
-            for col in text_columns:
-                if col in df.columns:
-                    # 查找匹配的行
-                    for idx, row in df.iterrows():
-                        cell_value = str(row.get(col, '')).strip()
-                        if cell_value == str(old_text).strip():
-                            logger.debug(f"通过 OldText='{old_text}' 定位到第{idx}行")
-                            return int(idx) if isinstance(idx, int) else idx  # type: ignore
-        
-        logger.warning(f"无法定位改动行：{change_record}")
-        return None
+        result = self.locate_record(df, change_record)
+        if result.position is None:
+            logger.warning(
+                f"无法定位改动行：status={result.status}, record={change_record}"
+            )
+        return result.position
     
     def can_fill(self, cell_value: Any, context: Dict[str, Any]) -> bool:
         """
@@ -574,35 +659,15 @@ class ChangeSyncStrategy(FillingStrategy):
         
         # 检查当前行是否有改动
         if row_idx is not None:
-            excel_row = row_idx + 2
-            # 检查是否有任意定位方式匹配
             for _, record in changes.iterrows():
-                matched = False
-                
-                # Index 匹配
-                if pd.notna(record.get('Index')) and int(record.get('Index', 0)) == excel_row:
-                    matched = True
-                
-                # Idx 匹配
-                if not matched and pd.notna(record.get('Idx')) and int(record.get('Idx', 0)) == excel_row:
-                    matched = True
-                
-                # OldText 匹配
-                if not matched and pd.notna(record.get('OldText')):
-                    row_data = context.get('row_data', {})
-                    text_columns = ['台词', 'text', '对话', 'dialogue']
-                    for col in text_columns:
-                        if col in row_data:
-                            current_text = str(row_data.get(col, '')).strip()
-                            old_text = str(record.get('OldText')).strip()
-                            if current_text == old_text:
-                                matched = True
-                                break
-                
-                if matched:
+                result = self.locate_record(
+                    context.get('dataframe', pd.DataFrame()),
+                    record.to_dict(),
+                )
+                if result.position == row_idx:
                     # 检查该列是否有新值
                     new_value = record.get(column_name)
-                    return pd.notna(new_value) and new_value != ""
+                    return not self.is_blank(new_value)
         
         return False
     

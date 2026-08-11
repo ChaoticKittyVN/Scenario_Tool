@@ -26,6 +26,9 @@ from core.param_process.param_translator import ParamTranslator
 logger = get_logger(__name__)
 
 SPECIAL_NAME_VALUES = {member.value for member in SpecialName}
+VOICE_MODE_CAPTURE = "capture"
+VOICE_MODE_AUTO_PRESET = "auto-preset"
+VOICE_MODES = {VOICE_MODE_CAPTURE, VOICE_MODE_AUTO_PRESET}
 
 class DialogueExporter:
     """配音台本导出器"""
@@ -41,7 +44,10 @@ class DialogueExporter:
         output_format: str = "excel",
         use_cache_map: bool = False,
         selected_characters: Optional[List[str]] = None,
-        per_character: bool = False
+        selected_sheets: Optional[List[str]] = None,
+        per_character: bool = False,
+        voice_mode: str = VOICE_MODE_CAPTURE,
+        sync_ready: bool = False,
     ):
         """
         Args:
@@ -49,22 +55,33 @@ class DialogueExporter:
             input_dir: 输入目录（覆盖配置）
             output_dir: 输出目录（覆盖配置）
             default_speaker: 角色为空时的默认名称
-            sort_by: 排序字段列表，如 ["角色", "行号"]
+            sort_by: 排序字段列表，如 ["Name", "Idx"]
             merge_files: 是否合并所有文件为一个表格
             output_format: 输出格式 "excel" 或 "csv"
+            voice_mode: Voice 输出模式；capture 直接抓取原表，auto-preset 使用自动预设
+            selected_characters: 仅导出的角色名列表
+            selected_sheets: 仅导出的工作表名列表
+            sync_ready: 使用同步工具可直接识别的定位列名
         """
+        if voice_mode not in VOICE_MODES:
+            supported_modes = ", ".join(sorted(VOICE_MODES))
+            raise ValueError(f"不支持的 Voice 输出模式: {voice_mode}；可选值: {supported_modes}")
+
         self.config = config
         self.input_dir = input_dir or config.paths.input_dir
         self.output_dir = output_dir or (config.paths.output_dir / "dialogue_exports")
         self.default_speaker = default_speaker
-        self.sort_by = sort_by or ["角色", "行号"]
+        self.sort_by = sort_by or ["Name", "Idx"]
         self.ignore_word = ["无语音"]
         self.ignore_text = [""]
         self.merge_files = merge_files
         self.output_format = output_format.lower()
         self.use_cache_map = use_cache_map
-        self.selected_characters = selected_characters
+        self.selected_characters = set(selected_characters or [])
+        self.selected_sheets = set(selected_sheets or [])
         self.per_character = per_character
+        self.voice_mode = voice_mode
+        self.sync_ready = sync_ready
 
         self.count_dict = {}  # 用于统计每个角色在每个工作表中的对话数量
         self.voice_filename_cache = {}  # 缓存完整的语音文件名，键为(speaker, sheet_name)元组
@@ -102,6 +119,25 @@ class DialogueExporter:
         """使用翻译器进行翻译"""
         return self.translator.translate("Name", param)
 
+    def _get_voice_prefix(self, speaker: str) -> str:
+        """优先使用 NameToVoice；未配置时保持原有回退规则。"""
+        mapped_name = self.translator.get_mapping("NameToVoice", speaker)
+        if mapped_name is not None and str(mapped_name).strip():
+            return str(mapped_name).strip()
+        return self._convert_chinese_to_english(speaker)
+
+    def _get_voice_group_key(self, speaker: str) -> tuple[str, str]:
+        """让映射到同一语音身份的别名共享连续编号。"""
+        mapped_name = self.translator.get_mapping("NameToVoice", speaker)
+        if mapped_name is not None and str(mapped_name).strip():
+            return ("NameToVoice", str(mapped_name).strip())
+        return ("Name", speaker)
+
+    def _is_selected_character(self, speaker: object) -> bool:
+        if not self.selected_characters:
+            return True
+        return str(speaker).strip() in self.selected_characters
+
     def extract_from_file(self, file_path: Path) -> pd.DataFrame:
         """从单个 Excel 文件提取对话，返回 DataFrame"""
         logger.info(f"正在处理：{file_path.name}")
@@ -111,12 +147,14 @@ class DialogueExporter:
             logger.error(f"跳过文件 {file_path.name}: {e}")
             return pd.DataFrame()
 
-        # 第一阶段：提取所有有效行并统计每个角色在各工作表中的出现次数
+        # 第一阶段：提取所有有效行；自动预设模式还需要统计编号范围
         temp_count = {}
         valid_data_cache = {}  # 缓存每个工作表的有效行数据
         
         for sheet_name, df in excel_data.items():
             if sheet_name == SheetName.PARAM_SHEET.value:
+                continue
+            if self.selected_sheets and sheet_name not in self.selected_sheets:
                 continue
 
             # 提取有效行（只调用一次）
@@ -127,34 +165,32 @@ class DialogueExporter:
             # 缓存有效行数据供后续使用
             valid_data_cache[sheet_name] = valid_df
 
-            # 统计每个角色的出现次数
-            for idx, row in valid_df.iterrows():
-                ignore = row.get(ColumnName.IGNORE.value, "")
-                if pd.isna(ignore) or ignore in self.ignore_word:
-                    continue
-                speaker = row.get(ColumnName.NAME.value, "")
-                if pd.isna(speaker) or speaker == "":
-                    continue
-                
-                if speaker not in temp_count:
-                    temp_count[speaker] = {}
-                if sheet_name not in temp_count[speaker]:
-                    temp_count[speaker][sheet_name] = 0
-                temp_count[speaker][sheet_name] += 1
+            if self.voice_mode == VOICE_MODE_AUTO_PRESET:
+                # 统计每个角色的出现次数
+                for idx, row in valid_df.iterrows():
+                    ignore = row.get(ColumnName.IGNORE.value, "")
+                    if pd.isna(ignore) or ignore in self.ignore_word:
+                        continue
+                    speaker = row.get(ColumnName.NAME.value, "")
+                    if pd.isna(speaker) or speaker == "":
+                        continue
+                    if not self._is_selected_character(speaker):
+                        continue
+
+                    voice_group = self._get_voice_group_key(str(speaker).strip())
+                    if voice_group not in temp_count:
+                        temp_count[voice_group] = {}
+                    if sheet_name not in temp_count[voice_group]:
+                        temp_count[voice_group][sheet_name] = 0
+                    temp_count[voice_group][sheet_name] += 1
 
         # 预生成所有语音文件名
         filename_generators = {}
-        for speaker, sheets in temp_count.items():
-            filename_generators[speaker] = {}
-            # 转换角色名为英文（只转换一次）
-            if not self.use_cache_map:
-                converted_speaker = self.translate_name(speaker)
-            else:
-                converted_speaker = self._convert_chinese_to_english(speaker)
-            
+        for voice_group, sheets in temp_count.items():
+            filename_generators[voice_group] = {}
             for sheet_name, count in sheets.items():
                 # 为每个角色 - 工作表组合创建编号迭代器
-                filename_generators[speaker][sheet_name] = iter(range(1, count + 1))
+                filename_generators[voice_group][sheet_name] = iter(range(1, count + 1))
 
         # 第二阶段：使用缓存的数据生成最终结果
         all_rows = []
@@ -170,26 +206,36 @@ class DialogueExporter:
                 speaker = row.get(ColumnName.NAME.value, "")
                 if pd.isna(speaker) or speaker == "" or speaker in SPECIAL_NAME_VALUES:
                     continue
+                if not self._is_selected_character(speaker):
+                    continue
                 text = row.get(ColumnName.TEXT.value, "")
                 if pd.isna(text) or text == "":
                     continue
                 index = row.get(ColumnName.INDEX.value, "")
 
-                # 使用预生成的编号和已转换的角色名
-                next_num = next(filename_generators[speaker][sheet_name])
-                count_num = f"{next_num:03d}"
-                
-                # 获取已转换的角色名（通过缓存避免重复转换）
-                cache_key = (speaker, sheet_name, idx)
-                if cache_key not in self.voice_filename_cache:
-                    converted_speaker = self._convert_chinese_to_english(speaker)
-                    self.voice_filename_cache[cache_key] = f"{converted_speaker}_{sheet_name}_{count_num}"
-                
-                voice_file_name = self.voice_filename_cache[cache_key]
+                if self.voice_mode == VOICE_MODE_AUTO_PRESET:
+                    # 使用当前版本的自动预设规则生成语音文件名
+                    voice_group = self._get_voice_group_key(str(speaker).strip())
+                    next_num = next(filename_generators[voice_group][sheet_name])
+                    count_num = f"{next_num:03d}"
+
+                    cache_key = (speaker, sheet_name, idx)
+                    if cache_key not in self.voice_filename_cache:
+                        converted_speaker = self._get_voice_prefix(str(speaker).strip())
+                        self.voice_filename_cache[cache_key] = (
+                            f"{converted_speaker}_{sheet_name}_{count_num}"
+                        )
+
+                    voice_file_name = self.voice_filename_cache[cache_key]
+                else:
+                    # 抓取模式不改写 Voice，空单元格统一导出为空字符串
+                    voice_file_name = row.get(ColumnName.VOICE.value, "")
+                    if pd.isna(voice_file_name):
+                        voice_file_name = ""
 
                 all_rows.append({
-                    "Filename": file_path.stem,
-                    "Sheet": sheet_name,
+                    "ExcelFilename" if self.sync_ready else "Filename": file_path.stem,
+                    "SheetName" if self.sync_ready else "Sheet": sheet_name,
                     "Index": index,
                     "Idx": idx + 2,
                     "Voice": voice_file_name,
@@ -267,7 +313,9 @@ class DialogueExporter:
     # 各列预设宽度（可根据实际需要调整）
     COLUMN_WIDTHS = {
         "Filename": 20,
+        "ExcelFilename": 20,
         "Sheet": 12,
+        "SheetName": 12,
         "Index": 10,
         "Idx": 8,
         "Voice": 30,
@@ -453,14 +501,26 @@ def main():
     parser = argparse.ArgumentParser(description="导出配音台本工具")
     parser.add_argument("--input", type=Path, help="输入目录（覆盖配置中的 input_dir）")
     parser.add_argument("--output", type=Path, help="输出目录（覆盖配置中的 output_dir）")
-    parser.add_argument("--sort", nargs="+", default=["角色", "文本行号"],
-                        help="排序字段，例如 --sort 角色 行号")
+    parser.add_argument("--sort", nargs="+", default=["Name", "Idx"],
+                        help="排序字段，例如 --sort Name Idx")
     parser.add_argument("--default-speaker", default="", help="角色为空时的默认名称")
     parser.add_argument("--merge", action="store_true", help="合并所有文件为一个表格")
     parser.add_argument("--format", choices=["excel", "csv"], default="excel",
                         help="输出格式 (默认：excel)")
+    parser.add_argument(
+        "--voice-mode",
+        choices=["capture", "auto-preset"],
+        default="capture",
+        help="Voice 输出模式：capture 抓取演出表格 Voice 列；auto-preset 按现有预设自动生成（默认：capture）",
+    )
     parser.add_argument("--per-character", action="store_true",
                     help="按角色分别导出为单独的文件（自动合并所有输入文件）")
+    parser.add_argument("--characters", nargs="+",
+                        help="仅导出指定角色，例如 --characters 主角 女主角")
+    parser.add_argument("--sheets", nargs="+",
+                        help="仅导出指定工作表，例如 --sheets Scene01 Scene02")
+    parser.add_argument("--sync-ready", action="store_true",
+                        help="将 Filename/Sheet 输出为 ExcelFilename/SheetName，便于直接同步")
     
     # 新增：转换模式参数
     parser.add_argument("--convert", type=Path,
@@ -497,8 +557,11 @@ def main():
         sort_by=args.sort,
         merge_files=args.merge,
         output_format=args.format,
-        selected_characters=getattr(args, 'characters', None),
+        selected_characters=args.characters,
+        selected_sheets=args.sheets,
         per_character=args.per_character,
+        voice_mode=args.voice_mode,
+        sync_ready=args.sync_ready,
     )
     exporter.export()
 

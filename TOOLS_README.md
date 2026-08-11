@@ -80,6 +80,18 @@ python tools/count_words.py --all-rows
 # 导出所有文件的配音台本
 python tools/export_dubbing_script.py
 
+# 默认使用抓取模式，直接沿用演出表格中的 Voice 列
+python tools/export_dubbing_script.py --voice-mode capture
+
+# 使用自动预设模式，按原有规则生成语音文件名
+python tools/export_dubbing_script.py --voice-mode auto-preset
+
+# 只导出指定角色和工作表
+python tools/export_dubbing_script.py --characters 主角 女主角 --sheets Scene01 Scene02
+
+# 输出可直接交给同步工具的定位列名
+python tools/export_dubbing_script.py --sync-ready
+
 # 合并所有文件为一个表格
 python tools/export_dubbing_script.py --merge
 
@@ -87,11 +99,32 @@ python tools/export_dubbing_script.py --merge
 python tools/export_dubbing_script.py --per-character
 
 # 指定排序字段
-python tools/export_dubbing_script.py --sort 角色 行号
+python tools/export_dubbing_script.py --sort Name Idx
 
 # 输出为 CSV 格式
 python tools/export_dubbing_script.py --format csv
 ```
+
+`--voice-mode` 支持两种模式：
+
+- `capture`（默认）：配音台本的 `Voice` 直接取自演出表格的 `Voice` 列，空单元格输出为空。
+- `auto-preset`：优先使用参数映射中的 `NameToVoice` 作为文件名前缀；多个别名可映射到同一前缀并共享连续编号。角色没有 `NameToVoice` 时保持原有回退规则。
+
+默认定位列仍为 `Filename`、`Sheet`。启用 `--sync-ready` 后仅将它们改名为 `ExcelFilename`、`SheetName`，其他导出列和默认格式不变。
+
+### 同步配音与审核文本
+
+```bash
+# 先预览 Voice 修改；支持 sync-ready 或默认 Filename/Sheet 导出表
+python tools/sync_voice_changes.py --input ./input --changes ./voice.xlsx --dry-run
+
+# 预览已批准的 AI/ASR 文本修改计划
+python tools/sync_changes.py --input ./input --changes ./text_review.xlsx --dry-run
+```
+
+两个同步工具都以 `ExcelFilename + SheetName + Index` 为主要定位契约，`Idx` 只用于辅助验证。语音同步表若包含 `Text` 或 `Name`，当前演出表格内容必须与其一致才会写入 `Voice`。
+
+文本审核格式包含 `OriginalText`、`ProposedText`、`Decision`。仅批准状态会进入同步，并且写入前当前 `Text` 必须仍等于 `OriginalText`。原有直接提供 `Text` 新值的同步表继续可用。工具不调用 ASR 服务，识别结果、置信度和修改原因等列可作为审核元数据保留。
 
 ### 🔄 转换为演出脚本格式
 
