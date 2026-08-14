@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -23,41 +22,16 @@ from core.excel_management import (
 )
 from core.logger import get_logger
 from core.param_process.param_translator import ParamTranslator
+from core.scenario_generation.models import (
+    GeneratedRowBlock,
+    GenerationRuntime,
+    GenerationSummary,
+)
 from core.scenario_output import OutputFormat, OutputManager
 from core.word_statistics import calculate_dataframe_word_statistics
 
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class GenerationSummary:
-    total_files: int = 0
-    succeeded_files: int = 0
-    failed_files: int = 0
-    untranslatable_count: int = 0
-    untranslatable_log: Optional[Path] = None
-    error: Optional[str] = None
-
-    @property
-    def success(self) -> bool:
-        return self.error is None and self.total_files > 0 and self.failed_files == 0
-
-
-@dataclass
-class GeneratedRowBlock:
-    excel_row: int
-    scenario_index: str
-    command_count: int
-    commands: list[Any] = field(repr=False)
-    error: Optional[str] = None
-
-
-@dataclass
-class GenerationRuntime:
-    translator: ParamTranslator
-    processor: Any
-    dataframe_processor: DataFrameProcessor
 
 
 def is_excel_output(engine_config: Any) -> bool:

@@ -29,7 +29,10 @@ def test_generate_scenarios_shares_complete_batch_workflow(tmp_path):
     progress = []
 
     with (
-        patch("core.scenario_generation.ParamTranslator", return_value=translator),
+        patch(
+            "core.scenario_generation.service.ParamTranslator",
+            return_value=translator,
+        ),
         patch.object(
             ScenarioGenerationService,
             "create_processor",
@@ -58,7 +61,10 @@ def test_generate_scenarios_reports_partial_failure(tmp_path):
     translator.get_untranslatable_count.return_value = 0
 
     with (
-        patch("core.scenario_generation.ParamTranslator", return_value=translator),
+        patch(
+            "core.scenario_generation.service.ParamTranslator",
+            return_value=translator,
+        ),
         patch.object(ScenarioGenerationService, "create_processor", return_value=Mock()),
         patch.object(
             ScenarioGenerationService,
