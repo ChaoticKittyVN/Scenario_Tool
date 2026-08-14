@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from core.config_manager import AppConfig
+from core.scenario_generation import ScenarioGenerationService
 from engines.renpy.config import RenpyConfig
 from generate_scenario import generate_scenarios
 
@@ -28,10 +29,13 @@ def test_generate_scenarios_shares_complete_batch_workflow(tmp_path):
     progress = []
 
     with (
-        patch("generate_scenario.import_engine_module") as import_engine,
-        patch("generate_scenario.ParamTranslator", return_value=translator),
-        patch("generate_scenario.create_processor", return_value=Mock()) as create_processor,
-        patch("generate_scenario.process_excel_file") as process_file,
+        patch("core.scenario_generation.ParamTranslator", return_value=translator),
+        patch.object(
+            ScenarioGenerationService,
+            "create_processor",
+            return_value=Mock(),
+        ) as create_processor,
+        patch.object(ScenarioGenerationService, "generate_workbook") as process_file,
     ):
         summary = generate_scenarios(config, progress.append)
 
@@ -40,7 +44,6 @@ def test_generate_scenarios_shares_complete_batch_workflow(tmp_path):
     assert summary.succeeded_files == 2
     assert summary.failed_files == 0
     assert summary.untranslatable_count == 2
-    import_engine.assert_called_once_with("renpy")
     create_processor.assert_called_once()
     assert process_file.call_count == 2
     assert progress[0] == "准备生成 2 个文件"
@@ -55,11 +58,11 @@ def test_generate_scenarios_reports_partial_failure(tmp_path):
     translator.get_untranslatable_count.return_value = 0
 
     with (
-        patch("generate_scenario.import_engine_module"),
-        patch("generate_scenario.ParamTranslator", return_value=translator),
-        patch("generate_scenario.create_processor", return_value=Mock()),
-        patch(
-            "generate_scenario.process_excel_file",
+        patch("core.scenario_generation.ParamTranslator", return_value=translator),
+        patch.object(ScenarioGenerationService, "create_processor", return_value=Mock()),
+        patch.object(
+            ScenarioGenerationService,
+            "generate_workbook",
             side_effect=[None, RuntimeError("broken")],
         ),
     ):

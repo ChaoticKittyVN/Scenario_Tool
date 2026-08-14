@@ -1,4 +1,4 @@
-# Scenario Tool 0.10.0
+# Scenario Tool 0.10.1
 
 视觉小说脚本生成工具，支持从 Excel 表格生成 Ren'Py、Naninovel 和 Utage 引擎脚本。
 

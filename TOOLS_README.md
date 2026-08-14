@@ -83,6 +83,75 @@ python tools/count_words.py --all-rows
 
 ---
 
+## 指定范围测试片段生成
+
+`tools/generate_range_test_case.py` 从演出表格中选择一个或多个 Excel 实际行号范围，并通过与正式生成共用的核心服务生成独立测试片段。默认使用 `warmup` 模式，从状态回放起点静默处理到目标范围，以保留角色姿势等生成器缓存，但只输出目标行。
+
+```powershell
+# 同一工作簿生成两个独立测试片段
+python tools/generate_range_test_case.py `
+  --input input/ch09.xlsx `
+  --range ch09:120-140 `
+  --range ch09:250-275
+
+# @100 表示输出第 100-140 行，其中 120-140 是目标范围
+python tools/generate_range_test_case.py `
+  --input input/ch09.xlsx `
+  --range ch09:120-140@100
+
+# 从第 100 行开始回放并输出，生成更完整的独立测试上下文
+python tools/generate_range_test_case.py `
+  --input input/ch09.xlsx `
+  --range ch09:120-140 `
+  --mode prefix `
+  --replay-start 100
+
+# 不预热前文状态，仅使用目标行快速检查无状态生成器
+python tools/generate_range_test_case.py `
+  --input input/ch09.xlsx `
+  --range ch09:120-140 `
+  --mode target-only
+
+# 自动在各片段开头生成 Test01、Test02 标签
+python tools/generate_range_test_case.py `
+  --input input/ch09.xlsx `
+  --range ch09:120-140 `
+  --range ch09:250-275 `
+  --with-label
+
+# 执行包含名称、上下文起点和自定义标签的 YAML 计划
+python tools/generate_range_test_case.py --plan config/test_cases/ch09.yaml
+```
+
+计划文件示例：
+
+```yaml
+input: input/ch09.xlsx
+output_dir: output/test_cases/ch09
+cases:
+  - name: camera_move
+    sheet: ch09
+    rows: 120-140
+    context_start: 100
+    mode: context
+    replay_start: 80
+    label: TestCamera
+  - name: character_animation
+    sheet: ch09
+    rows: 250-275
+```
+
+行号使用 Excel 界面显示的实际行号并包含首尾。范围必须位于 `END` 之前，Ignore 行按照正式生成规则跳过。执行模式如下：
+
+- `target-only`：创建全新 Processor，只处理并输出目标范围，适合无状态生成器。
+- `warmup`：从 `replay_start`（默认第 2 行）回放状态，只输出目标范围；这是默认模式。
+- `context`：回放更早内容，并从 `context_start` 开始输出到目标结束；`@100` 是该模式的简写。
+- `prefix`：从 `replay_start` 开始同时回放和输出，适合需要较完整引擎运行状态的独立片段。
+
+`--with-label` 或计划中的 `label` 会通过合成 `Name=label`、`Text=<标签名>` 的行调用现有引擎生成器。输出目录同时生成 `manifest.json`，记录执行模式、回放与输出起点、跳过行、生成命令数和错误。
+
+---
+
 ## 🎙️ 配音台本导出工具
 
 ### 基本用法
