@@ -3,8 +3,9 @@
 该模块提供用于统计文本中字数的功能。
 """
 from abc import ABC, abstractmethod
-from enum import Enum
-from typing import List, Tuple, Dict, Any, Optional, Callable
+import unicodedata
+from typing import Dict, List, Optional, Tuple
+
 from core.text_processor import TextProcessor, PunctuationFilter
 import pandas as pd
 
@@ -102,4 +103,69 @@ class BasicWordCounter(WordCounter):
             counts.setdefault(category, 0)
             counts[category] += line_count
 
+        return counts
+
+
+class WordStyleWordCounter(WordCounter):
+    """使用接近 Microsoft Word 中文文档的规则统计字数。
+
+    中文字符逐字计数，连续的非中文文字和数字按一个词计数。空白、换行、
+    控制字符和 Unicode 格式字符不计数；标点可按需逐字符计数。
+    """
+
+    def __init__(self, include_punctuation: bool = False):
+        self.include_punctuation = include_punctuation
+
+    @staticmethod
+    def _is_chinese_character(character: str) -> bool:
+        codepoint = ord(character)
+        return (
+            0x3400 <= codepoint <= 0x4DBF
+            or 0x4E00 <= codepoint <= 0x9FFF
+            or 0xF900 <= codepoint <= 0xFAFF
+            or 0x20000 <= codepoint <= 0x2FA1F
+            or 0x30000 <= codepoint <= 0x323AF
+        )
+
+    def _count_line(self, line: str) -> int:
+        count = 0
+        in_word = False
+
+        for character in line:
+            if self._is_chinese_character(character):
+                count += 1
+                in_word = False
+                continue
+
+            if character.isalnum():
+                if not in_word:
+                    count += 1
+                    in_word = True
+                continue
+
+            in_word = False
+            if self.include_punctuation and unicodedata.category(character).startswith("P"):
+                count += 1
+
+        return count
+
+    def count(self, text: List[str]) -> int:
+        total_count = 0
+        for line in text:
+            if line is None or pd.isna(line):
+                continue
+            total_count += self._count_line(str(line))
+        return total_count
+
+    def count_by(self, text: List[Tuple[str, str]]) -> Dict[str, int]:
+        counts: Dict[str, int] = {}
+        for category, line in text:
+            if line is None or pd.isna(line):
+                continue
+            if category is None or pd.isna(category):
+                category = "unrecognized"
+
+            category = str(category)
+            counts.setdefault(category, 0)
+            counts[category] += self._count_line(str(line))
         return counts

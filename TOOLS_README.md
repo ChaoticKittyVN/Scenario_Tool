@@ -64,9 +64,20 @@ python tools/count_words.py
 # 同时保存便于比较的 JSON 报告
 python tools/count_words.py --output output/word_count.json
 
+# Word 风格：中文逐字、连续英文和数字按词，默认不计标点
+python tools/count_words.py --count-mode word
+
+# Word 风格并逐个计入标点
+python tools/count_words.py --count-mode word-with-punctuation
+
+# 同时输出旧 Basic、Word 不含标点、Word 含标点三种结果
+python tools/count_words.py --count-mode all --output output/word_count_comparison.json
+
 # 审查 END 后或 Ignore 行中是否存在额外文本
 python tools/count_words.py --all-rows
 ```
+
+默认 `--count-mode basic` 保持原有字符统计和报告结构兼容：先删除非字母数字字符，再计算剩余字符长度，因此不能视为 Word 字数。`word` 使用接近 Word 中文文档的规则，中文字符逐字计算、连续英文和数字按词计算，并忽略空白、换行、控制字符、Unicode 格式字符和标点；`word-with-punctuation` 在此基础上逐个计入 Unicode 标点。`all` 会使用明确命名的字段同时输出三种口径。
 
 默认行范围与正式生成一致；`--all-rows` 仅用于排查表尾残留或忽略行，不代表正式脚本字数。特殊名称来自 `core.constants.SpecialName`，默认排除；`--exclude-name` 的优先级高于其他名称选项。
 

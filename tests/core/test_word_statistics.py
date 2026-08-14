@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pandas as pd
 
 from core.excel_management import DataFrameProcessor
+from core.word_counter import WordStyleWordCounter
 from core.word_statistics import calculate_dataframe_word_statistics
 from tools.count_words import build_report, discover_excel_files, filter_rows_by_name
 
@@ -35,6 +36,20 @@ def test_statistics_skip_missing_text_and_accept_missing_name_column():
     assert statistics.total == 4
     assert statistics.text_rows == 1
     assert statistics.by_speaker == {"unrecognized": 4}
+
+
+def test_statistics_accept_word_style_counter():
+    dataframe = pd.DataFrame(
+        {"Name": ["Alice", "Bob"], "Text": ["你好，world", "ABC 123"]}
+    )
+
+    statistics = calculate_dataframe_word_statistics(
+        dataframe,
+        counter=WordStyleWordCounter(),
+    )
+
+    assert statistics.total == 5
+    assert statistics.by_speaker == {"Alice": 3, "Bob": 2}
 
 
 def test_word_count_report_uses_end_and_ignore_rules(tmp_path):
@@ -162,3 +177,32 @@ def test_report_filters_selected_sheet_and_names(tmp_path):
         "Alice": 1,
         "label": 2,
     }
+
+
+def test_default_report_keeps_legacy_shape_and_all_mode_adds_named_counts(tmp_path):
+    workbook = tmp_path / "scenario.xlsx"
+    pd.DataFrame(
+        {
+            "Name": ["Alice", ""],
+            "Text": ["你好，world!", ""],
+            "Note": ["", "END"],
+        }
+    ).to_excel(workbook, sheet_name="Scene", index=False)
+    config = SimpleNamespace(
+        processing=SimpleNamespace(ignore_mode=False, ignore_words=[])
+    )
+
+    legacy_report = build_report([workbook], config)
+    all_report = build_report([workbook], config, count_mode="all")
+
+    assert "count_mode" not in legacy_report
+    assert "counts" not in legacy_report
+    assert legacy_report["total"] == 7
+    assert all_report["count_mode"] == "all"
+    assert all_report["counts"] == {
+        "basic": 7,
+        "word": 3,
+        "word-with-punctuation": 5,
+    }
+    sheet = all_report["files"][0]["sheets"][0]
+    assert sheet["by_speaker_counts"]["Alice"] == all_report["counts"]

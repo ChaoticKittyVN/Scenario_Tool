@@ -15,10 +15,26 @@ if str(PROJECT_ROOT) not in sys.path:
 from core.config_manager import AppConfig
 from core.constants import EXCEL_EXTENSIONS, SheetName, SpecialName, TEMP_FILE_PREFIX
 from core.excel_management import DataFrameProcessor, ExcelFileManager
+from core.word_counter import BasicWordCounter, WordCounter, WordStyleWordCounter
 from core.word_statistics import UNRECOGNIZED_SPEAKER, calculate_dataframe_word_statistics
 
 
 SPECIAL_NAME_VALUES = {member.value for member in SpecialName}
+COUNT_MODE_BASIC = "basic"
+COUNT_MODE_WORD = "word"
+COUNT_MODE_WORD_WITH_PUNCTUATION = "word-with-punctuation"
+COUNT_MODE_ALL = "all"
+COUNT_MODES = (
+    COUNT_MODE_BASIC,
+    COUNT_MODE_WORD,
+    COUNT_MODE_WORD_WITH_PUNCTUATION,
+    COUNT_MODE_ALL,
+)
+COUNT_LABELS = {
+    COUNT_MODE_BASIC: "Basic 字符数",
+    COUNT_MODE_WORD: "Word 字数",
+    COUNT_MODE_WORD_WITH_PUNCTUATION: "Word 字数（含标点）",
+}
 
 TOOL_UI = {
     "title": "字数统计",
@@ -51,6 +67,7 @@ TOOL_UI = {
             "order": 70,
         },
         "all_rows": {"label": "统计整张工作表", "group": "高级", "order": 80},
+        "count_mode": {"label": "统计口径", "group": "统计范围", "order": 85},
         "output": {
             "label": "JSON 报告",
             "group": "输出",
@@ -138,6 +155,7 @@ def build_report(
     exclude_names: Optional[Iterable[str]] = None,
     include_special_names: Optional[Iterable[str]] = None,
     include_all_special_names: bool = False,
+    count_mode: str = COUNT_MODE_BASIC,
 ) -> dict:
     manager = ExcelFileManager(cache_enabled=False)
     processor = DataFrameProcessor(config)
@@ -149,6 +167,15 @@ def build_report(
     if unknown_special_names:
         unknown = ", ".join(sorted(unknown_special_names))
         raise ValueError(f"不是已知的特殊名称: {unknown}")
+    if count_mode not in COUNT_MODES:
+        raise ValueError(f"不支持的统计口径: {count_mode}")
+
+    counters: dict[str, WordCounter] = {
+        COUNT_MODE_BASIC: BasicWordCounter(),
+        COUNT_MODE_WORD: WordStyleWordCounter(),
+        COUNT_MODE_WORD_WITH_PUNCTUATION: WordStyleWordCounter(include_punctuation=True),
+    }
+    selected_modes = tuple(counters) if count_mode == COUNT_MODE_ALL else (count_mode,)
 
     report = {
         "total": 0,
@@ -182,13 +209,36 @@ def build_report(
                 include_special_names=included_special_set,
                 include_all_special_names=include_all_special_names,
             )
-            statistics = calculate_dataframe_word_statistics(counted_df)
+            statistics_by_mode = {
+                mode: calculate_dataframe_word_statistics(counted_df, counter=counters[mode])
+                for mode in selected_modes
+            }
+            statistics = statistics_by_mode[selected_modes[0]]
             sheet_report = {
                 "name": sheet_name,
                 "total": statistics.total,
                 "text_rows": statistics.text_rows,
                 "by_speaker": dict(sorted(statistics.by_speaker.items())),
             }
+            if count_mode == COUNT_MODE_ALL:
+                sheet_report["counts"] = {
+                    mode: mode_statistics.total
+                    for mode, mode_statistics in statistics_by_mode.items()
+                }
+                all_speakers = sorted(
+                    {
+                        speaker
+                        for mode_statistics in statistics_by_mode.values()
+                        for speaker in mode_statistics.by_speaker
+                    }
+                )
+                sheet_report["by_speaker_counts"] = {
+                    speaker: {
+                        mode: mode_statistics.by_speaker.get(speaker, 0)
+                        for mode, mode_statistics in statistics_by_mode.items()
+                    }
+                    for speaker in all_speakers
+                }
             file_report["sheets"].append(sheet_report)
             file_report["total"] += statistics.total
             file_report["text_rows"] += statistics.text_rows
@@ -197,17 +247,66 @@ def build_report(
         report["total"] += file_report["total"]
         report["text_rows"] += file_report["text_rows"]
 
+    if count_mode != COUNT_MODE_BASIC:
+        report["count_mode"] = count_mode
+    if count_mode == COUNT_MODE_ALL:
+        report["counts"] = {
+            mode: sum(
+                sheet["counts"][mode]
+                for file_report in report["files"]
+                for sheet in file_report["sheets"]
+            )
+            for mode in selected_modes
+        }
+        for file_report in report["files"]:
+            file_report["counts"] = {
+                mode: sum(sheet["counts"][mode] for sheet in file_report["sheets"])
+                for mode in selected_modes
+            }
+
     return report
 
 
 def print_report(report: dict) -> None:
+    count_mode = report.get("count_mode", COUNT_MODE_BASIC)
+    if count_mode == COUNT_MODE_ALL:
+        _print_all_counts_report(report)
+        return
+
+    unit = "字" if count_mode == COUNT_MODE_BASIC else "词/字"
+    if count_mode != COUNT_MODE_BASIC:
+        print(f"统计口径: {COUNT_LABELS[count_mode]}")
     for file_report in report["files"]:
-        print(f"\n{Path(file_report['path']).name}: {file_report['total']} 字 / {file_report['text_rows']} 行")
+        print(f"\n{Path(file_report['path']).name}: {file_report['total']} {unit} / {file_report['text_rows']} 行")
         for sheet in file_report["sheets"]:
-            print(f"  {sheet['name']}: {sheet['total']} 字 / {sheet['text_rows']} 行")
+            print(f"  {sheet['name']}: {sheet['total']} {unit} / {sheet['text_rows']} 行")
             for speaker, count in sheet["by_speaker"].items():
                 print(f"    {speaker}: {count}")
-    print(f"\n合计: {report['total']} 字 / {report['text_rows']} 行 / {len(report['files'])} 个文件")
+    print(f"\n合计: {report['total']} {unit} / {report['text_rows']} 行 / {len(report['files'])} 个文件")
+
+
+def _format_counts(counts: dict) -> str:
+    return " / ".join(f"{COUNT_LABELS[mode]}: {count}" for mode, count in counts.items())
+
+
+def _print_all_counts_report(report: dict) -> None:
+    print("统计口径: 全部")
+    for file_report in report["files"]:
+        print(
+            f"\n{Path(file_report['path']).name}: "
+            f"{_format_counts(file_report['counts'])} / {file_report['text_rows']} 行"
+        )
+        for sheet in file_report["sheets"]:
+            print(
+                f"  {sheet['name']}: {_format_counts(sheet['counts'])} / "
+                f"{sheet['text_rows']} 行"
+            )
+            for speaker, counts in sheet["by_speaker_counts"].items():
+                print(f"    {speaker}: {_format_counts(counts)}")
+    print(
+        f"\n合计: {_format_counts(report['counts'])} / "
+        f"{report['text_rows']} 行 / {len(report['files'])} 个文件"
+    )
 
 
 def parse_args(argv=None):
@@ -273,6 +372,15 @@ def parse_args(argv=None):
         action="store_true",
         help="统计整张工作表，不应用 END 和 Ignore 规则",
     )
+    parser.add_argument(
+        "--count-mode",
+        choices=COUNT_MODES,
+        default=COUNT_MODE_BASIC,
+        help=(
+            "统计口径：basic 保持原字符统计；word 使用 Word 风格且忽略标点；"
+            "word-with-punctuation 计入标点；all 同时输出三种结果"
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -301,6 +409,7 @@ def main(argv=None) -> int:
             exclude_names=args.exclude_names,
             include_special_names=args.include_special_names,
             include_all_special_names=args.include_all_special_names,
+            count_mode=args.count_mode,
         )
     except ValueError as exc:
         print(f"错误：{exc}", file=sys.stderr)

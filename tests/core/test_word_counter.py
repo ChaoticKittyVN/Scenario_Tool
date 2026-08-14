@@ -136,3 +136,29 @@ class TestBasicWordCounter:
             "greeting": 10,
             "unrecognized": 11
         }
+
+
+class TestWordStyleWordCounter:
+    def test_counts_chinese_characters_and_contiguous_latin_tokens(self):
+        counter = WordStyleWordCounter()
+
+        assert counter.count(["你好，world 123！ABC42"]) == 5
+
+    def test_ignores_punctuation_whitespace_newlines_and_format_characters(self):
+        counter = WordStyleWordCounter()
+
+        assert counter.count(["甲，\n 乙\u200b！"]) == 2
+
+    def test_can_include_unicode_punctuation(self):
+        counter = WordStyleWordCounter(include_punctuation=True)
+
+        assert counter.count(["甲，ABC-123！"]) == 6
+
+    def test_count_by_uses_the_same_word_style_rules(self):
+        counter = WordStyleWordCounter()
+
+        assert counter.count_by([
+            ("Alice", "你好，world"),
+            ("Alice", "123"),
+            (None, "甲"),
+        ]) == {"Alice": 4, "unrecognized": 1}

@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 
 from core.constants import ColumnName
-from core.word_counter import BasicWordCounter
+from core.word_counter import BasicWordCounter, WordCounter
 
 
 UNRECOGNIZED_SPEAKER = "unrecognized"
@@ -36,7 +36,7 @@ class WordStatistics:
 
 def calculate_dataframe_word_statistics(
     df: pd.DataFrame,
-    counter: Optional[BasicWordCounter] = None,
+    counter: Optional[WordCounter] = None,
     name_column: str = ColumnName.NAME.value,
     text_column: str = ColumnName.TEXT.value,
 ) -> WordStatistics:
