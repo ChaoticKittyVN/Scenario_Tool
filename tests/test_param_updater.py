@@ -1059,6 +1059,19 @@ class TestMultiProjectParamUpdater:
             "ProjectMusic": "projectmusic"
         }
 
+    def test_single_project_param_file_log_is_emitted_once(self, updater):
+        param_dir = updater.config.paths.param_config_dir
+        project_file = param_dir / "param_data_renpy_chapter_a.xlsx"
+        self._write_param_file(project_file, ["ProjectMusic"])
+        updater.config.processing.multi_project_mode = False
+        updater.config.projects = {"chapter_a": "第一章"}
+
+        with patch("core.param_update.sources.logger.info") as log_info:
+            assert updater._default_param_file() == project_file
+            assert updater._default_param_file() == project_file
+
+        log_info.assert_called_once()
+
     def test_single_project_mode_supports_legacy_project_filename(self, updater):
         param_dir = updater.config.paths.param_config_dir
         project_file = param_dir / "param_data_chapter_a.xlsx"
@@ -1097,6 +1110,19 @@ class TestMultiProjectParamUpdater:
         updater.config.projects = {"chapter_a": "第一章"}
 
         assert updater._variant_data_file() == project_file
+
+    def test_single_project_variant_file_log_is_emitted_once(self, updater):
+        param_dir = updater.config.paths.param_config_dir
+        project_file = param_dir / "variant_data_chapter_a.xlsx"
+        project_file.touch()
+        updater.config.processing.multi_project_mode = False
+        updater.config.projects = {"chapter_a": "第一章"}
+
+        with patch("core.param_update.sources.logger.info") as log_info:
+            assert updater._variant_data_file() == project_file
+            assert updater._variant_data_file() == project_file
+
+        log_info.assert_called_once()
 
     def test_single_project_mode_falls_back_to_default_variant_file(self, updater):
         param_dir = updater.config.paths.param_config_dir

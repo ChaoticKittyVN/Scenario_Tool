@@ -29,10 +29,12 @@ class ParamSourceMixin:
         )
         for project_file in project_candidates:
             if project_file.exists():
-                logger.info(
-                    f"单项目模式使用项目参数文件: {project_file.name} "
-                    f"(项目: {project_key})"
-                )
+                if getattr(self, "_reported_project_param_file", None) != project_file:
+                    logger.info(
+                        f"单项目模式使用项目参数文件: {project_file.name} "
+                        f"(项目: {project_key})"
+                    )
+                    self._reported_project_param_file = project_file
                 return project_file
         return default_file
 
@@ -46,10 +48,12 @@ class ParamSourceMixin:
         project_key = next(iter(self.projects))
         project_file = param_dir / f"variant_data_{project_key}.xlsx"
         if project_file.exists():
-            logger.info(
-                f"单项目模式使用项目差分参数文件: {project_file.name} "
-                f"(项目: {project_key})"
-            )
+            if getattr(self, "_reported_project_variant_file", None) != project_file:
+                logger.info(
+                    f"单项目模式使用项目差分参数文件: {project_file.name} "
+                    f"(项目: {project_key})"
+                )
+                self._reported_project_variant_file = project_file
             return project_file
         return default_file
 
