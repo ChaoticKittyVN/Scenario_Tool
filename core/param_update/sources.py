@@ -38,7 +38,20 @@ class ParamSourceMixin:
 
     def _variant_data_file(self) -> Path:
         """Return the configured variant parameter workbook."""
-        return Path(self.config.paths.param_config_dir) / "variant_data.xlsx"
+        param_dir = Path(self.config.paths.param_config_dir)
+        default_file = param_dir / "variant_data.xlsx"
+        if self.multi_project_mode or len(self.projects) != 1:
+            return default_file
+
+        project_key = next(iter(self.projects))
+        project_file = param_dir / f"variant_data_{project_key}.xlsx"
+        if project_file.exists():
+            logger.info(
+                f"单项目模式使用项目差分参数文件: {project_file.name} "
+                f"(项目: {project_key})"
+            )
+            return project_file
+        return default_file
 
     def read_param_file(
         self,

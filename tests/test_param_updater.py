@@ -1087,6 +1087,35 @@ class TestMultiProjectParamUpdater:
 
         assert updater._default_param_file() == base_file
 
+    def test_single_project_mode_prefers_project_variant_file(self, updater):
+        param_dir = updater.config.paths.param_config_dir
+        default_file = param_dir / "variant_data.xlsx"
+        project_file = param_dir / "variant_data_chapter_a.xlsx"
+        default_file.touch()
+        project_file.touch()
+        updater.config.processing.multi_project_mode = False
+        updater.config.projects = {"chapter_a": "第一章"}
+
+        assert updater._variant_data_file() == project_file
+
+    def test_single_project_mode_falls_back_to_default_variant_file(self, updater):
+        param_dir = updater.config.paths.param_config_dir
+        default_file = param_dir / "variant_data.xlsx"
+        default_file.touch()
+        updater.config.processing.multi_project_mode = False
+        updater.config.projects = {"chapter_a": "第一章"}
+
+        assert updater._variant_data_file() == default_file
+
+    def test_multi_project_mode_keeps_default_variant_file(self, updater):
+        param_dir = updater.config.paths.param_config_dir
+        default_file = param_dir / "variant_data.xlsx"
+        project_file = param_dir / "variant_data_chapter_a.xlsx"
+        default_file.touch()
+        project_file.touch()
+
+        assert updater._variant_data_file() == default_file
+
     def test_enabled_mode_merges_project_mapping_files(self, updater):
         param_dir = updater.config.paths.param_config_dir
         self._write_param_file(param_dir / "param_data_renpy.xlsx", ["BaseMusic"])
