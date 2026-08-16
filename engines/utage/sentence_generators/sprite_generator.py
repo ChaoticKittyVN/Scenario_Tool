@@ -3,10 +3,10 @@ Utage Sprite Generator
 生成精灵图相关命令
 """
 from typing import Any, Dict, Optional
-from core.dict_based_sentence_generator import DictBasedSentenceGenerator
+from engines.utage.generator_base import UtageGeneratorBase
 
 
-class SpriteGenerator(DictBasedSentenceGenerator):
+class SpriteGenerator(UtageGeneratorBase):
     """精灵图生成器"""
 
     # 精灵图资源配置
@@ -58,11 +58,11 @@ class SpriteGenerator(DictBasedSentenceGenerator):
         if not self.can_process(data):
             return None
 
-        line = self.create_command_dict("Sprite")
+        line = self.create_command("Sprite")
         sprite = self.get_value("Sprite", data)
         if self.exists_param("SpriteAtr", data):
             sprite += self.get_value("SpriteAtr", data)
         line["Arg1"] = sprite
-        self._set_param_fast(line, "SpriteLayer", data)
+        self.set_param(line, "SpriteLayer", data)
 
         return [line]

@@ -3,10 +3,10 @@ Utage Wait Generator
 生成等待命令
 """
 from typing import Any, Dict, Optional
-from core.dict_based_sentence_generator import DictBasedSentenceGenerator
+from engines.utage.generator_base import UtageGeneratorBase
 
 
-class WaitGenerator(DictBasedSentenceGenerator):
+class WaitGenerator(UtageGeneratorBase):
     """等待生成器"""
 
     param_config = {
@@ -44,6 +44,6 @@ class WaitGenerator(DictBasedSentenceGenerator):
                 line["Arg6"] = int(wait[1:])
         else:
             self.set_command(line, "Wait")
-            self._set_param_fast(line, "Wait", data)
+            self.set_param(line, "Wait", data)
 
         return [line]

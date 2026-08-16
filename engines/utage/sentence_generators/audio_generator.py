@@ -3,10 +3,10 @@ Utage Audio Generator
 生成音频相关命令（音乐、音效、氛围）
 """
 from typing import Any, Dict, Optional
-from core.dict_based_sentence_generator import DictBasedSentenceGenerator
+from engines.utage.generator_base import UtageGeneratorBase
 
 
-class AudioGenerator(DictBasedSentenceGenerator):
+class AudioGenerator(UtageGeneratorBase):
     """音频生成器"""
 
     # Music 资源配置
@@ -128,8 +128,7 @@ class AudioGenerator(DictBasedSentenceGenerator):
                 audio_value = str(audio_value)
 
             line = {}
-            if self.exists_param("WaitType", data):
-                self._set_param_fast(line, "WaitType", data)
+            self.set_wait_type(line, data)
             # 使用基类的配置缓存
             audio_cfg = self.get_cached_config(audio_type)
 
@@ -137,7 +136,7 @@ class AudioGenerator(DictBasedSentenceGenerator):
                 # 停止命令
                 line["Command"] = audio_cfg.get("stop_format", "")
                 # 自动使用缓存的字段名
-                self._set_param_fast(line, "AudioFadeTime", data)
+                self.set_param(line, "AudioFadeTime", data)
             else:
                 # 播放命令
                 format_str = audio_cfg.get("format", "")
@@ -151,8 +150,8 @@ class AudioGenerator(DictBasedSentenceGenerator):
                 line[audio_key] = audio_value
                 
                 # 设置可选参数（自动使用缓存的字段名）
-                self._set_param_fast(line, "Volume", data)
-                self._set_param_fast(line, "AudioFadeTime", data)
+                self.set_param(line, "Volume", data)
+                self.set_param(line, "AudioFadeTime", data)
 
             lines.append(line)
 

@@ -3,11 +3,11 @@ Utage Character & Text Generator
 生成文本和对话命令
 """
 from typing import Any, Dict, Optional
-from core.dict_based_sentence_generator import DictBasedSentenceGenerator
 from core.constants import WindowMode, SpecialName
+from engines.utage.generator_base import UtageGeneratorBase
 
 
-class CharacterTextGenerator(DictBasedSentenceGenerator):
+class CharacterTextGenerator(UtageGeneratorBase):
     """角色与文本生成器"""
 
     # 标记：允许与Macro一起处理（因为Macro可能需要Text）
@@ -122,8 +122,7 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
 
         # 处理角色
         line = {}
-        if self.exists_param("WaitType", data):
-                self._set_param_fast(line, "WaitType", data)
+        self.set_wait_type(line, data)
         if character and not is_off:
             # 使用缓存的字段名
             character_field = self.get_cached_field("Character", "Arg1")
@@ -133,21 +132,20 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
             variant = self.get_value("Variant", data)
 
             line["Arg2"] = variant
-            self._set_param_fast(line, "CharacterLayer", data)
-            self._set_param_fast(line, "CharacterFade", data, use_default=True)
+            self.set_param(line, "CharacterLayer", data)
+            self.set_param(line, "CharacterFade", data, use_default=True)
 
         elif is_off:
             line["Command"] = "CharacterOff"
-            self._set_param_fast(line, "Character", data)
-            self._set_param_fast(line, "CharacterLayer", data)
-            self._set_param_fast(line, "CharacterFade", data, use_default=True)
+            self.set_param(line, "Character", data)
+            self.set_param(line, "CharacterLayer", data)
+            self.set_param(line, "CharacterFade", data, use_default=True)
 
 
         if not same_chara:
             lines.append(line)
             line = {}
-            if self.exists_param("WaitType", data):
-                self._set_param_fast(line, "WaitType", data)
+            self.set_wait_type(line, data)
 
         window = str(data.get("MessageWindow", "")) if "MessageWindow" in data else ""
         # 处理窗口显示
@@ -164,15 +162,14 @@ class CharacterTextGenerator(DictBasedSentenceGenerator):
             # else:
                 # character_name = self.translator.translate("Name", character_name)
             line = {}
-            if self.exists_param("WaitType", data):
-                self._set_param_fast(line, "WaitType", data)
+            self.set_wait_type(line, data)
             if self.exists_param("Voice", data):
-                self._set_param_fast(line, "Voice", data)
+                self.set_param(line, "Voice", data)
             # 使用缓存的字段名
             name_field = self.get_cached_field("Name", "Arg2")
             line[name_field] = character_name
         if self.exists_param("Voice", data):
-            self._set_param_fast(line, "Voice", data)           
+            self.set_param(line, "Voice", data)
  
         if text:
             if character_name in self.SPECIAL_NAME_VALUES:

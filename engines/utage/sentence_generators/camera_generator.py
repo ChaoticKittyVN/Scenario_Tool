@@ -3,10 +3,10 @@ Utage Camera Generator
 生成镜头效果命令
 """
 from typing import Any, Dict, Optional
-from core.dict_based_sentence_generator import DictBasedSentenceGenerator
+from engines.utage.generator_base import UtageGeneratorBase
 
 
-class CameraGenerator(DictBasedSentenceGenerator):
+class CameraGenerator(UtageGeneratorBase):
     """镜头效果生成器"""
 
     param_config = {
@@ -58,11 +58,11 @@ class CameraGenerator(DictBasedSentenceGenerator):
         data = self.do_translate(data)
 
         line = {}
-        self._set_param_fast(line, "ZoomCamera", data)
-        self._set_param_fast(line, "Zoom", data)
-        self._set_param_fast(line, "CameraX", data)
-        self._set_param_fast(line, "CameraY", data)
-        self._set_param_fast(line, "CameraTime", data)
+        self.set_param(line, "ZoomCamera", data)
+        self.set_param(line, "Zoom", data)
+        self.set_param(line, "CameraX", data)
+        self.set_param(line, "CameraY", data)
+        self.set_param(line, "CameraTime", data)
 
-        self._set_param_fast(line, "WaitType", data)
+        self.set_wait_type(line, data)
         return [line]

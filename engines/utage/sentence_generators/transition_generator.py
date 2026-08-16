@@ -3,10 +3,10 @@ Utage Fade Generator
 生成转场命令
 """
 from typing import Any, Dict, Optional
-from core.dict_based_sentence_generator import DictBasedSentenceGenerator
+from engines.utage.generator_base import UtageGeneratorBase
 
 
-class FadeGenerator(DictBasedSentenceGenerator):
+class FadeGenerator(UtageGeneratorBase):
     """渐变转场生成器"""
 
     param_config = {
@@ -60,10 +60,10 @@ class FadeGenerator(DictBasedSentenceGenerator):
         data = self.do_translate(data)
 
         line = {}
-        self._set_param_fast(line, "FadeType", data)
-        self._set_param_fast(line, "FadeColor", data, use_default=True)
-        self._set_param_fast(line, "FadeCamera", data)
-        self._set_param_fast(line, "FadeRule", data)
-        self._set_param_fast(line, "FadeTime", data, use_default=True)
+        self.set_param(line, "FadeType", data)
+        self.set_param(line, "FadeColor", data, use_default=True)
+        self.set_param(line, "FadeCamera", data)
+        self.set_param(line, "FadeRule", data)
+        self.set_param(line, "FadeTime", data, use_default=True)
 
         return [line]

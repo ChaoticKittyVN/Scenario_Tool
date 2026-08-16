@@ -3,10 +3,10 @@ Utage Direct Command Generator
 生成直接命令
 """
 from typing import Any, Dict, Optional
-from core.dict_based_sentence_generator import DictBasedSentenceGenerator
+from engines.utage.generator_base import UtageGeneratorBase
 
 
-class DirectCommandGenerator(DictBasedSentenceGenerator):
+class DirectCommandGenerator(UtageGeneratorBase):
     """直接命令生成器"""
 
     # 标记：独占模式 - 当此生成器成功处理时，其他生成器（除Text相关）应被跳过
@@ -57,10 +57,10 @@ class DirectCommandGenerator(DictBasedSentenceGenerator):
             if command == "Label":
                 line["Command"] = self._labelize(value)
             elif command == "Jump":
-                self._set_param_fast(line, "DirectCommand", data)
+                self.set_param(line, "DirectCommand", data)
                 line["Arg1"] = self._labelize(value)
             elif command == "Selection":
-                self._set_param_fast(line, "DirectCommand", data)
+                self.set_param(line, "DirectCommand", data)
                 # 选项跳转标签
                 line["Arg1"] = self._labelize(value)
 
@@ -74,8 +74,8 @@ class DirectCommandGenerator(DictBasedSentenceGenerator):
                 line["Text"] = self.get_value("Text", data) if self.exists_param("Text", data) else value
 
         else:
-            self._set_param_fast(line, "CommandValue", data)
-            self._set_param_fast(line, "DirectCommand", data)
+            self.set_param(line, "CommandValue", data)
+            self.set_param(line, "DirectCommand", data)
 
         return [line]
     

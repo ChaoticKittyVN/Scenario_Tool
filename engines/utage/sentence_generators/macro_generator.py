@@ -3,8 +3,8 @@ Utage Macro Generator
 生成宏命令语句
 """
 from typing import Any, Dict, Optional
-from core.dict_based_sentence_generator import DictBasedSentenceGenerator
 from core.logger import get_logger
+from engines.utage.generator_base import UtageGeneratorBase
 
 logger = get_logger()
 
@@ -16,7 +16,7 @@ except ImportError:
     MACRO_MAPPINGS = {}
 
 
-class MacroGenerator(DictBasedSentenceGenerator):
+class MacroGenerator(UtageGeneratorBase):
     """
     宏命令生成器
     
@@ -88,10 +88,9 @@ class MacroGenerator(DictBasedSentenceGenerator):
             logger.warning(f"未找到宏 '{macro_name}' 的映射配置")
             return None
         
-        line = self.create_command_dict()
+        line = self.create_command()
         self.set_command(line, self.get_value("Macro", data))
-        if self.exists_param("WaitType", data):
-            self._set_param_fast(line, "WaitType", data)
+        self.set_wait_type(line, data)
 
         # 首先处理组合参数，创建一个处理后的数据副本
         processed_data = self._apply_combined_params(data)
