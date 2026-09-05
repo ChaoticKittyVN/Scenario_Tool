@@ -111,6 +111,14 @@ def test_audio_has_independent_ambience_channel_and_uses_code_options():
     ) == ["play sound 雨声.ogg volume 80% loop fadein 0.5"]
 
 
+def test_numeric_spreadsheet_values_render_without_float_suffixes():
+    generator = AudioGenerator(IdentityTranslator(), LetsGalConfig())
+
+    assert generator.process({"Music": "主题曲.ogg", "Volume": 70.0}) == [
+        "play music 主题曲.ogg volume 70% loop"
+    ]
+
+
 def test_voice_is_direct_path_and_precedes_dialogue():
     processor = make_processor()
 

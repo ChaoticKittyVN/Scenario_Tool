@@ -32,6 +32,15 @@ class CameraGenerator(LetsGalGeneratorBase):
             not self.is_empty(data.get(name)) for name in self.param_config
         )
 
+    @staticmethod
+    def _number_text(value: Any) -> str:
+        text = str(value).strip()
+        try:
+            number = float(text)
+        except ValueError:
+            return text
+        return str(int(number)) if number.is_integer() else str(number)
+
     def process(self, data: Dict[str, Any]) -> Optional[list[str]]:
         if not self.can_process(data):
             return None
@@ -43,7 +52,7 @@ class CameraGenerator(LetsGalGeneratorBase):
         for name, keyword in (("OffsetX", "x"), ("OffsetY", "y"), ("Zoom", "zoom")):
             value = data.get(name)
             if not self.is_empty(value):
-                tokens.extend([keyword, str(value).strip()])
+                tokens.extend([keyword, self._number_text(value)])
         duration = self.first_value(data, ("CameraDuration", "CameraTime"))
         if not self.is_empty(duration):
             tokens.extend(

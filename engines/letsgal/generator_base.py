@@ -100,4 +100,10 @@ class LetsGalGeneratorBase(BaseSentenceGenerator):
         if cls.is_empty(value):
             return ""
         text = str(value).strip()
-        return text if text.endswith("%") else f"{text}%"
+        raw = text[:-1].strip() if text.endswith("%") else text
+        try:
+            number = float(raw)
+        except ValueError:
+            return text if text.endswith("%") else f"{text}%"
+        normalized = str(int(number)) if number.is_integer() else str(number)
+        return f"{normalized}%"
