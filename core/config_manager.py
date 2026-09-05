@@ -429,11 +429,13 @@ def __getattr__(name: str):
     - RenpyConfig
     - NaninovelConfig
     - UtageConfig
+    - LetsGalConfig
     """
     engine_config_map = {
         'RenpyConfig': 'engines.renpy.config',
         'NaninovelConfig': 'engines.naninovel.config',
         'UtageConfig': 'engines.utage.config',
+        'LetsGalConfig': 'engines.letsgal.config',
     }
     
     if name in engine_config_map:
