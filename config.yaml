@@ -36,6 +36,13 @@ variant_agent_export:
   parameter_template: '{情绪}{序号}'
   # 可用 '*' 设置所有工作表，也可按工作表名称覆盖以上字段。
   sheet_profiles: {}
+# 独立音频资料源默认关闭；启用、项目命名和冲突规则见 docs/markdown/audio-data.md。
+audio_data:
+  enabled: false
+# 只控制完整更新/仅映射模式是否附带导出，也可单独使用 --audio-doc-only。
+audio_doc_export:
+  enabled: false
+  output_file: audio_doc.json
 resources:
   extensions:
     图片:

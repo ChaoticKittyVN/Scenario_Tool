@@ -7,6 +7,8 @@ from core.config_manager import AppConfig
 from core.excel_management import ExcelFileManager
 from core.logger import get_logger
 from core.param_update.mapping_export import MappingExportMixin
+from core.param_update.audio_data import AudioDataMixin
+from core.param_update.audio_export import AudioDocExportMixin
 from core.param_update.project_scope import ProjectScopeMixin
 from core.param_update.sheet_sync import ParameterSheetSyncMixin
 from core.param_update.sources import ParamSourceMixin
@@ -19,8 +21,10 @@ logger = get_logger()
 class ParamUpdater(
     ProjectScopeMixin,
     ParamSourceMixin,
+    AudioDataMixin,
     MappingExportMixin,
     VariantAgentExportMixin,
+    AudioDocExportMixin,
     ParameterSheetSyncMixin,
 ):
     """Public facade for all parameter update operations."""
@@ -57,6 +61,15 @@ class ParamUpdater(
             return False
 
         variant_file_path: Optional[Path] = None
+        audio_export_config = getattr(self.config, "audio_doc_export", None)
+        export_audio = getattr(audio_export_config, "enabled", False) is True
+        try:
+            self._load_audio_sources()
+            if generate_mapping_files and export_audio and not self.audio_data_enabled:
+                raise ValueError("audio_doc_export.enabled 需要启用 audio_data.enabled")
+        except Exception as exc:
+            logger.error(f"音频资料检查失败: {exc}")
+            return False
         if generate_mapping_files:
             if not self.generate_param_mappings(dry_run):
                 return False
@@ -68,6 +81,8 @@ class ParamUpdater(
             ):
                 if not self.export_agent_variant_document(dry_run):
                     return False
+            if export_audio and not self.export_audio_document(dry_run):
+                return False
 
         if update_parameter_sheets:
             if generate_mapping_files:

@@ -19,8 +19,11 @@ Excel 中文参数 → 参数映射文件 → 引擎脚本参数
 - **Naninovel**: `param_config/param_data_naninovel.xlsx`
 - **Utage**: `param_config/param_data_utage.xlsx`
 - **差分参数**: `param_config/variant_data.xlsx`（可选）
+- **独立音频资料**: 通用 `param_config/audio_data.xlsx` 和项目专用 `param_config/audio_data_<项目键>.xlsx`（显式启用，不含引擎命名层）
 
 单项目和多项目的参数文件选择规则见[配置说明](configuration.md#项目与篇章参数)。
+
+独立音频源的类型接管、冲突校验、模板和音乐维度见[独立音频资料源](audio-data.md)。未启用的旧项目继续从 `param_data` 读取音频参数。
 
 ---
 
@@ -95,7 +98,7 @@ param_config/variant_data.xlsx
 py update_param.py
 ```
 
-默认直接执行会保持原有流程：生成基础与差分映射，并把 `param_data`、`variant_data` 同步到 `input/` 中演出表格的参数表。
+默认直接执行会保持原有流程：生成基础与差分映射，并把 `param_data`、`variant_data` 以及已启用的 `audio_data` 同步到 `input/` 中演出表格的参数表。音频仍写入统一 `PARAM_MAPPINGS`，生成器及资源校验无需额外查询机制。
 
 可以先预览：
 
@@ -117,6 +120,9 @@ py update_param.py --variant-mappings-only
 
 # 只生成 Agent 差分 JSON
 py update_param.py --agent-variant-doc-only
+
+# 只导出音频资料 JSON（需要 audio_data.enabled: true）
+py update_param.py --audio-doc-only
 ```
 
 ### 3. 自动生成映射文件
@@ -126,6 +132,7 @@ py update_param.py --agent-variant-doc-only
 - `param_config/param_mappings.py` - 基础参数映射
 - `param_config/variant_mappings.py` - 差分参数映射（如果存在）
 - `param_config/variant_agent_data.json` - Agent 差分文档（显式执行或配置启用时）
+- `param_config/audio_doc.json` - 音频资料文档（显式执行或配置启用时）
 
 ### 4. 重新生成脚本
 
@@ -319,6 +326,7 @@ ScenarioParam: "m1"
 - `param_config/param_data_naninovel.xlsx` - Naninovel 参数文件
 - `param_config/param_data_utage.xlsx` - Utage 参数文件
 - `param_config/variant_data.xlsx` - 差分参数文件
+- `param_config/audio_data.xlsx` - 音频资料源（两列映射、六个中文维度，未自动启用）
 - `param_config/param_mappings.py` - 生成的参数映射（自动生成）
 - `param_config/variant_mappings.py` - 生成的差分映射（自动生成）
 - `param_config/variant_agent_data.json` - Agent 差分文档（按需生成）

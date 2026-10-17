@@ -199,6 +199,7 @@ class ParameterSheetSyncMixin:
             )
 
         try:
+            self._load_audio_sources()
             validation_data = self.collect_validation_data(param_file, variant_file)
             if not validation_data:
                 logger.warning("未能收集到验证数据，跳过演出表格更新")

@@ -158,4 +158,4 @@ class ParamSourceMixin:
             except Exception as exc:
                 logger.warning(f"读取差分参数文件时发生未知错误: {exc}")
 
-        return validation_data
+        return self._with_audio_validation(validation_data)

@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     scope.add_argument(
         "--parameter-sheet-only",
         action="store_true",
-        help="只从 param_data/variant_data 同步参数表，不重新生成映射模块。",
+        help="从 param_data、可选 variant_data 和已启用的 audio_data 同步参数表，不生成映射模块。",
     )
     scope.add_argument(
         "--variant-mappings-only",
@@ -58,6 +58,11 @@ def parse_args() -> argparse.Namespace:
         "--agent-variant-doc-only",
         action="store_true",
         help="只从 variant_data.xlsx 生成供 Agent 使用的差分 JSON 文档。",
+    )
+    scope.add_argument(
+        "--audio-doc-only",
+        action="store_true",
+        help="只从已启用的 audio_data 导出音频资料 JSON 文档。",
     )
     return parser.parse_args()
 
@@ -90,6 +95,8 @@ def main() -> int:
             success, _ = updater.generate_variant_mappings(args.dry_run)
         elif args.agent_variant_doc_only:
             success = updater.export_agent_variant_document(args.dry_run)
+        elif args.audio_doc_only:
+            success = updater.export_audio_document(args.dry_run)
         else:
             generate_mapping_files = not args.parameter_sheet_only
             update_parameter_sheets = not args.mappings_only
@@ -99,7 +106,7 @@ def main() -> int:
                 update_parameter_sheets=update_parameter_sheets,
                 dry_run=args.dry_run,
             )
-        if (args.mappings_only or args.variant_mappings_only or args.agent_variant_doc_only) and workbooks:
+        if (args.mappings_only or args.variant_mappings_only or args.agent_variant_doc_only or args.audio_doc_only) and workbooks:
             logger.warning("当前模式不会使用 --workbook 参数")
         if success:
             return 0

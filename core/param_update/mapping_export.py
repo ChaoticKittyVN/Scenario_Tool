@@ -53,6 +53,7 @@ class MappingExportMixin:
                     mappings_list.append(project_mappings)
                     logger.info(f"已加载项目 '{project_key}' 的参数映射")
             mappings = self._merge_mappings(mappings_list)
+            mappings = self._with_audio_mappings(mappings)
             if not mappings:
                 logger.error("未能读取到任何参数映射")
                 return False

@@ -42,7 +42,7 @@ paths:
 |------|------|
 | `input_dir` | 演出 Excel 输入目录 |
 | `output_dir` | 生成脚本和报告输出目录 |
-| `param_config_dir` | `param_data`、`variant_data` 和生成映射所在目录 |
+| `param_config_dir` | `param_data`、`variant_data`、可选 `audio_data` 和生成映射所在目录 |
 | `log_dir` | 日志目录 |
 | `input_voice_dir` | 语音输入目录 |
 
@@ -94,7 +94,23 @@ projects:
 - 基础参数仍来自 `param_data_<engine>.xlsx`。
 - 每个项目使用 `param_data_<project>.xlsx`。
 - `update_param.py` 根据 `projects` 的识别文本匹配演出表文件名，再把对应项目参数合并到该工作簿的参数表。
-- 文件名匹配不到项目时只使用基础参数；匹配到多个项目时记录警告并使用第一个。
+- 文件名匹配不到项目时使用基础参数和通用音频候选；匹配到多个项目时记录警告并使用第一个。
+
+## 独立音频资料
+
+```yaml
+audio_data:
+  enabled: false
+audio_doc_export:
+  enabled: false
+  output_file: audio_doc.json
+```
+
+`audio_data.enabled` 显式启用独立音频源；关闭或未配置时，Music、Ambience、Sound 继续使用原 `param_data`。音频文件只分通用 `audio_data.xlsx` 和项目专用 `audio_data_<项目键>.xlsx`，不按引擎命名。单项目专用整份优先，没有专用文件时使用通用文件；多项目合并共享基础与存在的项目资料，项目同名记录优先。已选中文件或内容错误会失败，不静默换源。
+
+`audio_doc_export.enabled` 控制完整更新及仅映射模式是否附带 JSON，输出相对路径以 `param_config_dir` 为基准。单独执行 `python update_param.py --audio-doc-only` 不要求开启自动导出，但必须启用独立源。
+
+`param_config/audio_data.xlsx` 是两列映射加六个中文维度的普通表格。源文件中的工作表接管相应音频类型，旧参数源不得保留同类型数据。命名、冲突规则和导出结构见[音频资料说明](audio-data.md)。
 
 ## Agent 差分文档
 

@@ -107,7 +107,7 @@ class ProjectScopeMixin:
         """Merge base data with the project data selected for one workbook."""
         project_key = self._match_project_for_excel(excel_file)
         if project_key is None:
-            return base_validation_data
+            return self._with_audio_validation(base_validation_data)
 
         if project_key not in project_cache:
             project_file = (
@@ -124,6 +124,7 @@ class ProjectScopeMixin:
 
         project_data = project_cache[project_key]
         if not project_data:
-            return base_validation_data
+            return self._with_audio_validation(base_validation_data, project_key)
         logger.info(f"为 {excel_file.name} 合并项目 '{project_key}' 的定制参数")
-        return self._merge_validation_data([base_validation_data, project_data])
+        merged = self._merge_validation_data([base_validation_data, project_data])
+        return self._with_audio_validation(merged, project_key)

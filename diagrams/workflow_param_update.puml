@@ -18,6 +18,18 @@ note right
   (renpy/naninovel)
 end note
 
+if (audio_data.enabled?) then (是)
+  :选择通用或项目 audio_data，单项目专用优先;
+  :多项目按普通参数规则合并通用和项目记录;
+  :校验必填映射并保留扩展资料;
+  :检查已接管类型是否仍有旧音频参数;
+  if (校验通过?) then (是)
+  else (否)
+    :报错并停止，不回退;
+    stop
+  endif
+endif
+
 partition "阶段1: 基础参数映射" {
   :读取 param_data_{engine}.xlsx;
 
@@ -43,6 +55,7 @@ partition "阶段1: 基础参数映射" {
     repeat while (还有工作表?) is (是)
     ->否;
 
+    :接入已验证的独立音频映射;
     :生成 param_mappings.py;
     note right
       变量名: PARAM_MAPPINGS
@@ -96,6 +109,16 @@ partition "阶段2: 差分参数映射" {
     :跳过差分参数处理;
   endif
 }
+
+if (audio_doc_export.enabled?) then (是)
+  :按项目和类型生成 audio_doc.json;
+  note right
+    支持 --audio-doc-only 单独导出
+    描述与逐项依据不推导选曲结论
+  end note
+endif
+
+:按工作簿项目同步参数候选;
 
 :输出完成信息;
 

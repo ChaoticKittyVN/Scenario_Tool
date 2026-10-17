@@ -110,6 +110,31 @@ class VariantAgentExportConfig:
 
 
 @dataclass
+class AudioDataConfig:
+    """独立音频资料源配置。"""
+
+    enabled: bool = False
+
+    def __post_init__(self):
+        if not isinstance(self.enabled, bool):
+            raise ValueError("audio_data.enabled 必须是布尔值")
+
+
+@dataclass
+class AudioDocExportConfig:
+    """从独立音频源生成音频资料 JSON。"""
+
+    enabled: bool = False
+    output_file: str = "audio_doc.json"
+
+    def __post_init__(self):
+        if not isinstance(self.enabled, bool):
+            raise ValueError("audio_doc_export.enabled 必须是布尔值")
+        if not isinstance(self.output_file, str) or not self.output_file.strip():
+            raise ValueError("audio_doc_export.output_file 必须是非空路径")
+
+
+@dataclass
 class EngineDiscoveryConfig:
     """控制项目允许使用的可选引擎。空列表表示使用全部已安装引擎。"""
 
@@ -219,6 +244,10 @@ class AppConfig:
     variant_agent_export: VariantAgentExportConfig = field(
         default_factory=VariantAgentExportConfig
     )
+    audio_data: AudioDataConfig = field(default_factory=AudioDataConfig)
+    audio_doc_export: AudioDocExportConfig = field(
+        default_factory=AudioDocExportConfig
+    )
     projects: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -272,6 +301,14 @@ class AppConfig:
             )
         )
         projects_data = data.get('projects', {}) or {}
+        audio_data_values = data.get('audio_data', {})
+        audio_export_values = data.get('audio_doc_export', {})
+        if not isinstance(audio_data_values, dict):
+            raise ValueError("audio_data 配置必须是映射")
+        if not isinstance(audio_export_values, dict):
+            raise ValueError("audio_doc_export 配置必须是映射")
+        audio_data = AudioDataConfig(**audio_data_values)
+        audio_doc_export = AudioDocExportConfig(**audio_export_values)
         if not isinstance(projects_data, dict):
             raise ValueError("projects 配置必须是项目键到文件名识别文本的映射")
         projects = {str(key): str(value) for key, value in projects_data.items()}
@@ -306,6 +343,8 @@ class AppConfig:
             engines=engines,
             resources=resources,
             variant_agent_export=variant_agent_export,
+            audio_data=audio_data,
+            audio_doc_export=audio_doc_export,
             projects=projects,
         )
 
@@ -350,6 +389,11 @@ class AppConfig:
                 'sheet_profiles': self.variant_agent_export.sheet_profiles,
             },
             'projects': self.projects,
+            'audio_data': {'enabled': self.audio_data.enabled},
+            'audio_doc_export': {
+                'enabled': self.audio_doc_export.enabled,
+                'output_file': self.audio_doc_export.output_file,
+            },
         }
 
         # 将引擎配置的所有字段添加到engine字典中

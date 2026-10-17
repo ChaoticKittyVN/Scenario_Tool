@@ -98,7 +98,7 @@ scenario_tool/
 ```mermaid
 graph LR
     A[在input文件夹中放入需要的演出表格] --> B
-    B[编辑 param_config 中的 param_data 与可选 variant_data] --> C
+    B[编辑 param_data、可选 variant_data 和已启用的 audio_data] --> C
     C[执行update_param] --> D
     D[在演出表格中确认数据验证后进行演出参数填写] --> E
     E[执行generate_scenario] --> F
@@ -110,6 +110,12 @@ graph LR
 ## 🧰 附加功能
 
 除基础的演出脚本生成外，项目还提供以下可直接执行的 Python 工具。所有命令均应在项目根目录运行。
+
+### 独立音频资料
+
+`param_config/audio_data.xlsx` 提供 Music / Ambience / Sound 三张无格式工作表，每张仅有两列映射和六个中文维度。显式启用 `audio_data` 后，统一映射及参数候选由 `update_param.py` 更新；音频资料可用 `--audio-doc-only` 导出，自动导出开关为 `audio_doc_export`。旧项目默认沿用 `param_data`。
+
+可直接填写或复制该空白表。文件选择、冲突规则和使用方法见[音频资料说明](docs/markdown/audio-data.md)。
 
 ### 自动整理 Index
 
