@@ -185,6 +185,8 @@ class MainWindow(QMainWindow):
 
         # 浏览按钮
         self.ui.scenario_input_btn.clicked.connect(self._browse_input_dir)
+        self.ui.scenario_workbook_btn.clicked.connect(self._browse_scenario_workbook)
+        self.ui.scenario_clear_workbook_btn.clicked.connect(self._clear_scenario_workbook)
         self.ui.scenario_output_btn.clicked.connect(self._browse_output_dir)
 
         # 按钮
@@ -288,6 +290,7 @@ class MainWindow(QMainWindow):
                 break
 
         self.ui.scenario_input_edit.setText(str(self.config.paths.input_dir))
+        self._clear_scenario_workbook()
         self.ui.scenario_output_edit.setText(str(self.config.paths.output_dir))
         self.ui.scenario_ignore_check.setChecked(self.config.processing.ignore_mode)
         self.ui.scenario_ignore_edit.setEnabled(self.config.processing.ignore_mode)
@@ -298,6 +301,40 @@ class MainWindow(QMainWindow):
         dir_path = QFileDialog.getExistingDirectory(self, "选择输入目录", self.ui.scenario_input_edit.text())
         if dir_path:
             self.ui.scenario_input_edit.setText(dir_path)
+
+    def _browse_scenario_workbook(self):
+        """Choose one workbook and populate its worksheet list."""
+        current = self.ui.scenario_workbook_edit.text()
+        start_dir = str(Path(current).parent) if current else self.ui.scenario_input_edit.text()
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择工作簿",
+            start_dir,
+            "Excel 工作簿 (*.xlsx *.xls)",
+        )
+        if not file_path:
+            return
+
+        try:
+            from core.excel_management import ExcelFileManager
+
+            sheet_names = ExcelFileManager().get_sheet_names(Path(file_path))
+        except Exception as exc:
+            QMessageBox.critical(self, "读取工作簿失败", str(exc))
+            return
+
+        self.ui.scenario_workbook_edit.setText(file_path)
+        self.ui.scenario_sheet_combo.clear()
+        self.ui.scenario_sheet_combo.addItem("全部工作表", None)
+        for sheet_name in sheet_names:
+            self.ui.scenario_sheet_combo.addItem(sheet_name, sheet_name)
+        self.ui.scenario_sheet_combo.setEnabled(True)
+
+    def _clear_scenario_workbook(self):
+        self.ui.scenario_workbook_edit.clear()
+        self.ui.scenario_sheet_combo.clear()
+        self.ui.scenario_sheet_combo.addItem("全部工作表", None)
+        self.ui.scenario_sheet_combo.setEnabled(False)
 
     def _browse_output_dir(self):
         """浏览输出目录"""
@@ -337,7 +374,13 @@ class MainWindow(QMainWindow):
         self.ui.scenario_generate_btn.setEnabled(False)
 
         # 使用临时配置开始生成
-        self.scenario_controller.generate_scripts(temp_config)
+        workbook_path = self.ui.scenario_workbook_edit.text().strip() or None
+        sheet_name = self.ui.scenario_sheet_combo.currentData() if workbook_path else None
+        self.scenario_controller.generate_scripts(
+            temp_config,
+            workbook_path=Path(workbook_path) if workbook_path else None,
+            sheet_name=sheet_name,
+        )
 
     def _on_scenario_progress(self, message: str):
         """脚本生成进度更新"""

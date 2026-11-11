@@ -1,5 +1,6 @@
 """Generate complete engine scenarios from configured Excel workbooks."""
 
+import argparse
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -139,21 +140,38 @@ def process_excel_file(file_path: Path, config: AppConfig, processor, translator
 def generate_scenarios(
     config: AppConfig,
     progress_callback: Optional[Callable[[str], None]] = None,
+    workbook_path: Optional[Path] = None,
+    sheet_name: Optional[str] = None,
 ) -> GenerationSummary:
     """Run the complete generation workflow shared by CLI and GUI."""
-    return ScenarioGenerationService(config).generate_all(progress_callback)
+    return ScenarioGenerationService(config).generate_all(
+        progress_callback,
+        workbook_path=workbook_path,
+        sheet_name=sheet_name,
+    )
 
 
-def main() -> int:
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description="Generate scripts from scenario workbooks")
+    parser.add_argument("--config", type=Path, default=Path("config.yaml"))
+    parser.add_argument("--workbook", type=Path, help="只导出指定工作簿")
+    parser.add_argument("--sheet", help="只导出指定工作表（需同时指定 --workbook）")
+    args = parser.parse_args(argv)
+    if args.sheet and not args.workbook:
+        parser.error("--sheet 需要同时指定 --workbook")
     try:
-        config_path = Path("config.yaml")
+        config_path = args.config
         if config_path.exists():
             logger.info(f"从配置文件加载: {config_path}")
             config = AppConfig.from_file(config_path)
         else:
             logger.info("使用默认配置")
             config = AppConfig.create_default("naninovel")
-        summary = generate_scenarios(config)
+        summary = generate_scenarios(
+            config,
+            workbook_path=args.workbook,
+            sheet_name=args.sheet,
+        )
         return 0 if summary.success else 1
     except Exception as exc:
         logger.critical(f"程序执行失败: {exc}", exc_info=True)

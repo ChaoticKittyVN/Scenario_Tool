@@ -226,6 +226,7 @@ class ScenarioGenerationService:
         sheet: str,
         dataframe: pd.DataFrame,
         excel_outputs: Optional[dict[str, list[Any]]],
+        output_dir: Optional[Path] = None,
     ) -> bool:
         if sheet == SheetName.PARAM_SHEET.value:
             logger.debug(f"跳过参数表: {sheet}")
@@ -244,23 +245,30 @@ class ScenarioGenerationService:
         for character_name, count in statistics.by_speaker.items():
             logger.info(f"  说话者 '{character_name}' 字数: {count}")
 
-        self.config.paths.output_dir.mkdir(parents=True, exist_ok=True)
+        target_output_dir = output_dir or self.config.paths.output_dir
+        target_output_dir.mkdir(parents=True, exist_ok=True)
         if is_excel_output(self.config.engine):
             if commands and excel_outputs is not None:
                 excel_outputs[sheet] = commands
             return True
 
-        output_path = self.config.paths.output_dir / self.config.engine.get_output_filename(sheet)
+        output_path = target_output_dir / self.config.engine.get_output_filename(sheet)
         return self.write_output(commands, output_path, OutputFormat.TEXT)
 
     def generate_workbook(
         self,
         file_path: Path,
         runtime: GenerationRuntime,
+        sheet_name: Optional[str] = None,
+        output_dir: Optional[Path] = None,
     ) -> bool:
         try:
             logger.info(f"开始处理文件: {file_path.name}")
             excel_data = self.load_workbook(file_path)
+            if sheet_name is not None:
+                if sheet_name not in excel_data:
+                    raise ExcelDataError(f"工作表不存在: {sheet_name} ({file_path.name})")
+                excel_data = {sheet_name: excel_data[sheet_name]}
             excel_outputs: Optional[dict[str, list[Any]]] = (
                 {} if is_excel_output(self.config.engine) else None
             )
@@ -271,12 +279,13 @@ class ScenarioGenerationService:
                     sheet,
                     dataframe,
                     excel_outputs,
+                    output_dir,
                 )
 
             if is_excel_output(self.config.engine):
                 if excel_outputs:
                     output_path = (
-                        self.config.paths.output_dir
+                        (output_dir or self.config.paths.output_dir)
                         / f"{file_path.stem}_输出脚本.xlsx"
                     )
                     return self.write_output(
@@ -295,19 +304,30 @@ class ScenarioGenerationService:
     def generate_all(
         self,
         progress_callback: Optional[Callable[[str], None]] = None,
+        workbook_path: Optional[Path] = None,
+        sheet_name: Optional[str] = None,
     ) -> GenerationSummary:
         def progress(message: str) -> None:
             if progress_callback:
                 progress_callback(message)
 
         input_dir = Path(self.config.paths.input_dir)
-        if not input_dir.exists():
+        if workbook_path is not None:
+            selected_workbook = Path(workbook_path).expanduser()
+            if (
+                not selected_workbook.is_file()
+                or selected_workbook.suffix.lower() not in (".xlsx", ".xls")
+            ):
+                message = f"指定的工作簿不存在或格式不支持: {selected_workbook}"
+                logger.error(message)
+                return GenerationSummary(error=message)
+            excel_files = [selected_workbook]
+        elif not input_dir.exists():
             message = f"输入路径不存在: {input_dir}"
             logger.error(message)
             return GenerationSummary(error=message)
-
-        self.config.paths.ensure_dirs_exist()
-        excel_files = self.discover_workbooks()
+        else:
+            excel_files = self.discover_workbooks()
         if not excel_files:
             message = f"在 {input_dir} 中没有找到Excel文件"
             logger.warning(message)
@@ -319,11 +339,21 @@ class ScenarioGenerationService:
         progress(f"准备生成 {len(excel_files)} 个文件")
 
         # Preserve the existing production behavior: one processor per batch.
+        self.config.paths.ensure_dirs_exist()
         runtime = self.create_runtime()
         for index, excel_file in enumerate(excel_files, 1):
+            target_output_dir = self.config.paths.output_dir
+            if workbook_path is not None:
+                target_output_dir = target_output_dir / "指定导出" / excel_file.stem
+                target_output_dir.mkdir(parents=True, exist_ok=True)
             progress(f"[{index}/{len(excel_files)}] 处理 {excel_file.name}")
             try:
-                self.generate_workbook(excel_file, runtime)
+                self.generate_workbook(
+                    excel_file,
+                    runtime,
+                    sheet_name=sheet_name,
+                    output_dir=target_output_dir,
+                )
                 summary.succeeded_files += 1
             except (ExcelFileNotFoundError, ExcelFormatError) as exc:
                 summary.failed_files += 1
